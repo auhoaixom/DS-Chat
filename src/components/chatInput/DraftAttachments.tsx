@@ -49,7 +49,7 @@ const AttachmentItem = ({
   onRemove: () => void
 }) => {
   const t = useTranslate()
-  const { image, url, link } = useFileView(item.file, item.file.name)
+  const { image, url, open } = useFileView(item.file, item.file.name)
   const task = useUploads((state) => state.tasks[item.id] ?? UPLOADING)
   const status = task.status
   const error = task.status === 'error' ? t(task.error.key, task.error.params) : undefined
@@ -65,7 +65,17 @@ const AttachmentItem = ({
       className={clsx(styles.attachment, failed && styles.attachmentFailed)}
       title={error ?? item.file.name}
     >
-      {link && status === 'done' ? <a {...link}>{preview}</a> : preview}
+      {open && status === 'done' ? (
+        <button
+          type="button"
+          style={{ border: 'none', padding: 0, background: 'none' }}
+          onClick={open}
+        >
+          {preview}
+        </button>
+      ) : (
+        preview
+      )}
       {status === 'uploading' ? <div className={styles.uploading} /> : null}
       {failed && retry ? (
         <Tooltip content={retryLabel}>
@@ -94,7 +104,7 @@ const AttachmentItem = ({
       name={item.file.name}
       size={item.file.size}
       status={status}
-      link={link}
+      onOpen={open}
       error={error}
       onRetry={retry}
       onRemove={onRemove}

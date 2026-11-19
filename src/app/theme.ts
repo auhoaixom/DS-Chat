@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { StatusBar, Style } from '@capacitor/status-bar'
 import { useSettings, type ThemePreference } from '../services/settings.js'
 
 export type Theme = 'light' | 'dark'
@@ -22,13 +24,41 @@ export const useTheme = (): Theme => {
   return resolveTheme(preference, osTheme)
 }
 
+let appliedTheme: Theme | null = null
+
+/** rgb()/rgba() 转 #rrggbb，原生状态栏只接受十六进制 */
+const toHex = (color: string): string | null => {
+  const parts = color.match(/\d+/g)
+  if (!parts || parts.length < 3) {
+    return null
+  }
+  const [red, green, blue] = parts.map(Number)
+  return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+/** 原生容器里同步状态栏背景色与图标明暗；浏览器中跳过 */
+const syncStatusBar = (theme: Theme, backgroundColor: string) => {
+  if (!Capacitor.isNativePlatform()) {
+    return
+  }
+  const color = toHex(backgroundColor)
+  if (color) {
+    void StatusBar.setBackgroundColor({ color }).catch(() => {})
+  }
+  // Dark 表示深色背景配浅色图标，与页面主题一致
+  void StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light }).catch(() => {})
+}
+
 const syncPageBackground = () => {
   const backgroundColor = getComputedStyle(document.body).backgroundColor
   document.documentElement.style.backgroundColor = backgroundColor
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', backgroundColor)
+  if (appliedTheme) {
+    syncStatusBar(appliedTheme, backgroundColor)
+  }
 }
 
-/** 同步页面主题、根画布背景和支持 theme-color 的浏览器栏。 */
+/** 同步页面主题、根画布背景、浏览器栏与原生状态栏。 */
 const applyTheme = (theme: Theme) => {
   const body = document.body
   // 主题切换帧禁用过渡，使页面颜色同步更新
@@ -49,8 +79,6 @@ const applyTheme = (theme: Theme) => {
     body.classList.remove('change-theme')
   }, 0)
 }
-
-let appliedTheme: Theme | null = null
 
 const syncTheme = () => {
   const theme = resolveTheme(useSettings.getState().themePreference, getOsTheme())

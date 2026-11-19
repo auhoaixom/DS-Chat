@@ -34,7 +34,7 @@ export const MessageFile = ({
   onRetry: (() => void) | null
 }) => {
   const t = useTranslate()
-  const { image, url, link } = useFileView(file.id, file.name)
+  const { image, url, open } = useFileView(file.id, file.name)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const upload = useUploadState(file)
   const uploading = upload?.status === 'uploading'
@@ -112,11 +112,17 @@ export const MessageFile = ({
       )
     }
 
-    // 正常态：链接到原件
-    return link ? (
-      <a className={clsx(styles.image, styles.imageThumb)} {...link} title={file.name}>
+    // 正常态：点击在应用内放大预览
+    return open ? (
+      <button
+        type="button"
+        className={clsx(styles.image, styles.imageThumb)}
+        style={{ border: 'none', padding: 0, background: 'none' }}
+        title={file.name}
+        onClick={open}
+      >
         {preview}
-      </a>
+      </button>
     ) : (
       // 原件还没加载出来（极短暂）
       <div className={styles.image} />
@@ -130,7 +136,7 @@ export const MessageFile = ({
       status={uploading ? 'uploading' : failed ? 'error' : 'done'}
       error={errorText}
       onRetry={retry ?? undefined}
-      link={link}
+      onOpen={open}
     />
   )
 }

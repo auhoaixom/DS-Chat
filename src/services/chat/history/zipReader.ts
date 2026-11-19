@@ -16,6 +16,24 @@ const invalid = (): never => {
   throw new ArchiveError()
 }
 
+/**
+ * 归档数据源。整包一次性读入内存后按偏移切片。
+ * 安卓 WebView 的 content:// 文件每次 slice().arrayBuffer() 都要重新打开一次，
+ * 逐个条目读取会产生几百次打开操作（实测每次数十毫秒），导入因此长时间无响应。
+ */
+type ByteSource = {
+  size: number
+  read(start: number, length: number): Uint8Array
+}
+
+const sourceOf = async (file: File): Promise<ByteSource> => {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  return {
+    size: bytes.length,
+    read: (start, length) => bytes.subarray(start, start + length),
+  }
+}
+
 /** 本地文件头签名 PK\x03\x04，用于在解析前区分 ZIP 与其他文件。 */
 export const isZipFile = async (file: File) => {
   const bytes = new Uint8Array(await file.slice(0, 4).arrayBuffer())
@@ -32,11 +50,11 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
   return crc >>> 0
 })
 
-const readBytes = async (file: File, start: number, length: number) => {
-  if (start < 0 || length < 0 || start + length > file.size) {
+const readBytes = (source: ByteSource, start: number, length: number) => {
+  if (start < 0 || length < 0 || start + length > source.size) {
     invalid()
   }
-  const bytes = new Uint8Array(await file.slice(start, start + length).arrayBuffer())
+  const bytes = source.read(start, length)
   if (bytes.length !== length) {
     invalid()
   }
@@ -85,12 +103,13 @@ type Entry = {
   offset: number
 }
 
-const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: number }> => {
-  if (file.size < 22) {
+const readDirectory = (source: ByteSource): { entries: Entry[]; offset: number } => {
+  const { size: fileSize } = source
+  if (fileSize < 22) {
     invalid()
   }
-  const tailStart = Math.max(0, file.size - 22 - 0xffff)
-  const tail = await readBytes(file, tailStart, file.size - tailStart)
+  const tailStart = Math.max(0, fileSize - 22 - 0xffff)
+  const tail = readBytes(source, tailStart, fileSize - tailStart)
   const tailView = viewOf(tail)
   let end = tail.length - 22
   while (
@@ -124,7 +143,7 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
     if (cursor + 46 > size) {
       invalid()
     }
-    const view = viewOf(await readBytes(file, offset + cursor, 46))
+    const view = viewOf(readBytes(source, offset + cursor, 46))
     if (view.getUint32(0, true) !== 0x02014b50) {
       invalid()
     }
@@ -150,7 +169,7 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
     ) {
       invalid()
     }
-    const name = await readBytes(file, offset + cursor + 46, nameLength)
+    const name = readBytes(source, offset + cursor + 46, nameLength).slice()
     const path = decodePath(name, flags)
     // 目录和同名文件也不能互相覆盖。
     const identity = path.endsWith('/') ? path.slice(0, -1) : path
@@ -158,7 +177,7 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
       invalid()
     }
     paths.add(identity)
-    checkExtra(await readBytes(file, offset + cursor + 46 + nameLength, extraLength))
+    checkExtra(readBytes(source, offset + cursor + 46 + nameLength, extraLength))
     entries.push({
       path,
       name,
@@ -177,11 +196,11 @@ const readDirectory = async (file: File): Promise<{ entries: Entry[]; offset: nu
   return { entries: entries.sort((a, b) => a.offset - b.offset), offset }
 }
 
-const readEntryOffset = async (file: File, entry: Entry, boundary: number) => {
+const readEntryOffset = (source: ByteSource, entry: Entry, boundary: number) => {
   if (entry.offset + 30 > boundary) {
     invalid()
   }
-  const view = viewOf(await readBytes(file, entry.offset, 30))
+  const view = viewOf(readBytes(source, entry.offset, 30))
   const nameLength = view.getUint16(26, true)
   const extraLength = view.getUint16(28, true)
   const start = entry.offset + 30 + nameLength + extraLength
@@ -205,7 +224,7 @@ const readEntryOffset = async (file: File, entry: Entry, boundary: number) => {
       invalid()
     }
   }
-  const metadata = await readBytes(file, entry.offset + 30, nameLength + extraLength)
+  const metadata = readBytes(source, entry.offset + 30, nameLength + extraLength)
   if (entry.name.some((byte, index) => byte !== metadata[index])) {
     invalid()
   }
@@ -214,7 +233,7 @@ const readEntryOffset = async (file: File, entry: Entry, boundary: number) => {
     if (end + 12 > boundary) {
       invalid()
     }
-    const descriptor = viewOf(await readBytes(file, end, Math.min(16, boundary - end)))
+    const descriptor = viewOf(readBytes(source, end, Math.min(16, boundary - end)))
     const shift = descriptor.getUint32(0, true) === 0x08074b50 ? 4 : 0
     if (
       shift + 12 > descriptor.byteLength ||
@@ -237,12 +256,14 @@ export type ArchiveEntry = {
 /**
  * 按条目在文件中的物理顺序逐条、逐块解压，跳过目录条目。
  * 调用方必须消费完当前条目的数据，再请求下一个条目。
+ * 整包只读取一次，解析过程完全在内存中进行。
  */
 export async function* readArchive(file: File): AsyncGenerator<ArchiveEntry> {
-  const directory = await readDirectory(file)
+  const source = await sourceOf(file)
+  const directory = readDirectory(source)
   for (const [index, entry] of directory.entries.entries()) {
     const boundary = directory.entries[index + 1]?.offset ?? directory.offset
-    const start = await readEntryOffset(file, entry, boundary)
+    const start = readEntryOffset(source, entry, boundary)
     if (entry.path.endsWith('/')) {
       continue
     }
@@ -265,8 +286,8 @@ export async function* readArchive(file: File): AsyncGenerator<ArchiveEntry> {
       }
       const inflate = entry.method === 8 ? new Inflate(append) : null
       for (let offset = 0; offset < entry.compressedSize; offset += READ_CHUNK_BYTES) {
-        const chunk = await readBytes(
-          file,
+        const chunk = readBytes(
+          source,
           start + offset,
           Math.min(READ_CHUNK_BYTES, entry.compressedSize - offset)
         )
@@ -300,9 +321,9 @@ export async function* readArchive(file: File): AsyncGenerator<ArchiveEntry> {
 
 /** 读出整个条目：会话 JSON 需要完整解析，图片需要识别类型后整张保存。 */
 export const readEntry = async (entry: ArchiveEntry): Promise<Blob> => {
-  const parts: Blob[] = []
+  const parts: BlobPart[] = []
   for await (const chunk of entry.stream) {
-    parts.push(new Blob([chunk as Uint8Array<ArrayBuffer>]))
+    parts.push(chunk as Uint8Array<ArrayBuffer>)
   }
   return new Blob(parts)
 }

@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import type { AnchorHTMLAttributes, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { formatSize, getExtension } from '../../services/attachments.js'
 import { IconCloseFill14, IconRefreshOutline16 } from '../base/icons.js'
@@ -10,6 +10,7 @@ import styles from './FileCard.module.css'
  * 文档文件卡片：图标 + 文件名 + 「扩展名 大小」或状态文案。
  * 输入框内失败时描边和说明标红；可重试时显示刷新图标，不可重试时常显红色删除按钮。
  * 消息里的不可重试文件保留普通边框和状态说明。
+ * 打开动作由 onOpen 提供：原生容器里由调用方转成系统分享，而不是浏览器链接。
  */
 export const FileCard = ({
   name,
@@ -18,7 +19,7 @@ export const FileCard = ({
   error,
   onRetry,
   onRemove,
-  link,
+  onOpen,
 }: {
   name: string
   size: number
@@ -26,7 +27,7 @@ export const FileCard = ({
   error?: string
   onRetry?: () => void
   onRemove?: () => void
-  link?: AnchorHTMLAttributes<HTMLAnchorElement>
+  onOpen?: () => void
 }) => {
   const t = useTranslate()
   const ext = getExtension(name)
@@ -43,14 +44,14 @@ export const FileCard = ({
     description = error ?? t('uploadFileStatusFailed')
   }
   const onClick = status === 'error' ? onRetry : undefined
-  const fileLink = status === 'done' ? link : undefined
+  const open = status === 'done' ? onOpen : undefined
   return (
     <div
       className={clsx(
         styles.card,
         onRemove && styles.editable,
         status === 'error' && (onRemove || onRetry) && styles.failed,
-        (onClick || fileLink) && styles.clickable
+        (onClick || open) && styles.clickable
       )}
       title={
         status === 'error'
@@ -66,7 +67,9 @@ export const FileCard = ({
         <div className={styles.caption}>{name}</div>
         <div className={styles.subCaption}>{description}</div>
       </div>
-      {fileLink && <a {...fileLink} aria-label={name} />}
+      {open ? (
+        <button type="button" className={styles.overlay} aria-label={name} onClick={open} />
+      ) : null}
       {onRemove ? (
         <button
           type="button"

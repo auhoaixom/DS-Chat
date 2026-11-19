@@ -5,7 +5,6 @@ import { useIsMobile } from '../../app/viewport.js'
 import { IconEditOutline16 } from '../base/icons.js'
 import { getFileViewType, isImage } from '../../services/attachments.js'
 import { editMessage, retryUpload } from '../../services/chat/store.js'
-import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { UserMessage as UserMessageType } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
@@ -56,7 +55,6 @@ export const UserMessage = memo(function UserMessage({
 
   const sendEdit = () => {
     if (canSend && ensureApiKey() && editMessage(sessionId, message.id, draft.trim())) {
-      stopReadAloud()
       setEditing(false)
     }
   }

@@ -1,4 +1,12 @@
-import { createElement, memo, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
+import {
+  createElement,
+  memo,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ClipboardEvent,
+  type ReactNode,
+} from 'react'
 import clsx from 'clsx'
 import type {
   BlockContent,
@@ -212,6 +220,83 @@ const MarkdownBlockContentOrDefinitionContent = memo(
   }
 )
 
+const BLOCK_TAGS = new Set([
+  'P',
+  'DIV',
+  'LI',
+  'TR',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'BLOCKQUOTE',
+  'PRE',
+  'TABLE',
+])
+
+/**
+ * 还原选区内容：KaTeX 节点换回 LaTeX 源码，块级元素末尾补换行。
+ * KaTeX 渲染后 DOM 里只剩排版结果，直接复制会把公式变成零散的视觉字符。
+ */
+const restoreSelection = (node: Node): void => {
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return
+  }
+  const element = node as HTMLElement
+  const latex = element.getAttribute('data-latex')
+  if (latex !== null) {
+    const display = element.getAttribute('data-display') === '1'
+    element.replaceWith(document.createTextNode(display ? `$$${latex}$$` : `$${latex}$`))
+    return
+  }
+  if (element.tagName === 'BR') {
+    element.replaceWith(document.createTextNode('\n'))
+    return
+  }
+  for (const child of Array.from(element.childNodes)) {
+    restoreSelection(child)
+  }
+  if (BLOCK_TAGS.has(element.tagName)) {
+    element.append('\n')
+  }
+}
+
+const containsLatex = (node: Node): boolean => {
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return false
+  }
+  const element = node as HTMLElement
+  return element.hasAttribute('data-latex') || Array.from(element.childNodes).some(containsLatex)
+}
+
+/** 选区里没有公式时放行浏览器默认行为，避免改变普通文本的复制结果。 */
+const handleCopy = (event: ClipboardEvent<HTMLDivElement>) => {
+  const selection = document.getSelection()
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    return
+  }
+  const range = selection.getRangeAt(0)
+  if (!event.currentTarget.contains(range.commonAncestorContainer)) {
+    return
+  }
+  const fragment = range.cloneContents()
+  const roots = Array.from(fragment.childNodes)
+  if (!roots.some(containsLatex)) {
+    return
+  }
+  for (const root of roots) {
+    restoreSelection(root)
+  }
+  const text = fragment.textContent
+  if (!text) {
+    return
+  }
+  event.clipboardData.setData('text/plain', text)
+  event.preventDefault()
+}
+
 export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
   ast,
   onUpdate,
@@ -234,7 +319,7 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
 
   return useMemo(
     () => (
-      <div className={clsx('ds-markdown', className)}>
+      <div className={clsx('ds-markdown', className)} onCopy={handleCopy}>
         {/* 解析器在根节点下产出块级内容。 */}
         <MarkdownBlockContentOrDefinitionContent
           nodes={ast.children as Array<BlockContent | DefinitionContent>}

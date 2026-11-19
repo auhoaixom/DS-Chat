@@ -17,13 +17,13 @@ import {
 } from '../../services/chat/backup.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
+import { shareBlob } from '../../services/exportFile.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
   isChineseBrowser,
   setLocale,
   setLocation,
   setThemePreference,
-  setTtsVoice,
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
@@ -98,7 +98,6 @@ const SettingsContent = () => {
             <>
               <ThemeSetting />
               <LocaleSetting />
-              <TtsVoiceSetting />
               <LocationSetting />
             </>
           ) : (
@@ -285,29 +284,6 @@ const LocaleSetting = () => {
             { value: 'en-US', label: t('settingsLocaleEnUS'), lang: 'en' },
           ]}
           onChange={setLocale}
-        />
-      }
-    />
-  )
-}
-
-/** 朗读音色：stella（海星，女声）/ tide（暗潮，男声） */
-const TtsVoiceSetting = () => {
-  const t = useTranslate()
-  const ttsVoice = useSettings((state) => state.ttsVoice)
-  return (
-    <SettingCell
-      label={t('settingsTtsVoice')}
-      status={null}
-      action={
-        <Select
-          ariaLabel={t('settingsTtsVoice')}
-          value={ttsVoice}
-          options={[
-            { value: 'stella', label: t('settingsTtsVoiceStella') },
-            { value: 'tide', label: t('settingsTtsVoiceTide') },
-          ]}
-          onChange={setTtsVoice}
         />
       }
     />
@@ -524,12 +500,7 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
     setStatus(null)
     try {
       const { name, blob } = await exportHistory()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = name
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      await shareBlob(blob, name)
     } catch (error) {
       setStatus(errorStatus('historyExportFailed', error))
     } finally {

@@ -4,6 +4,11 @@ English | [简体中文](README.zh-CN.md)
 
 A static chat demo powered by the DeepSeek API. No application backend is required: the browser connects directly to the configured API service.
 
+> **私有安卓改造版（DS Chat）**
+>
+> 本项目基于官方 chat-demo 改造：已移除全部语音输入与朗读功能，通过 Capacitor 打包为安卓应用。
+> 仅供个人本机使用，不分发、不上架任何应用商店。
+
 You can [try the app online](https://deepseek-ai.github.io/chat-demo/) or download the archive from [Releases](https://github.com/deepseek-ai/deepseek-chat-demo/releases), extract it, and double-click `index.html` to use it locally without installation or a build. Enter your API key in Settings before your first chat.
 
 ## Getting started

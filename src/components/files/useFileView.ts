@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getFileViewType, isImage } from '../../services/attachments.js'
 import { loadFile } from '../../services/chat/db.js'
+import { shareBlob } from '../../services/exportFile.js'
+import { showToast } from '../base/toastState.js'
+import { useFilePreview } from './filePreviewState.js'
 
 const createViewUrl = (original: Blob, type: string) => {
   const blob = original.slice(0, original.size, type || 'application/octet-stream')
@@ -16,34 +19,62 @@ const createViewUrl = (original: Blob, type: string) => {
   })
 }
 
-/** 草稿传 File，已发送的附件传 IndexedDB 原件 ID。 */
+type ViewState = {
+  source: File | string
+  type: string
+  url: string | null
+  blob: Blob | null
+}
+
+/**
+ * 草稿传 File，已发送的附件传 IndexedDB 原件 ID。
+ *
+ * 打开方式在原生容器里必须绕开浏览器语义：
+ * 图片交给应用内预览层（`_blank` 会开出没有关闭入口的窗口），
+ * 其余文件写入缓存后交给系统分享面板（`<a download>` 在 WebView 里没有接收方）。
+ */
 export const useFileView = (source: File | string, name: string) => {
   const type = getFileViewType(name)
-  const [state, setState] = useState<{ source: File | string; type: string; url: string | null }>()
+  const showPreview = useFilePreview((state) => state.open)
+  const [state, setState] = useState<ViewState>()
   useEffect(() => {
     let active = true
     const original = typeof source === 'string' ? loadFile(source) : Promise.resolve(source)
     const pending = original
-      .then((blob) => (active && blob ? createViewUrl(blob, type) : null))
+      .then(async (blob) => {
+        if (!active || !blob) {
+          return null
+        }
+        return { url: await createViewUrl(blob, type), blob }
+      })
       .catch(() => null)
-    void pending.then((url) => {
+    void pending.then((result) => {
       if (active) {
-        setState({ source, type, url })
+        setState({ source, type, url: result?.url ?? null, blob: result?.blob ?? null })
       }
     })
     return () => {
       active = false
-      void pending.then((url) => {
-        if (url?.startsWith('blob:')) {
-          URL.revokeObjectURL(url)
+      void pending.then((result) => {
+        if (result?.url.startsWith('blob:')) {
+          URL.revokeObjectURL(result.url)
         }
       })
     }
   }, [source, type])
 
-  const url = state?.source === source && state.type === type ? state.url : undefined
+  const current = state?.source === source && state.type === type ? state : undefined
+  const url = current?.url
   const image = isImage(type)
-  const openInTab = type === 'application/pdf' || (image && type !== 'image/svg+xml')
-  const action = openInTab ? { target: '_blank', rel: 'noreferrer' } : { download: name }
-  return { url, image, link: url ? { href: url, ...action } : undefined }
+  const open = !url
+    ? undefined
+    : image
+      ? () => showPreview(url, name)
+      : () => {
+          const blob = current?.blob
+          if (blob) {
+            void shareBlob(blob, name).catch(() => showToast({ key: 'fileOpenFailed' }))
+          }
+        }
+  return { url, image, open }
 }
