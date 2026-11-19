@@ -33,7 +33,7 @@ type ViewState = {
  * 图片交给应用内预览层（`_blank` 会开出没有关闭入口的窗口），
  * 其余文件写入缓存后交给系统分享面板（`<a download>` 在 WebView 里没有接收方）。
  */
-export const useFileView = (source: File | string, name: string) => {
+export const useFileView = (source: File | string, name: string, onCrop?: () => void) => {
   const type = getFileViewType(name)
   const showPreview = useFilePreview((state) => state.open)
   const [state, setState] = useState<ViewState>()
@@ -69,7 +69,7 @@ export const useFileView = (source: File | string, name: string) => {
   const open = !url
     ? undefined
     : image
-      ? () => showPreview(url, name)
+      ? () => showPreview(url, name, onCrop)
       : () => {
           const blob = current?.blob
           if (blob) {

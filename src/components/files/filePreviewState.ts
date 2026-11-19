@@ -7,13 +7,15 @@ import { create } from 'zustand'
 type FilePreviewState = {
   url: string | null
   name: string
-  open: (url: string, name: string) => void
+  /** 提供时预览层右上角显示裁剪入口；已发送的附件不提供 */
+  onCrop?: () => void
+  open: (url: string, name: string, onCrop?: () => void) => void
   close: () => void
 }
 
 export const useFilePreview = create<FilePreviewState>((set) => ({
   url: null,
   name: '',
-  open: (url, name) => set({ url, name }),
-  close: () => set({ url: null, name: '' }),
+  open: (url, name, onCrop) => set({ url, name, onCrop }),
+  close: () => set({ url: null, name: '', onCrop: undefined }),
 }))

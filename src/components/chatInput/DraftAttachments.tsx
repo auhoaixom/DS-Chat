@@ -16,10 +16,13 @@ export const DraftAttachments = memo(function DraftAttachments({
   items,
   onRetry,
   onRemove,
+  onCrop,
 }: {
   items: DraftAttachment[]
   onRetry: (id: string) => void
   onRemove: (id: string) => void
+  /** 放大预览后裁剪这张图片，结果替换原件 */
+  onCrop: (id: string) => void
 }) {
   if (items.length === 0) {
     return null
@@ -32,6 +35,7 @@ export const DraftAttachments = memo(function DraftAttachments({
           item={item}
           onRetry={() => onRetry(item.id)}
           onRemove={() => onRemove(item.id)}
+          onCrop={() => onCrop(item.id)}
         />
       ))}
     </div>
@@ -43,13 +47,15 @@ const AttachmentItem = ({
   item,
   onRetry,
   onRemove,
+  onCrop,
 }: {
   item: DraftAttachment
   onRetry: () => void
   onRemove: () => void
+  onCrop: () => void
 }) => {
   const t = useTranslate()
-  const { image, url, open } = useFileView(item.file, item.file.name)
+  const { image, url, open } = useFileView(item.file, item.file.name, onCrop)
   const task = useUploads((state) => state.tasks[item.id] ?? UPLOADING)
   const status = task.status
   const error = task.status === 'error' ? t(task.error.key, task.error.params) : undefined

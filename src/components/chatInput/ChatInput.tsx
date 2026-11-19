@@ -17,12 +17,14 @@ import {
   getDraft,
   prepareDraftMessage,
   removeDraftAttachment,
+  replaceDraftAttachment,
   retryDraftAttachment,
   setDraftText,
   useDrafts,
 } from '../../services/chat/drafts.js'
 import { capturePhoto } from '../../services/camera.js'
 import { cropImage } from '../camera/cropState.js'
+import { useFilePreview } from '../files/filePreviewState.js'
 import { ActionSheet } from '../base/ActionSheet.js'
 import { IconButton } from '../base/IconButton.js'
 import { Tooltip } from '../base/Tooltip.js'
@@ -173,6 +175,28 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     imageInputRef.current?.click()
   }
 
+  /** 放大预览后裁剪草稿附件：结果替换同一个附件并重新上传。 */
+  const cropDraft = async (id: string) => {
+    const attachment = getDraft(sessionId).attachments.find((item) => item.id === id)
+    if (!attachment) {
+      return
+    }
+    useFilePreview.getState().close()
+    const cropped = await cropImage(attachment.file)
+    if (!cropped) {
+      return
+    }
+    const error = replaceDraftAttachment(
+      sessionId,
+      id,
+      cropped,
+      useSettings.getState().apiKey ?? ''
+    )
+    if (error) {
+      showToast(error)
+    }
+  }
+
   const send = () => {
     if (
       useChatStore.getState().importingHistory ||
@@ -200,7 +224,12 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         }
       }}
     >
-      <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
+      <DraftAttachments
+        items={attachments}
+        onRetry={retryFile}
+        onRemove={removeFile}
+        onCrop={(id) => void cropDraft(id)}
+      />
       <div className={styles.textareaWrapper}>
         <textarea
           ref={textareaRef}

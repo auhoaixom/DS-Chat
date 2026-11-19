@@ -50,7 +50,7 @@
   justify-content: center;
   flex: 1;
   min-height: 0;
-  padding: 0 44px;
+  padding: 0 32px;
   overflow: hidden;
 }
 
@@ -67,8 +67,8 @@
   display: block;
   width: auto;
   height: auto;
-  max-width: calc(100vw - 88px);
-  max-height: calc(100vh - 260px);
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 240px);
 }
 
 /* 阴影充当裁剪框外的遮罩，比四块 div 更省事且不会漏缝 */

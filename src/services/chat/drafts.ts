@@ -92,6 +92,39 @@ export const retryDraftAttachment = (
   }
 }
 
+/**
+ * 裁剪后替换草稿里的原件：沿用同一个附件 id，取消旧上传并用新文件重新上传，
+ * 这样草稿里的顺序和位置不变，上传状态也能跟着刷新。
+ */
+export const replaceDraftAttachment = (
+  sessionId: string | null,
+  attachmentId: string,
+  file: File,
+  apiKey: string
+): TranslationMessage | null => {
+  const attachment = getDraft(sessionId).attachments.find((item) => item.id === attachmentId)
+  if (!attachment) {
+    return null
+  }
+  // 只校验文件本身（大小、格式），数量不增加
+  const error = validateFiles([file], 0)
+  if (error) {
+    return error
+  }
+  cancelUpload(attachment.id)
+  const next: DraftAttachment = {
+    ...attachment,
+    file,
+    isImage: isImage(resolveMimeType(file)),
+  }
+  updateDraft(sessionId, (draft) => ({
+    ...draft,
+    attachments: draft.attachments.map((item) => (item.id === attachmentId ? next : item)),
+  }))
+  upload(next, apiKey)
+  return null
+}
+
 /** 发送按钮和实际提交共用规则：有内容，且全部附件已上传成功。 */
 export const prepareDraftMessage = (draft: Draft, tasks: Record<string, UploadTask>) => {
   const text = draft.text.trim()

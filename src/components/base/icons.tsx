@@ -522,6 +522,18 @@ export const IconCameraOutline16 = () => (
   </svg>
 )
 
+/** 裁剪：四角标记，用于图片预览层的裁剪入口 */
+export const IconCropOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M2.8 6V3.6a.8.8 0 0 1 .8-.8H6M10 2.8h2.4a.8.8 0 0 1 .8.8V6M13.2 10v2.4a.8.8 0 0 1-.8.8H10M6 13.2H3.6a.8.8 0 0 1-.8-.8V10"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 /** 错误提示图标：圆环 + 感叹号，颜色跟随 currentColor */
 export const IconToastError16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
