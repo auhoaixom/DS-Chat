@@ -118,12 +118,22 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     setSheetOpen(true)
   }
 
-  /** 拍照结果并入同一份草稿附件，走现有的校验与上传链路。 */
+  /**
+   * 拍照并裁剪，结果并入同一份草稿附件。
+   * 裁剪页点「取消」只放弃这张照片、重新回到相机，不退出整个拍照流程；
+   * 只有在系统相机里直接返回才会真正结束。
+   */
   const takePhoto = async () => {
     setSheetOpen(false)
-    try {
-      const result = await capturePhoto()
-      // null 表示用户取消，静默返回
+    for (;;) {
+      let result: Awaited<ReturnType<typeof capturePhoto>>
+      try {
+        result = await capturePhoto()
+      } catch {
+        showToast({ key: 'cameraFailed' })
+        return
+      }
+      // null 表示在系统相机里取消，结束流程
       if (!result) {
         return
       }
@@ -138,17 +148,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         })
         return
       }
-      // 拍完先裁剪：裁剪框没动过时直接用原图
+      // 裁剪框没动过时直接用原图；取消则回到相机重拍
       const cropped = await cropImage(result.file)
       if (!cropped) {
-        return
+        continue
       }
       const error = addDraftFiles(sessionId, [cropped], useSettings.getState().apiKey ?? '')
       if (error) {
         showToast(error)
       }
-    } catch {
-      showToast({ key: 'cameraFailed' })
+      return
     }
   }
 

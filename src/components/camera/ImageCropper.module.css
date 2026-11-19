@@ -88,16 +88,16 @@
   height: 52px;
   touch-action: none;
 
-  /* 视觉上是 14px 的白点，触摸热区留到 52px，手指不容易点空 */
+  /* 视觉上是 10px 的白点，触摸热区留到 52px，手指不容易点空 */
   &::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 14px;
-    height: 14px;
-    margin: -7px 0 0 -7px;
-    border: 2px solid rgba(0, 0, 0, 0.18);
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border: 1.5px solid rgba(0, 0, 0, 0.2);
     border-radius: 50%;
     background-color: #fff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
