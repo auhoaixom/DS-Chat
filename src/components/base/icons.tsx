@@ -510,16 +510,15 @@ export const IconPhotoErrorFill20 = () => (
   </svg>
 )
 
-/** 相机：拍照 / 选图入口，描边颜色跟随 currentColor */
+/** 相机：拍照 / 选图入口。与回形针同为一组附件入口，统一采用实心填充风格 */
 export const IconCameraOutline16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
-      d="M2.4 5.6h2.2l1-1.6h4.8l1 1.6h2.2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-11.2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z"
-      stroke="currentColor"
-      strokeWidth={1.3}
-      strokeLinejoin="round"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M6.4 1.9h3.2a1 1 0 0 1 .86.5l.66 1.1h2.08A1.8 1.8 0 0 1 15 5.3v7.4a1.8 1.8 0 0 1-1.8 1.8H2.8A1.8 1.8 0 0 1 1 12.7V5.3a1.8 1.8 0 0 1 1.8-1.8h2.08l.66-1.1a1 1 0 0 1 .86-.5ZM8 5.9a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Zm0 1.4a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6Z"
+      fill="currentColor"
     />
-    <circle cx="8" cy="8.6" r="2.1" stroke="currentColor" strokeWidth={1.3} />
   </svg>
 )
 

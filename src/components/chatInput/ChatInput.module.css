@@ -152,11 +152,19 @@
   background-color: var(--dsw-alias-button-contrast-fill);
   filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.2));
   cursor: pointer;
-  opacity: 0;
+  /* 常显：触屏没有 hover，隐藏起来的删除按钮等于不存在 */
+  opacity: 1;
   transition: opacity var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  /* 视觉仍是 18px，热区扩到 34px，方便手指点中 */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
 }
 
-/* 不可重试时删除按钮常显，提示需要先删除 */
+/* 不可重试时删除按钮换成错误色，提示需要先删除 */
 .invalidRemove {
   opacity: 1;
   color: var(--dsw-alias-label-primary-foreground);

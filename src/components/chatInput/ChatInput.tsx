@@ -230,6 +230,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         <div className={styles.right}>
           <IconButton
             size="m"
+            tone="primary"
             icon={<IconCameraOutline16 />}
             tooltip={t('attachPhoto')}
             disabled={importingHistory || picking}

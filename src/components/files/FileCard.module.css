@@ -126,8 +126,16 @@
   color: var(--dsw-alias-label-primary-inverted);
   background-color: var(--dsw-alias-button-contrast-fill);
   cursor: pointer;
-  opacity: 0;
+  /* 常显：触屏没有 hover，隐藏起来的删除按钮等于不存在 */
+  opacity: 1;
   transition: opacity 0.2s ease-in-out;
+
+  /* 视觉仍是 18px，热区扩到 34px，方便手指点中 */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
 }
 
 .invalidRemove {
