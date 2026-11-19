@@ -21,7 +21,8 @@ import {
   setDraftText,
   useDrafts,
 } from '../../services/chat/drafts.js'
-import { pickPhoto } from '../../services/camera.js'
+import { capturePhoto } from '../../services/camera.js'
+import { ActionSheet } from '../base/ActionSheet.js'
 import { IconButton } from '../base/IconButton.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -51,8 +52,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
-  const [picking, setPicking] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
 
@@ -103,14 +105,23 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   // 排队、上传中或上传失败的附件都留在输入框，全部上传成功后才能发送
   const canSend = !importingHistory && !streaming && draftReady
 
-  /** 拍照或从相册选图，结果并入同一份草稿附件，走现有的校验与上传链路。 */
-  const openCamera = async () => {
-    if (importingHistory || picking || !ensureApiKey()) {
+  /**
+   * 打开来源选择面板；实际取图在 choosePhotoSource 里做。
+   * 不做 picking 防重入：相机被系统返回键关闭时 Capacitor 的回调可能不返回，
+   * picking 会一直停在 true，那样会永久挡住这个入口。面板本身已经挡住重复点击。
+   */
+  const openCamera = () => {
+    if (importingHistory || !ensureApiKey()) {
       return
     }
-    setPicking(true)
+    setSheetOpen(true)
+  }
+
+  /** 拍照结果并入同一份草稿附件，走现有的校验与上传链路。 */
+  const takePhoto = async () => {
+    setSheetOpen(false)
     try {
-      const result = await pickPhoto()
+      const result = await capturePhoto()
       // null 表示用户取消，静默返回
       if (!result) {
         return
@@ -130,9 +141,21 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       if (error) {
         showToast(error)
       }
-    } finally {
-      setPicking(false)
+    } catch {
+      showToast({ key: 'cameraFailed' })
     }
+  }
+
+  /**
+   * 相册走 WebView 原生的 file input：
+   * 不需要相册读取权限，系统会给出「照片/文件」来源选择，并且支持多选。
+   */
+  const openImagePicker = () => {
+    setSheetOpen(false)
+    if (!ensureApiKey()) {
+      return
+    }
+    imageInputRef.current?.click()
   }
 
   const send = () => {
@@ -233,7 +256,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             tone="primary"
             icon={<IconCameraOutline16 />}
             tooltip={t('attachPhoto')}
-            disabled={importingHistory || picking}
+            disabled={importingHistory}
             onClick={() => void openCamera()}
           />
           <IconButton
@@ -250,6 +273,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             multiple
             hidden
             accept={ACCEPT}
+            onChange={(event) => {
+              acceptFiles(Array.from(event.target.files ?? []))
+              event.target.value = ''
+            }}
+          />
+          <input
+            ref={imageInputRef}
+            type="file"
+            multiple
+            hidden
+            accept="image/*"
             onChange={(event) => {
               acceptFiles(Array.from(event.target.files ?? []))
               event.target.value = ''
@@ -280,6 +314,22 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         </div>
       </div>
       {dragging ? <DragMask /> : null}
+      <ActionSheet
+        open={sheetOpen}
+        title={t('attachPhoto')}
+        items={[
+          { key: 'camera', label: t('cameraPromptTake') },
+          { key: 'photos', label: t('cameraPromptLibrary') },
+        ]}
+        onSelect={(key) => {
+          if (key === 'camera') {
+            void takePhoto()
+          } else {
+            openImagePicker()
+          }
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
     </div>
   )
 }
