@@ -162,7 +162,7 @@ export const en = {
   cameraFailed: 'Unable to open the camera. Please try again later.',
   cropTitle: 'Crop',
   cropDone: 'Done',
-  cropHint: 'Drag the corners to resize, drag inside to move',
+  cropHint: 'Drag the edges or corners to resize, drag inside to move',
   dragFileToUpload: 'Drop files here to upload',
   dragFileDesc: 'Up to {count} files, {size} MB each',
   apiKeyInvalidRetry: 'Invalid API Key. Please change it and try again.',

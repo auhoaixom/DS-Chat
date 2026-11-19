@@ -154,7 +154,7 @@ export const zh = {
   cameraFailed: '无法打开相机，请稍后再试',
   cropTitle: '裁剪',
   cropDone: '完成',
-  cropHint: '拖动四角调整范围，拖动框内可整体移动',
+  cropHint: '拖动边或角调整范围，拖动框内可整体移动',
   dragFileToUpload: '文件拖动到此处即可上传',
   dragFileDesc: '最多 {count} 个，每个 {size}MB',
   apiKeyInvalidRetry: 'API Key 无效，请更换后重试',

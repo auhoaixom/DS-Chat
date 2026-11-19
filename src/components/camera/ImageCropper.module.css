@@ -81,22 +81,24 @@
 
 .handle {
   position: absolute;
-  width: 36px;
-  height: 36px;
+  z-index: 2;
+  width: 52px;
+  height: 52px;
   touch-action: none;
 
-  /* 视觉上是 12px 的白点，触摸热区留足 36px */
+  /* 视觉上是 18px 的白点，触摸热区留到 52px，手指不容易点空 */
   &::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 12px;
-    height: 12px;
-    margin: -6px 0 0 -6px;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid rgba(0, 0, 0, 0.18);
     border-radius: 50%;
     background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
   }
 
   &[data-corner='nw'] {
@@ -125,6 +127,51 @@
     bottom: 0;
     transform: translate(50%, 50%);
     cursor: nwse-resize;
+  }
+}
+
+/* 四条边：跨在边框上，外半边可能被舞台裁掉，内半边仍可命中 */
+.edge {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.001);
+  }
+
+  &[data-edge='n'] {
+    top: -16px;
+    right: 26px;
+    left: 26px;
+    height: 32px;
+    cursor: ns-resize;
+  }
+
+  &[data-edge='s'] {
+    right: 26px;
+    bottom: -16px;
+    left: 26px;
+    height: 32px;
+    cursor: ns-resize;
+  }
+
+  &[data-edge='w'] {
+    top: 26px;
+    bottom: 26px;
+    left: -16px;
+    width: 32px;
+    cursor: ew-resize;
+  }
+
+  &[data-edge='e'] {
+    top: 26px;
+    right: -16px;
+    bottom: 26px;
+    width: 32px;
+    cursor: ew-resize;
   }
 }
 

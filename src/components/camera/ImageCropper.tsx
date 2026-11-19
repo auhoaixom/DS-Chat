@@ -9,7 +9,8 @@ import { finishCrop, useCropRequest } from './cropState.js'
 import styles from './ImageCropper.module.css'
 
 type Rect = { x: number; y: number; w: number; h: number }
-type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se'
+/** 四角调整两条边，四边只调整一条，move 为整体平移 */
+type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e'
 
 type Drag = {
   mode: DragMode
@@ -190,6 +191,14 @@ export const ImageCropper = () => {
             }}
             onPointerDown={beginDrag('move')}
           >
+            {(['n', 's', 'w', 'e'] as const).map((edge) => (
+              <span
+                key={edge}
+                className={styles.edge}
+                data-edge={edge}
+                onPointerDown={beginDrag(edge)}
+              />
+            ))}
             {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
               <span
                 key={corner}
