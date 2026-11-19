@@ -1,6 +1,7 @@
 import clsx from 'clsx'
-import { memo, useCallback, useLayoutEffect, useRef } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import {
+  IconCameraOutline16,
   IconGlobeLanguageOutline14,
   IconPaperclipOutline16,
   IconSendOutline16,
@@ -20,6 +21,7 @@ import {
   setDraftText,
   useDrafts,
 } from '../../services/chat/drafts.js'
+import { pickPhoto } from '../../services/camera.js'
 import { IconButton } from '../base/IconButton.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -49,6 +51,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const [picking, setPicking] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -99,6 +102,38 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
 
   // 排队、上传中或上传失败的附件都留在输入框，全部上传成功后才能发送
   const canSend = !importingHistory && !streaming && draftReady
+
+  /** 拍照或从相册选图，结果并入同一份草稿附件，走现有的校验与上传链路。 */
+  const openCamera = async () => {
+    if (importingHistory || picking || !ensureApiKey()) {
+      return
+    }
+    setPicking(true)
+    try {
+      const result = await pickPhoto()
+      // null 表示用户取消，静默返回
+      if (!result) {
+        return
+      }
+      if ('error' in result) {
+        showToast({
+          key:
+            result.error === 'denied'
+              ? 'cameraPermissionDenied'
+              : result.error === 'unsupported'
+                ? 'uploadUnsupportedFormat'
+                : 'cameraFailed',
+        })
+        return
+      }
+      const error = addDraftFiles(sessionId, [result.file], useSettings.getState().apiKey ?? '')
+      if (error) {
+        showToast(error)
+      }
+    } finally {
+      setPicking(false)
+    }
+  }
 
   const send = () => {
     if (
@@ -193,6 +228,13 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           </Tooltip>
         </div>
         <div className={styles.right}>
+          <IconButton
+            size="m"
+            icon={<IconCameraOutline16 />}
+            tooltip={t('attachPhoto')}
+            disabled={importingHistory || picking}
+            onClick={() => void openCamera()}
+          />
           <IconButton
             size="m"
             tone="primary"

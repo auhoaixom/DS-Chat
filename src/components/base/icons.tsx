@@ -510,6 +510,19 @@ export const IconPhotoErrorFill20 = () => (
   </svg>
 )
 
+/** 相机：拍照 / 选图入口，描边颜色跟随 currentColor */
+export const IconCameraOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M2.4 5.6h2.2l1-1.6h4.8l1 1.6h2.2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-11.2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Z"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinejoin="round"
+    />
+    <circle cx="8" cy="8.6" r="2.1" stroke="currentColor" strokeWidth={1.3} />
+  </svg>
+)
+
 /** 错误提示图标：圆环 + 感叹号，颜色跟随 currentColor */
 export const IconToastError16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
