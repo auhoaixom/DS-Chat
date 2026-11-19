@@ -16,6 +16,7 @@ import { SessionView } from '../components/session/SessionView.js'
 import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
 import { ensureApiKey } from '../components/settings/settingsDialogState.js'
+import { ImageCropper } from '../components/camera/ImageCropper.js'
 import { FilePreview } from '../components/files/FilePreview.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
 import { Toast } from '../components/base/Toast.js'
@@ -135,6 +136,7 @@ export const App = () => {
       </div>
       <SettingsDialog />
       <FilePreview />
+      <ImageCropper />
       <Toast />
     </>
   )

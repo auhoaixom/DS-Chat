@@ -22,6 +22,7 @@ import {
   useDrafts,
 } from '../../services/chat/drafts.js'
 import { capturePhoto } from '../../services/camera.js'
+import { cropImage } from '../camera/cropState.js'
 import { ActionSheet } from '../base/ActionSheet.js'
 import { IconButton } from '../base/IconButton.js'
 import { Tooltip } from '../base/Tooltip.js'
@@ -137,7 +138,12 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         })
         return
       }
-      const error = addDraftFiles(sessionId, [result.file], useSettings.getState().apiKey ?? '')
+      // 拍完先裁剪：裁剪框没动过时直接用原图
+      const cropped = await cropImage(result.file)
+      if (!cropped) {
+        return
+      }
+      const error = addDraftFiles(sessionId, [cropped], useSettings.getState().apiKey ?? '')
       if (error) {
         showToast(error)
       }

@@ -1,0 +1,136 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  background-color: #000;
+  touch-action: none;
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+}
+
+.title {
+  flex: 1;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.headerButton {
+  flex-shrink: 0;
+  min-width: 56px;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 15px;
+  cursor: pointer;
+
+  &:active {
+    opacity: 0.6;
+  }
+}
+
+.stageWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px;
+  overflow: hidden;
+}
+
+/* 尺寸由图片自身决定，裁剪框的百分比坐标因此与图片像素一一对应 */
+.stage {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 220px);
+}
+
+/* 阴影充当裁剪框外的遮罩，比四块 div 更省事且不会漏缝 */
+.frame {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-sizing: border-box;
+  cursor: move;
+  touch-action: none;
+}
+
+.handle {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  touch-action: none;
+
+  /* 视觉上是 12px 的白点，触摸热区留足 36px */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border-radius: 50%;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
+  &[data-corner='nw'] {
+    top: 0;
+    left: 0;
+    transform: translate(-50%, -50%);
+    cursor: nwse-resize;
+  }
+
+  &[data-corner='ne'] {
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    cursor: nesw-resize;
+  }
+
+  &[data-corner='sw'] {
+    bottom: 0;
+    left: 0;
+    transform: translate(-50%, 50%);
+    cursor: nesw-resize;
+  }
+
+  &[data-corner='se'] {
+    right: 0;
+    bottom: 0;
+    transform: translate(50%, 50%);
+    cursor: nwse-resize;
+  }
+}
+
+.hint {
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  text-align: center;
+}

@@ -1,5 +1,6 @@
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
+import { finishCrop, isCropping } from '../components/camera/cropState.js'
 import { useFilePreview } from '../components/files/filePreviewState.js'
 import { closeSearchPanel, useSearchPanel } from '../components/search/searchPanelState.js'
 import { closeSettings, useSettingsDialog } from '../components/settings/settingsDialogState.js'
@@ -16,7 +17,12 @@ export const bindBackButton = () => {
     return () => {}
   }
   const handle = CapacitorApp.addListener('backButton', () => {
-    // 图片预览在最上层，优先关闭
+    // 裁剪界面在最上层，返回键等于取消裁剪
+    if (isCropping()) {
+      finishCrop(null)
+      return
+    }
+    // 图片预览在其次，优先关闭
     if (useFilePreview.getState().url) {
       useFilePreview.getState().close()
       return
