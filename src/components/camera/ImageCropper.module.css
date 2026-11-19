@@ -43,13 +43,14 @@
   }
 }
 
+/* 四周留出空间：裁剪框贴到图片边缘时，四角手柄仍完整落在屏幕内 */
 .stageWrap {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1;
   min-height: 0;
-  padding: 0 16px;
+  padding: 0 44px;
   overflow: hidden;
 }
 
@@ -57,7 +58,8 @@
 .stage {
   position: relative;
   display: inline-block;
-  overflow: hidden;
+  /* 手柄有一半伸到图片外，不能被舞台裁掉 */
+  overflow: visible;
   line-height: 0;
 }
 
@@ -65,8 +67,8 @@
   display: block;
   width: auto;
   height: auto;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 220px);
+  max-width: calc(100vw - 88px);
+  max-height: calc(100vh - 260px);
 }
 
 /* 阴影充当裁剪框外的遮罩，比四块 div 更省事且不会漏缝 */
@@ -86,15 +88,15 @@
   height: 52px;
   touch-action: none;
 
-  /* 视觉上是 18px 的白点，触摸热区留到 52px，手指不容易点空 */
+  /* 视觉上是 14px 的白点，触摸热区留到 52px，手指不容易点空 */
   &::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 18px;
-    height: 18px;
-    margin: -9px 0 0 -9px;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
     border: 2px solid rgba(0, 0, 0, 0.18);
     border-radius: 50%;
     background-color: #fff;

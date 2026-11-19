@@ -19,18 +19,15 @@ type Drag = {
   origin: Rect
 }
 
-/** 裁剪框相对图片的归一化坐标，四周留一点边方便拖动 */
-const DEFAULT_RECT: Rect = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }
+/** 裁剪框相对图片的归一化坐标：默认铺满整张图，也就是「不裁剪」 */
+const DEFAULT_RECT: Rect = { x: 0, y: 0, w: 1, h: 1 }
 /** 裁剪框最小边长（占图片比例） */
 const MIN_SIZE = 0.1
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
-/**
- * 判定「没实际裁剪」：默认框留了一点边方便拖手柄，
- * 只要用户没明显收窄，就直接用原图，避免无谓的重新编码。
- */
-const isFullRect = ({ x, y, w, h }: Rect) => x <= 0.06 && y <= 0.06 && w >= 0.88 && h >= 0.88
+/** 判定「没实际裁剪」：默认铺满整张图，用户没动过就直接用原图，避免无谓的重新编码 */
+const isFullRect = ({ x, y, w, h }: Rect) => x <= 0.001 && y <= 0.001 && w >= 0.999 && h >= 0.999
 
 /** 根据拖动的角或整体平移，算出新的裁剪框，并保证不出图、不小于最小尺寸。 */
 const applyDrag = (origin: Rect, mode: DragMode, dx: number, dy: number): Rect => {
