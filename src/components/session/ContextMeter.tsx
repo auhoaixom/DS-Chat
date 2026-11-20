@@ -28,7 +28,15 @@ export const ContextMeter = ({ session }: { session: Session }) => {
   const run = useChatStore((state) => state.compacting[session.id])
   const { anchorRef, floatingRef, position } = useAnchoredPosition<HTMLSpanElement, HTMLDivElement>(
     open,
-    { side: 'bottom', align: 'end', offset: 6, maxHeight: 460 }
+    {
+      side: 'bottom',
+      align: 'end',
+      offset: 6,
+      maxHeight: 460,
+      // 压缩开始/进入下一段时面板会换成进度布局，比空闲时高；
+      // 不给这个标识，面板会沿用空闲时量出的高度，把底部的「停止」挤到边框上
+      measureKey: run ? `${run.phase}:${run.done}/${run.total}` : 'idle',
+    }
   )
   useDismiss(open, [anchorRef, floatingRef], () => setOpen(false))
 

@@ -225,7 +225,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 进度态只有一个操作，和空闲态一样占满整行，否则会缩成左侧一颗小按钮 */
 .progress .actionButton {
-  flex: none;
+  align-self: stretch;
   margin-top: 6px;
 }
