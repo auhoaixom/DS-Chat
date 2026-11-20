@@ -80,8 +80,20 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 20px;
+  /**
+   * 面板只负责「块与块之间」的距离，块内部的距离归各块自己。
+   * 这样再加一个块、再多一种状态，都落在同一条节奏上，不用再逐个挑数字。
+   */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* 明细区：标题、总量、占比条、分项本来就是一摞，内部间距仍由各自定义 */
+.summary {
+  display: block;
 }
 
 .head {
@@ -186,7 +198,7 @@
 }
 
 .hint {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
@@ -194,15 +206,20 @@
 
 .divider {
   height: 1px;
-  margin: 12px 0;
+  margin: 0;
   background-color: var(--dsw-alias-border-l2);
+}
+
+/* 说明和按钮是一组：到分割线的距离由面板的 gap 给，两者之间由这里的 gap 给 */
+.actionsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .actions {
   display: flex;
   gap: 8px;
-  /* 提示只有上边距，这里补上下边距，否则小字会贴着按钮 */
-  margin-top: 8px;
 }
 
 .actionButton {

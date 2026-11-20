@@ -103,47 +103,50 @@ export const ContextMeter = ({ session }: { session: Session }) => {
               role="dialog"
               aria-label={t('contextTitle')}
             >
-              <div className={styles.head}>
-                <span className={styles.headline}>{t('contextUsed')}</span>
-                <span className={styles.headPercent}>{percentLabel}</span>
-              </div>
-              <div className={styles.figures}>
-                {formatTokens(usage.used)} / {formatTokens(usage.window)}
-              </div>
-              <div className={styles.bar}>
-                <span
-                  className={clsx(styles.segment, styles.segmentMessages)}
-                  style={{
-                    flexGrow: Math.max(0, usage.messageTokens),
-                  }}
-                />
-                <span
-                  className={clsx(styles.segment, styles.segmentSystem)}
-                  style={{ flexGrow: Math.max(0, usage.systemTokens) }}
-                />
-              </div>
-              <dl className={styles.rows}>
-                <div className={styles.row}>
-                  <dt className={styles.swatchMessages}>{t('contextMessages')}</dt>
-                  <dd>{formatTokens(usage.messageTokens)}</dd>
+              {/* 明细区自成一摞，内部间距归这些块自己；面板只负责块与块之间 */}
+              <div className={styles.summary}>
+                <div className={styles.head}>
+                  <span className={styles.headline}>{t('contextUsed')}</span>
+                  <span className={styles.headPercent}>{percentLabel}</span>
                 </div>
-                <div className={styles.row}>
-                  <dt className={styles.swatchSystem}>{t('contextSystem')}</dt>
-                  <dd>{formatTokens(usage.systemTokens)}</dd>
+                <div className={styles.figures}>
+                  {formatTokens(usage.used)} / {formatTokens(usage.window)}
                 </div>
-                {cache ? (
-                  <div
-                    className={styles.row}
-                    title={t('contextCacheHitAria', {
-                      percent: `${cache.percent}%`,
-                      count: cache.requests,
-                    })}
-                  >
-                    <dt className={styles.swatchCache}>{t('contextCacheHit')}</dt>
-                    <dd>{`${cache.percent}%`}</dd>
+                <div className={styles.bar}>
+                  <span
+                    className={clsx(styles.segment, styles.segmentMessages)}
+                    style={{
+                      flexGrow: Math.max(0, usage.messageTokens),
+                    }}
+                  />
+                  <span
+                    className={clsx(styles.segment, styles.segmentSystem)}
+                    style={{ flexGrow: Math.max(0, usage.systemTokens) }}
+                  />
+                </div>
+                <dl className={styles.rows}>
+                  <div className={styles.row}>
+                    <dt className={styles.swatchMessages}>{t('contextMessages')}</dt>
+                    <dd>{formatTokens(usage.messageTokens)}</dd>
                   </div>
-                ) : null}
-              </dl>
+                  <div className={styles.row}>
+                    <dt className={styles.swatchSystem}>{t('contextSystem')}</dt>
+                    <dd>{formatTokens(usage.systemTokens)}</dd>
+                  </div>
+                  {cache ? (
+                    <div
+                      className={styles.row}
+                      title={t('contextCacheHitAria', {
+                        percent: `${cache.percent}%`,
+                        count: cache.requests,
+                      })}
+                    >
+                      <dt className={styles.swatchCache}>{t('contextCacheHit')}</dt>
+                      <dd>{`${cache.percent}%`}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </div>
 
               <div className={styles.divider} />
 
@@ -169,7 +172,7 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                   ) : null}
                 </div>
               ) : (
-                <>
+                <div className={styles.actionsBlock}>
                   <p className={styles.hint}>{t('contextCompactHint')}</p>
                   <div className={styles.actions}>
                     <Button
@@ -191,7 +194,7 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                       </Button>
                     ) : null}
                   </div>
-                </>
+                </div>
               )}
             </div>,
             document.body
