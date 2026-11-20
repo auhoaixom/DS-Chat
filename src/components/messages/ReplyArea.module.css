@@ -191,6 +191,8 @@
 }
 
 .query {
+  /* flex 子项默认不肯缩到内容宽度以下，长搜索词会把整行撑出容器 */
+  min-width: 0;
   margin-left: 6px;
   overflow: hidden;
   white-space: nowrap;
@@ -235,6 +237,7 @@
 .page {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   max-width: 100%;
   margin-right: 6px;
   white-space: nowrap;

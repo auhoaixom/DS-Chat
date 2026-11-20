@@ -1,6 +1,9 @@
 .ds-markdown {
   font: var(--dsw-font-markdown-base);
   color: var(--dsw-alias-label-primary);
+  /* 长串（无空格的长单词、长路径、长标识符）必须在容器内断开，
+     否则会撑出可横向拖动的空白页面 */
+  overflow-wrap: anywhere;
 }
 
 .ds-markdown strong {
@@ -193,6 +196,9 @@
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
+  /* inline-flex 的元素默认按内容宽度排布，超长行内代码会把整行撑出容器 */
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-code);
   font-family: var(--ds-font-family-code);
   font-size: 0.875em !important;
@@ -227,6 +233,13 @@
   overflow-y: hidden;
   max-width: 100%;
   padding: 4px;
+}
+
+/** 渲染失败时退回的源码文本 */
+.ds-markdown-math-raw {
+  font-family: var(--ds-font-family-code);
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .ds-markdown > * .ds-markdown-math {

@@ -23,6 +23,13 @@ declare module 'mdast' {
   }
 }
 
+declare module 'mdast-util-math' {
+  /** 行内公式的原始定界符：`$$…$$` 与 `$…$` 的渲染与复制都不一样 */
+  interface InlineMath {
+    mathSource?: 'dollar2' | 'dollar1' | 'paren'
+  }
+}
+
 const text = (value: string): Text => ({ type: 'text', value })
 
 /**
@@ -64,6 +71,19 @@ export function toMdAst(
       ;(node as Parent).children = node.children.flatMap(simplify) as RootContent[]
     }
     switch (node.type) {
+      case 'inlineMath': {
+        const source = raw(node)
+        // 价格「$5 … $10」这类文本也会被当成行内公式：没有命令的中文按原文输出
+        if (/[\u4e00-\u9fff]/.test(node.value) && !node.value.includes('\\')) {
+          return [text(source)]
+        }
+        node.mathSource = source.startsWith('$$')
+          ? 'dollar2'
+          : source.startsWith('\\(')
+            ? 'paren'
+            : 'dollar1'
+        return [node]
+      }
       case 'link':
         return disableLink ? node.children : [node]
       case 'delete': {

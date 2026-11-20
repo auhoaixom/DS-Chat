@@ -4,6 +4,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* 任何横向溢出都不应该变成可拖动的空白页 */
+  overflow-x: hidden;
   scrollbar-gutter: stable both-edges;
   scrollbar-color: var(--scroll-color) transparent;
 }
@@ -24,6 +26,7 @@
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior-y: contain;
     scrollbar-color: var(--scroll-color) transparent;
   }

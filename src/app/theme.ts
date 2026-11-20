@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { useSettings, type ThemePreference } from '../services/settings.js'
+import { setSystemStatusBar } from '../services/systemBar.js'
 
 export type Theme = 'light' | 'dark'
 
@@ -41,12 +42,16 @@ const syncStatusBar = (theme: Theme, backgroundColor: string) => {
   if (!Capacitor.isNativePlatform()) {
     return
   }
+  const lightIcons = theme === 'dark'
   const color = toHex(backgroundColor)
   if (color) {
-    void StatusBar.setBackgroundColor({ color }).catch(() => {})
+    // 自带插件在 Android 16 上不会改底色，改用自建原生通道；失败时退回插件
+    void setSystemStatusBar(color, lightIcons).catch(() => {
+      void StatusBar.setBackgroundColor({ color }).catch(() => {})
+    })
   }
   // Dark 表示深色背景配浅色图标，与页面主题一致
-  void StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light }).catch(() => {})
+  void StatusBar.setStyle({ style: lightIcons ? Style.Dark : Style.Light }).catch(() => {})
 }
 
 const syncPageBackground = () => {

@@ -116,7 +116,7 @@ const MarkdownPhrasingContentItem = memo(function MarkdownPhrasingContentItem({
 }) {
   switch (node.type) {
     case 'inlineMath':
-      return <InlineMath value={node.value} />
+      return <InlineMath value={node.value} source={node.mathSource ?? 'dollar1'} />
     case 'break':
       return <br />
     case 'emphasis':
