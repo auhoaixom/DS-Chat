@@ -38,6 +38,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- 拍照：仅用于把照片加入对话附件，不写入系统相册。相册选择走 file input，不需要读取权限 -->
+    <!-- 拍照：仅用于把照片加入对话附件，不写入系统相册 -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 附件面板的「最近照片」：只在用户主动允许后读取相册缩略图 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 </manifest>

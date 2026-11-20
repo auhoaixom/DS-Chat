@@ -28,6 +28,7 @@ import { openInAppCamera } from '../camera/inAppCameraState.js'
 import { useFilePreview } from '../files/filePreviewState.js'
 import { AttachPanel, type AttachSource } from './AttachPanel.js'
 import { closeAttachPanel, toggleAttachPanel, useAttachPanelOpen } from './attachPanelState.js'
+import { loadRecentPhoto, type RecentPhotoItem } from '../../services/recentPhotos.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 import { DragMask, useFileDrop } from './DragMask.js'
@@ -166,6 +167,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     } else {
       openFilePicker()
     }
+  }
+
+  /** 最近照片条里点一张：取原图直接入草稿，面板保持打开方便连选 */
+  const pickRecentPhoto = async (photo: RecentPhotoItem) => {
+    const file = await loadRecentPhoto(photo.id)
+    if (!file) {
+      showToast({ key: 'photoLoadFailed' })
+      return
+    }
+    acceptFiles([file])
   }
 
   /**
@@ -441,7 +452,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       </div>
       {dragging ? <DragMask /> : null}
       </div>
-      {panelOpen ? <AttachPanel onPick={pickAttachment} /> : null}
+      {panelOpen ? (
+        <AttachPanel onPick={pickAttachment} onPickPhoto={(photo) => void pickRecentPhoto(photo)} />
+      ) : null}
     </>
   )
 }
