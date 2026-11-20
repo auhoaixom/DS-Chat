@@ -1,19 +1,32 @@
 import clsx from 'clsx'
 import { useTranslate } from '../../i18n/index.js'
 import { IconToastError16 } from './icons.js'
-import { useToast } from './toastState.js'
+import { hideToast, useToast } from './toastState.js'
 import styles from './Toast.module.css'
 
 export const Toast = () => {
   const t = useTranslate()
-  const { id, message } = useToast()
+  const { id, message, action } = useToast()
   if (!message) {
     return null
   }
+  const actionButton = action ? (
+    <button
+      type="button"
+      className={styles.action}
+      onClick={() => {
+        action.onClick()
+        hideToast()
+      }}
+    >
+      {t(action.key)}
+    </button>
+  ) : null
   if (typeof message === 'string') {
     return (
       <div key={id} className={styles.toast} role="status">
         {message}
+        {actionButton}
       </div>
     )
   }
@@ -33,6 +46,7 @@ export const Toast = () => {
           </a>
         ) : null}
       </span>
+      {actionButton}
     </div>
   )
 }

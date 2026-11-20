@@ -71,12 +71,10 @@ const AttachmentItem = ({
       className={clsx(styles.attachment, failed && styles.attachmentFailed)}
       title={error ?? item.file.name}
     >
-      {open && status === 'done' ? (
-        <button
-          type="button"
-          style={{ border: 'none', padding: 0, background: 'none' }}
-          onClick={open}
-        >
+      {/* 缩略图整块都是「打开预览」的可点区域：
+          上传过程中也不留出不可点的空白，否则浏览器会把点击吸附到右上角的删除按钮 */}
+      {open ? (
+        <button type="button" className={styles.attachmentButton} onClick={open}>
           {preview}
         </button>
       ) : (

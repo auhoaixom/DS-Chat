@@ -18,6 +18,7 @@ import {
   prepareDraftMessage,
   removeDraftAttachment,
   replaceDraftAttachment,
+  restoreDraftAttachment,
   retryDraftAttachment,
   setDraftText,
   useDrafts,
@@ -98,9 +99,28 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   )
   const removeFile = useCallback(
     (id: string) => {
-      if (!useChatStore.getState().importingHistory) {
-        removeDraftAttachment(sessionId, id)
+      if (useChatStore.getState().importingHistory) {
+        return
       }
+      const removed = removeDraftAttachment(sessionId, id)
+      if (!removed) {
+        return
+      }
+      // 缩略图右上角的删除热区很容易被拇指蹭到：给一次后悔的机会
+      showToast(
+        { key: 'attachmentRemoved' },
+        {
+          key: 'undo',
+          onClick: () => {
+            restoreDraftAttachment(
+              sessionId,
+              removed.attachment,
+              removed.index,
+              useSettings.getState().apiKey ?? ''
+            )
+          },
+        }
+      )
     },
     [sessionId]
   )

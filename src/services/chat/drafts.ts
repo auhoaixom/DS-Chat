@@ -150,16 +150,38 @@ export const prepareDraftMessage = (draft: Draft, tasks: Record<string, UploadTa
   return { text, files }
 }
 
-export const removeDraftAttachment = (sessionId: string | null, attachmentId: string) => {
-  const attachment = getDraft(sessionId).attachments.find((item) => item.id === attachmentId)
-  if (!attachment) {
-    return
+/** 删除附件；返回被删的附件与所在位置，便于「撤销」时原样放回 */
+export const removeDraftAttachment = (
+  sessionId: string | null,
+  attachmentId: string
+): { attachment: DraftAttachment; index: number } | null => {
+  const draft = getDraft(sessionId)
+  const index = draft.attachments.findIndex((item) => item.id === attachmentId)
+  if (index < 0) {
+    return null
   }
+  const attachment = draft.attachments[index]
   cancelUpload(attachment.id)
-  updateDraft(sessionId, (draft) => ({
-    ...draft,
-    attachments: draft.attachments.filter((item) => item.id !== attachmentId),
+  updateDraft(sessionId, (state) => ({
+    ...state,
+    attachments: state.attachments.filter((item) => item.id !== attachmentId),
   }))
+  return { attachment, index }
+}
+
+/** 撤销删除：按原来的位置放回，并重新开始上传 */
+export const restoreDraftAttachment = (
+  sessionId: string | null,
+  attachment: DraftAttachment,
+  index: number,
+  apiKey: string
+) => {
+  updateDraft(sessionId, (draft) => {
+    const attachments = [...draft.attachments]
+    attachments.splice(Math.min(index, attachments.length), 0, attachment)
+    return { ...draft, attachments }
+  })
+  upload(attachment, apiKey)
 }
 
 /** 发送成功后原件与 serverId 已交给会话，保留上传完成态。 */

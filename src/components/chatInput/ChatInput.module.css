@@ -44,8 +44,8 @@
   position: relative;
   flex-shrink: 0;
   box-sizing: border-box;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 16px;
   border: 1px solid var(--dsw-alias-border-l2);
   overflow: hidden;
@@ -63,9 +63,22 @@
   }
 }
 
+/* 整块缩略图即「打开预览」按钮：可点区域铺满，点击不会被吸附到删除按钮上 */
+.attachmentButton {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
 .uploading {
   position: absolute;
   inset: 0;
+  /* 只做视觉蒙层，不拦截点击：否则整块变成不可点区域 */
+  pointer-events: none;
   background-color: rgba(0, 0, 0, 0.3);
 
   &::after {
@@ -143,8 +156,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -156,11 +169,11 @@
   opacity: 1;
   transition: opacity var(--ds-transition-duration) var(--ds-ease-in-out);
 
-  /* 视觉仍是 18px，热区扩到 34px，方便手指点中 */
+  /* 视觉 22px，热区 34px；外扩只留 6px，避免热区吃掉缩略图靠近中心的位置 */
   &::after {
     content: '';
     position: absolute;
-    inset: -8px;
+    inset: -6px;
   }
 }
 
