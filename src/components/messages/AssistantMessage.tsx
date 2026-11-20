@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
-import { continueReply, regenerateReply } from '../../services/chat/store.js'
+import { continueReply, regenerateReply, useChatStore } from '../../services/chat/store.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { IconButton } from '../base/IconButton.js'
@@ -53,6 +53,8 @@ export const AssistantMessage = memo(function AssistantMessage({
     .join('\n\n')
   const copyText = responseText || notice?.text
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
+  // 自动压缩发生在请求发出前：这时把等待动画换成实际在做的事
+  const compactingRun = useChatStore((state) => state.compacting[sessionId])
   const summaryEntry = `${message.id}-summary`
   return (
     <div className={styles.message}>
@@ -76,9 +78,18 @@ export const AssistantMessage = memo(function AssistantMessage({
       ) : null}
       {waiting ? (
         <div className={styles.waiting}>
-          {[0, 1, 2].map((index) => (
-            <span key={index} className={styles.waitingDot} />
-          ))}
+          {compactingRun ? (
+            <>
+              {[0, 1, 2].map((index) => (
+                <span key={index} className={styles.waitingDot} />
+              ))}
+              <span className={styles.compactingLabel}>
+                {`${t('compactionRunning')} ${t('compactionProgressChars', { count: compactingRun.chars })}`}
+              </span>
+            </>
+          ) : (
+            [0, 1, 2].map((index) => <span key={index} className={styles.waitingDot} />)
+          )}
         </div>
       ) : null}
       {notice?.presentation === 'response' ? (

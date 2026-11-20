@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useIsMobile } from '../../app/viewport.js'
-import {
-  buildMessageVersions,
-  getVisibleMessages,
-  type MessageVersions,
-} from '../../services/chat/branches.js'
+import { buildMessageVersions, getVisibleMessages, type MessageVersions } from '../../services/chat/branches.js'
+import { getCoveredCount } from '../../services/chat/compaction.js'
 import { selectMessageVersion } from '../../services/chat/store.js'
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
+import { CompactionCard } from './CompactionCard.js'
 import { ScrollToBottomContext } from './scrollContext.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
@@ -48,7 +46,10 @@ export const MessageList = ({
   const stickyRef = useRef(true)
   const scrollTopRef = useRef(0)
   const restoreScrollRef = useRef<{ messageId: string; top: number } | null>(null)
-  const messages = getVisibleMessages(session)
+  const visible = getVisibleMessages(session)
+  // 已经压进摘要的早期消息不再渲染，顶部改用一张压缩卡片表示
+  const covered = getCoveredCount(visible, session.compaction)
+  const messages = covered > 0 ? visible.slice(covered) : visible
   const [previousVersions, setPreviousVersions] = useState(() =>
     buildMessageVersions(session, new Map())
   )
@@ -146,6 +147,7 @@ export const MessageList = ({
       <div ref={isMobile ? undefined : scrollRef} className={styles.container}>
         <div ref={isMobile ? scrollRef : undefined} className={styles.scroll}>
           <div ref={contentRef} className={styles.column}>
+            <CompactionCard sessionId={session.id} compaction={session.compaction} />
             {messages.map((message, index) =>
               message.role === 'user' ? (
                 <UserMessage

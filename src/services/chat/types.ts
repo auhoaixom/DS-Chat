@@ -105,6 +105,24 @@ export type AssistantMessage = MessageBranch & {
 
 export type Message = UserMessage | AssistantMessage
 
+/**
+ * 上下文压缩：当前分支开头的一段消息不再进入请求，改用这份摘要代替。
+ * 原始消息仍然保存在会话里，撤销这条记录即可完全恢复。
+ */
+export type Compaction = {
+  /** 摘要正文（Markdown），作为请求的系统信息附加在对话之前 */
+  summary: string
+  /** 被摘要覆盖的消息 ID，按原顺序；请求里只有它们形成的开头连续前缀会被替换 */
+  coveredIds: string[]
+  createdAt: number
+  /** manual：用户点按；auto：发送前按阈值或超限时自动触发 */
+  mode: 'manual' | 'auto'
+  /** 压缩前后的提示侧 token 估算，用于展示省下的量 */
+  beforeTokens: number
+  afterTokens: number
+  model: string | null
+}
+
 export type Session = {
   id: string
   title: string
@@ -114,6 +132,8 @@ export type Session = {
   messages: Message[]
   /** undefined 表示线性消息列表；null 表示空会话。 */
   rootMessageId?: string | null
+  /** 当前的上下文压缩；缺省表示没有压缩过 */
+  compaction?: Compaction
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */

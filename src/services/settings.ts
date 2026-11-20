@@ -15,7 +15,13 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
+  /** 上下文窗口大小，用于判断何时自动压缩上下文 */
+  contextWindow: number
 }
+
+/** 上下文窗口的可选值：接口不返回窗口长度，只能自己选一个偏保守的值 */
+export const CONTEXT_WINDOW_OPTIONS = [64_000, 128_000, 256_000, 512_000] as const
+export const DEFAULT_CONTEXT_WINDOW = 128_000
 
 const KEYS = {
   apiKey: 'chat-demo:api-key',
@@ -25,6 +31,7 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  contextWindow: 'chat-demo:context-window',
 } as const
 
 const read = (key: string) => {
@@ -81,6 +88,11 @@ const initialThemePreference = (): ThemePreference => {
   return saved === 'light' || saved === 'dark' ? saved : 'system'
 }
 
+const initialContextWindow = (): number => {
+  const saved = Number(read(KEYS.contextWindow))
+  return Number.isFinite(saved) && saved >= 1_000 ? saved : DEFAULT_CONTEXT_WINDOW
+}
+
 export const useSettings = create<Settings>(() => ({
   apiKey: read(KEYS.apiKey),
   locale: initialLocale(),
@@ -89,6 +101,7 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
+  contextWindow: initialContextWindow(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -125,4 +138,9 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setContextWindow = (contextWindow: number) => {
+  write(KEYS.contextWindow, String(contextWindow))
+  useSettings.setState({ contextWindow })
 }

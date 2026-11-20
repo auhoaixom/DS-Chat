@@ -46,6 +46,14 @@
   }
 }
 
+.compactingLabel {
+  margin-left: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 .notice {
   display: flex;
   align-items: flex-start;

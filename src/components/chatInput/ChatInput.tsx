@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
+  IconCompressOutline14,
   IconGlobeLanguageOutline14,
   IconPlusOutline16,
   IconSendOutline16,
@@ -10,6 +11,7 @@ import {
 import { setSearch, setThinking, useSettings } from '../../services/settings.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { sendMessage, stopReply, useChatStore } from '../../services/chat/store.js'
+import { openCompactionDialog } from '../messages/compactionState.js'
 import {
   addDraftFiles,
   EMPTY_DRAFT,
@@ -55,6 +57,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   )
   const thinking = useSettings((state) => state.thinking)
   const importingHistory = useChatStore((state) => state.importingHistory)
+  const compacting = useChatStore(
+    (state) => sessionId !== null && Object.hasOwn(state.compacting, sessionId)
+  )
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
   const panelOpen = useAttachPanelOpen()
@@ -391,6 +396,24 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               <span className={styles.toggleLabel}>{t('search')}</span>
             </button>
           </Tooltip>
+          {/* 手动压缩：把早期消息换成摘要；发送前也会按阈值自动触发 */}
+          {sessionId === null ? null : (
+            <Tooltip content={t('compactionTooltip')}>
+              <button
+                type="button"
+                className={clsx(styles.toggle, compacting && styles.selected)}
+                aria-label={t('compactionTitle')}
+                aria-busy={compacting}
+                disabled={importingHistory || streaming || compacting}
+                onClick={() => openCompactionDialog(sessionId)}
+              >
+                <IconCompressOutline14 />
+                <span className={styles.toggleLabel}>
+                  {t(compacting ? 'compactionRunning' : 'compactionButton')}
+                </span>
+              </button>
+            </Tooltip>
+          )}
         </div>
         <div className={styles.right}>
           <input

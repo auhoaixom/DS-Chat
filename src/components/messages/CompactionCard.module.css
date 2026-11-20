@@ -1,0 +1,144 @@
+.card {
+  margin: 10px 0 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background-color: var(--dsw-alias-bg-skeleton);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-markdown-small);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  > svg {
+    flex-shrink: 0;
+  }
+}
+
+.running .head {
+  cursor: default;
+
+  &:hover {
+    background: none;
+  }
+}
+
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--dsw-alias-brand-text);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  flex-shrink: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 160ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.pulse {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.summary {
+  padding: 4px 12px 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  :global(.ds-markdown h1),
+  :global(.ds-markdown h2),
+  :global(.ds-markdown h3) {
+    margin: 14px 0 6px;
+  }
+
+  /* 摘要放在卡片里，标题不需要正文那样的大字号 */
+  :global(.ds-markdown h1),
+  :global(.ds-markdown h2) {
+    font-size: 17px;
+    line-height: 24px;
+  }
+
+  :global(.ds-markdown h3) {
+    font-size: 15px;
+    line-height: 22px;
+  }
+
+  :global(.ds-markdown > :first-child) {
+    margin-top: 8px;
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.footnote {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.action {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--dsw-alias-brand-text);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

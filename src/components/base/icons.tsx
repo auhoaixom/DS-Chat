@@ -621,3 +621,16 @@ export const IconToastError16 = () => (
     />
   </svg>
 )
+
+/** 压缩上下文：上下两个箭头向中间收拢，中间一条横线 */
+export const IconCompressOutline14 = () => (
+  <svg width={14} height={14} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M7 2.1v3.2M5.5 3.9 7 5.4l1.5-1.5M7 11.9V8.7M5.5 10.1 7 8.6l1.5 1.5M2.8 7h8.4"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)

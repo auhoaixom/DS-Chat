@@ -20,13 +20,16 @@ import { useChatStore } from '../../services/chat/store.js'
 import { shareBlob } from '../../services/exportFile.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
+  CONTEXT_WINDOW_OPTIONS,
   isChineseBrowser,
+  setContextWindow,
   setLocale,
   setLocation,
   setThemePreference,
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
+import { formatTokens } from '../../services/chat/tokens.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
@@ -98,6 +101,7 @@ const SettingsContent = () => {
             <>
               <ThemeSetting />
               <LocaleSetting />
+              <ContextWindowSetting />
               <LocationSetting />
             </>
           ) : (
@@ -290,8 +294,31 @@ const LocaleSetting = () => {
   )
 }
 
-/** 覆盖导入的二次确认，叠在设置弹窗上 */
-const ImportConfirm = ({
+/** 上下文窗口大小：接口不返回窗口长度，用于判断何时自动压缩上下文 */
+const ContextWindowSetting = () => {
+  const t = useTranslate()
+  const contextWindow = useSettings((state) => state.contextWindow)
+  return (
+    <SettingCell
+      label={t('settingsContextWindow')}
+      description={t('settingsContextWindowHint')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsContextWindow')}
+          value={String(contextWindow)}
+          options={CONTEXT_WINDOW_OPTIONS.map((value) => ({
+            value: String(value),
+            label: formatTokens(value),
+          }))}
+          onChange={(value) => setContextWindow(Number(value))}
+        />
+      }
+    />
+  )
+}
+
+/** 覆盖导入的二次确认，叠在设置弹窗上 */const ImportConfirm = ({
   historyImport,
 }: {
   historyImport: ReturnType<typeof useHistoryImport>
