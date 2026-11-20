@@ -201,6 +201,8 @@
 .actions {
   display: flex;
   gap: 8px;
+  /* 提示只有上边距，这里补上下边距，否则小字会贴着按钮 */
+  margin-top: 8px;
 }
 
 .actionButton {
@@ -228,5 +230,6 @@
 /* 进度态只有一个操作，和空闲态一样占满整行，否则会缩成左侧一颗小按钮 */
 .progress .actionButton {
   align-self: stretch;
-  margin-top: 6px;
+  /* 与列的 gap 相加后同为 8px，切换状态时按钮上方的留白不变 */
+  margin-top: 4px;
 }
