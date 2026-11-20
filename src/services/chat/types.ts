@@ -92,6 +92,8 @@ export type AssistantMessage = MessageBranch & {
   stopDetails?: StopDetails
   /** 最近一次请求的用量，续写后更新 */
   usage?: MessageUsage
+  /** 发出这次请求时的提示侧估算（token），用于按"表面净增减"推算当前上下文占用 */
+  promptEstimate?: number
   error?: {
     /** upload：发送前补传附件失败，请求没有发出 */
     kind: ApiErrorKind | 'upload'

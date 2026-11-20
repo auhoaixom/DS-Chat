@@ -46,6 +46,13 @@ export const MessageList = ({
   const stickyRef = useRef(true)
   const scrollTopRef = useRef(0)
   const restoreScrollRef = useRef<{ messageId: string; top: number } | null>(null)
+  /** 上一次渲染时的滚动位置与内容高度，用于抵消顶部插入/移除造成的位移 */
+  const cutMetricsRef = useRef<{
+    sessionId: string
+    covered: number
+    top: number
+    height: number
+  } | null>(null)
   const visible = getVisibleMessages(session)
   // 已经压进摘要的早期消息不再渲染，顶部改用一张压缩卡片表示
   const covered = getCoveredCount(visible, session.compaction)
@@ -102,6 +109,33 @@ export const MessageList = ({
 
   useEffect(closeSearchPanel, [session.id, lastMessageId])
 
+  /**
+   * 压缩或撤销压缩会一次性在列表顶部插入/移除一大段内容。
+   * 只按滚动条位置保持的话，视口会被"顶"走（撤销时直接甩回对话开头），
+   * 所以按内容高度差把滚动位置补回来，让用户眼前的那一条消息留在原处。
+   */
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    const previous = cutMetricsRef.current
+    if (previous && previous.sessionId === session.id && previous.covered !== covered) {
+      const delta = el.scrollHeight - previous.height
+      // 本来就贴在顶部的用户想看的正是开头，这时不要把他往下推
+      if (delta !== 0 && previous.top > 0) {
+        el.scrollTop = Math.max(0, previous.top + delta)
+        scrollTopRef.current = el.scrollTop
+      }
+    }
+    cutMetricsRef.current = {
+      sessionId: session.id,
+      covered,
+      top: el.scrollTop,
+      height: el.scrollHeight,
+    }
+  }, [covered, isMobile, messages.length, session.id])
+
   const selectVersion = useCallback(
     (messageId: string, anchorTop: number) => {
       if (streaming) {
@@ -135,6 +169,12 @@ export const MessageList = ({
         stickyRef.current = false
       }
       scrollTopRef.current = el.scrollTop
+      // 顶部内容变化时要靠这份基准把视口钉住，滚动后必须跟着更新，否则会用到过期位置
+      const metrics = cutMetricsRef.current
+      if (metrics) {
+        metrics.top = el.scrollTop
+        metrics.height = el.scrollHeight
+      }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)

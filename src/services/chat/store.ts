@@ -9,12 +9,15 @@ import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } fro
 import {
   applyCompaction,
   buildCompaction,
+  estimateRequestTokens,
+  getSessionModel,
   isContextOverflowError,
   needsCompaction,
   withCompactionSummary,
   type CompactionProgress,
 } from './compaction.js'
 import * as db from './db.js'
+import { estimateTokens } from './tokens.js'
 import {
   clearAllDrafts,
   clearDraft,
@@ -43,7 +46,7 @@ import {
 /** deepseek-flash 同时支持深度思考与图片输入 */
 const MODEL: ChatModel = 'deepseek-flash'
 /** 所有生成请求统一携带的助手身份说明 */
-const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
+export const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -561,18 +564,6 @@ export const stopReply = (sessionId: string) => getStreamController(sessionId)?.
 /** 手动压缩的取消句柄；自动压缩复用本轮回复的 controller，停止生成即停止压缩 */
 const compactionControllers = new Map<string, AbortController>()
 
-/** 压缩摘要用最近一次回答的模型，没有记录时用默认模型 */
-const compactionModel = (session: Session): ChatModel => {
-  const visible = getVisibleMessages(session)
-  for (let index = visible.length - 1; index >= 0; index -= 1) {
-    const message = visible[index]
-    if (message?.role === 'assistant' && message.model) {
-      return message.model
-    }
-  }
-  return MODEL
-}
-
 const setCompactionRun = (sessionId: string, run: CompactionRun | null) => {
   set((state) => {
     const rest = Object.entries(state.compacting).filter(([id]) => id !== sessionId)
@@ -613,7 +604,7 @@ const runCompaction = async (
     const compaction = await buildCompaction({
       session,
       apiKey,
-      model: compactionModel(session),
+      model: getSessionModel(session),
       mode,
       signal,
       onProgress: (progress) => setCompactionRun(sessionId, { ...progress, mode, startedAt }),
@@ -1137,7 +1128,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const latestReminder = prepared.prefix
           ? prepared.prefix.latestReminder
           : createLatestReminder(useSettings.getState())
-        reply = { ...reply, latestReminder }
+        const system = summary ? withCompactionSummary(SYSTEM_PROMPT, summary) : SYSTEM_PROMPT
+        // 记下这次的提示侧估算：上下文占用用它和真实用量算"表面净增减"
+        const promptEstimate =
+          estimateRequestTokens([...prepared.history, prepared.question]) +
+          estimateTokens(system)
+        reply = { ...reply, latestReminder, promptEstimate }
         updateReply(sessionId, reply)
         persist(sessionId)
         const messages = toRequestMessages(
@@ -1151,7 +1147,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           useSettings.getState().apiKey ?? '',
           {
             model: initial.model ?? MODEL,
-            system: summary ? withCompactionSummary(SYSTEM_PROMPT, summary) : SYSTEM_PROMPT,
+            system,
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,

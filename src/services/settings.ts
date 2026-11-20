@@ -19,9 +19,10 @@ type Settings = {
   contextWindow: number
 }
 
-/** 上下文窗口的可选值：接口不返回窗口长度，只能自己选一个偏保守的值 */
-export const CONTEXT_WINDOW_OPTIONS = [64_000, 128_000, 256_000, 512_000] as const
-export const DEFAULT_CONTEXT_WINDOW = 128_000
+/** 上下文窗口的可选值：模型自己声明的容量优先，认不出的模型按这里选的值算 */
+export const CONTEXT_WINDOW_OPTIONS = [128_000, 262_144, 524_288, 1_048_576] as const
+/** 1Mi：deepseek-flash（DeepSeek-V4.1-Flash）官方 /models 声明的窗口 */
+export const DEFAULT_CONTEXT_WINDOW = 1_048_576
 
 const KEYS = {
   apiKey: 'chat-demo:api-key',

@@ -1,5 +1,5 @@
 import { ApiError, streamMessage } from '../api/client.js'
-import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types.js'
+import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { getVisibleMessages } from './branches.js'
 import { getReplyText } from './reply.js'
 import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
@@ -14,6 +14,8 @@ import type { Compaction, FileAttachment, Message, Session, UserMessage } from '
 export const COMPACT_RATIO = 0.8
 /** 压缩时保留的原文比例：最近这部分的 token 不超过窗口的这个比例 */
 const RETAIN_RATIO = 0.18
+/** 保留原文的绝对上限：窗口很大时按比例会留下十几万 token，压完等于没压 */
+const MAX_RETAIN_TOKENS = 120_000
 /** 但至少保留这么多 token 的原文，太短的会话压不出有价值的内容 */
 const MIN_RETAIN_TOKENS = 8_000
 /** 至少保留两条消息（一问一答） */
@@ -190,7 +192,10 @@ export const planCompaction = (
   if (manual) {
     start = Math.max(0, messages.length - MANUAL_RETAIN_MESSAGES)
   } else {
-    const retainTokens = Math.max(Math.round(window * RETAIN_RATIO), MIN_RETAIN_TOKENS)
+    const retainTokens = Math.min(
+      Math.max(Math.round(window * RETAIN_RATIO), MIN_RETAIN_TOKENS),
+      MAX_RETAIN_TOKENS
+    )
     start = messages.length
     let kept = 0
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -224,37 +229,101 @@ export const planCompaction = (
   }
 }
 
-/** 当前分支的提示侧 token 估算：最近一次真实用量 + 之后新增消息的估算 */
-export const estimatePromptTokens = (session: Session, question?: UserMessage): number => {
+/** 会话当前用的模型；没有记录时用默认模型 */
+export const getSessionModel = (session: Session): ChatModel => {
   const visible = getVisibleMessages(session)
-  let anchor = -1
-  let anchorUsage: MessageUsage | undefined
+  for (let index = visible.length - 1; index >= 0; index -= 1) {
+    const message = visible[index]
+    if (message?.role === 'assistant' && message.model) {
+      return message.model
+    }
+  }
+  return 'deepseek-flash'
+}
+
+/** 一次请求的提示侧估算：进入请求的消息 + 固定开销（系统提示与工具声明） */
+export const estimateRequestTokens = (messages: Message[], overhead = REQUEST_OVERHEAD) =>
+  messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0) + overhead
+
+export type ContextUsage = {
+  /** 下一次请求预计占用的提示侧 token */
+  used: number
+  /** 模型声明的上下文窗口 */
+  window: number
+  /** 0–100，超过上限时封顶 */
+  percent: number
+  /** 是否锚定了服务端真实用量；false 表示整体按字数估算 */
+  measured: boolean
+  /** 明细：对话消息与系统提示各占多少 */
+  messageTokens: number
+  systemTokens: number
+  /** 当前是否处于压缩状态 */
+  compacted: boolean
+}
+
+/**
+ * 上下文占用：以最近一次服务端回报的真实用量为锚，加上对话表面的净增减，
+ * 因此压缩后立即下降、撤销后立即回升——和「上一次请求用了多少」不是一回事。
+ */
+const measureContext = (
+  session: Session,
+  extra: Message[],
+  systemBase: string
+): ContextUsage | null => {
+  const visible = getVisibleMessages(session)
+  if (visible.length === 0 && extra.length === 0) {
+    return null
+  }
+  const { history, summary } = applyCompaction(visible, session.compaction)
+  const system = summary ? withCompactionSummary(systemBase, summary) : systemBase
+  const rawSystem = estimateTokens(system)
+  const rawMessages = estimateRequestTokens([...history, ...extra])
+  const rawTotal = rawSystem + rawMessages
+  let anchorUsage: number | undefined
+  let anchorEstimate: number | undefined
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const message = visible[index]
     if (message?.role === 'assistant' && message.usage) {
-      anchor = index
-      anchorUsage = message.usage
+      anchorUsage = getPromptTokens(message.usage)
+      anchorEstimate = message.promptEstimate
       break
     }
   }
-  let tokens = anchor >= 0 ? getPromptTokens(anchorUsage) : 0
-  for (const message of visible.slice(anchor + 1)) {
-    tokens += estimateMessageTokens(message)
+  let used = rawTotal
+  if (anchorUsage !== undefined && anchorEstimate !== undefined) {
+    used = Math.max(0, anchorUsage + (rawTotal - anchorEstimate))
   }
-  if (question) {
-    tokens += estimateMessageTokens(question)
+  const measured = anchorUsage !== undefined && anchorEstimate !== undefined
+  // 明细按比例归到真实用量上：否则估算出来的分解会比总数还大，看着像 bug
+  const scale = rawTotal > 0 ? used / rawTotal : 1
+  const window = getContextWindow(getSessionModel(session))
+  return {
+    used: Math.round(used),
+    window,
+    percent: Math.min(100, Math.round((used / window) * 100)),
+    measured,
+    messageTokens: Math.round(rawMessages * scale),
+    systemTokens: Math.round(rawSystem * scale),
+    compacted: summary !== null,
   }
-  return tokens + REQUEST_OVERHEAD
 }
 
+/** 当前分支下一次请求的上下文占用；空会话返回 null */
+export const getContextUsage = (session: Session, systemBase = ''): ContextUsage | null =>
+  measureContext(session, [], systemBase)
+
+/** 带上待发提问后的提示侧 token，用于判断是否该自动压缩 */
+export const estimatePromptTokens = (session: Session, question?: UserMessage): number =>
+  measureContext(session, question ? [question] : [], '')?.used ?? 0
+
 /** 是否需要自动压缩 */
-export const needsCompaction = (
-  session: Session,
-  question?: UserMessage,
-  window = getContextWindow()
-): boolean =>
-  estimatePromptTokens(session, question) > window * COMPACT_RATIO &&
-  planCompaction(getVisibleMessages(session), window) !== null
+export const needsCompaction = (session: Session, question?: UserMessage): boolean => {
+  const window = getContextWindow(getSessionModel(session))
+  return (
+    estimatePromptTokens(session, question) > window * COMPACT_RATIO &&
+    planCompaction(getVisibleMessages(session), window) !== null
+  )
+}
 
 /**
  * 请求里只有「被覆盖消息组成的开头连续前缀」才用摘要替换；
@@ -310,9 +379,22 @@ export const isContextOverflowError = (error: unknown): boolean => {
   return /context|token|length|too long|maximum|prompt|输入|长度|过长|超长/i.test(error.message)
 }
 
+/** 已有摘要时追加的合并要求：不照抄、不丢仍然成立的事实 */
+const MERGE_SYSTEM = `${SUMMARY_SYSTEM}
+
+6. 输入里可能包含一份"既有摘要"，它是更早对话的唯一记录。请把它当作已发生过的历史：保留其中仍然成立的事实与结论，丢弃已经过时的内容，再与新增的记录合并成一份完整摘要。不要逐字照抄既有摘要，也不要提及"既有摘要"这件事本身。`
+
+/** 判断旧压缩记录是否仍然覆盖在新范围的开头，是的话可以只处理新增部分 */
+const continuesFrom = (previous: Compaction, covered: Message[]): boolean =>
+  previous.coveredIds.length > 0 &&
+  previous.summary.trim() !== '' &&
+  previous.coveredIds.length < covered.length &&
+  previous.coveredIds.every((id, index) => covered[index]?.id === id)
+
 /**
  * 生成一份压缩记录：先按消息边界分段（必要时逐段总结），最后合成结构化摘要。
- * 返回 null 表示这段对话不值得压缩（消息太少）。
+ * 已经压缩过、且旧覆盖段仍然成立时，只把「旧摘要 + 上次裁剪点之后的新增」交给模型合并，
+ * 不再重发早已被摘要掉的原文。返回 null 表示这段对话不值得压缩（消息太少）。
  */
 export const buildCompaction = async ({
   session,
@@ -320,7 +402,7 @@ export const buildCompaction = async ({
   model,
   mode,
   signal,
-  window = getContextWindow(),
+  window = getContextWindow(getSessionModel(session)),
   onProgress,
 }: {
   session: Session
@@ -337,11 +419,23 @@ export const buildCompaction = async ({
     return null
   }
   const covered = visible.slice(0, plan.coveredIds.length)
-  const entries = covered.map(toTranscriptEntry)
-  const chunks = chunkEntries(entries)
+  // 能接着上次压：只总结「旧摘要 + 上次之后新增的原文」
+  const previous = session.compaction
+  const merge = previous !== undefined && continuesFrom(previous, covered)
+  const fresh = merge ? covered.slice(previous.coveredIds.length) : covered
+  const entries = fresh.map((message, index) =>
+    toTranscriptEntry(message, merge ? index + previous.coveredIds.length : index)
+  )
+  const head =
+    merge && previous
+      ? `#### 既有摘要（更早的对话）\n${previous.summary.trim()}`
+      : null
+  const chunks = chunkEntries(head === null ? entries : [head, ...entries])
   let input: string
   if (chunks.length <= 1) {
-    input = `下面是需要压缩的聊天记录：\n\n${entries.join('\n\n')}`
+    input = merge
+      ? `下面是上一份摘要，以及它之后新增的聊天记录：\n\n${[head, ...entries].join('\n\n')}`
+      : `下面是需要压缩的聊天记录：\n\n${entries.join('\n\n')}`
   } else {
     const notes: string[] = []
     for (const [index, chunk] of chunks.entries()) {
@@ -360,17 +454,32 @@ export const buildCompaction = async ({
     input = `下面是同一段对话按时间顺序排列的分段要点：\n\n${notes.join('\n\n')}\n\n请据此写出最终摘要。`
   }
   signal.throwIfAborted()
-  const summary = await requestSummary(apiKey, model, SUMMARY_SYSTEM, input, signal, (text) =>
-    onProgress?.({ phase: 'summary', done: chunks.length, total: chunks.length, chars: text.length })
+  const summary = await requestSummary(
+    apiKey,
+    model,
+    merge ? MERGE_SYSTEM : SUMMARY_SYSTEM,
+    input,
+    signal,
+    (text) =>
+      onProgress?.({ phase: 'summary', done: chunks.length, total: chunks.length, chars: text.length })
   )
   const beforeTokens = estimatePromptTokens(session)
+  // 压缩后 = 现状 - 这次新吞掉的原文 + 新摘要 - 被替换掉的旧摘要
+  const freshTokens = fresh.reduce((sum, message) => sum + estimateMessageTokens(message), 0)
+  const afterTokens = Math.max(
+    0,
+    beforeTokens -
+      freshTokens +
+      estimateTokens(summary) -
+      (merge && previous ? estimateTokens(previous.summary) : 0)
+  )
   return {
     summary,
     coveredIds: plan.coveredIds,
     createdAt: Date.now(),
     mode,
     beforeTokens,
-    afterTokens: Math.max(0, beforeTokens - plan.coveredTokens + estimateTokens(summary)),
+    afterTokens,
     model,
   }
 }

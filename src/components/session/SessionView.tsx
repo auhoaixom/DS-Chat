@@ -4,8 +4,8 @@ import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { useAttachPanelOpen } from '../chatInput/attachPanelState.js'
-import { CompactionDialog } from '../messages/CompactionDialog.js'
 import { MessageList } from '../messages/MessageList.js'
+import { ContextMeter } from './ContextMeter.js'
 import { MobileHeader } from './MobileHeader.js'
 import styles from './SessionView.module.css'
 
@@ -27,11 +27,16 @@ export const SessionView = ({
   return (
     <div className={styles.view}>
       {isMobile ? (
-        <MobileHeader title={title} />
+        <MobileHeader title={title}>
+          <ContextMeter session={session} />
+        </MobileHeader>
       ) : (
         <div className={styles.header}>
           <div className={clsx(styles.title, siderCollapsed && styles.withCollapsedSider)}>
             {title}
+          </div>
+          <div className={styles.headerRight}>
+            <ContextMeter session={session} />
           </div>
         </div>
       )}
@@ -47,7 +52,6 @@ export const SessionView = ({
           </div>
         }
       />
-      <CompactionDialog session={session} />
     </div>
   )
 }

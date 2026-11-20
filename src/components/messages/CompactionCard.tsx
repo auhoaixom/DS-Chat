@@ -77,7 +77,7 @@ export const CompactionCard = ({
           <IconCompressOutline14 />
         </span>
         <span className={styles.title}>
-          {t('compactionCardTitle', { count: compaction.coveredIds.length })}
+          {t('compactionCardTitle')}
         </span>
         {saved > 0 ? (
           <span className={styles.meta}>

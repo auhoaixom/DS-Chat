@@ -29,6 +29,14 @@
   margin-left: 113px;
 }
 
+.headerRight {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
 .inputContainer {
   position: sticky;
   bottom: 0;
