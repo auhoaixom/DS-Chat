@@ -28,6 +28,7 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
+import { Diagnostics } from './Diagnostics.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -60,6 +61,7 @@ const SettingsContent = () => {
   const historyDelete = useHistoryDelete()
   const replacingHistory = useChatStore((state) => state.importingHistory)
   const historyBusy = historyImport.busy || historyDelete.busy || replacingHistory
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   return (
     <>
       <Modal
@@ -102,6 +104,21 @@ const SettingsContent = () => {
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
+                label={t('diagnostics')}
+                description={t('diagnosticsHint')}
+                status={null}
+                action={
+                  <Button
+                    variant="outlined"
+                    size="m"
+                    className={styles.cellButton}
+                    onClick={() => setDiagnosticsOpen(true)}
+                  >
+                    {t('diagnosticsView')}
+                  </Button>
+                }
+              />
+              <SettingCell
                 label={t('deleteAllSessions')}
                 status={null}
                 action={
@@ -123,6 +140,7 @@ const SettingsContent = () => {
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
+      {diagnosticsOpen ? <Diagnostics onClose={() => setDiagnosticsOpen(false)} /> : null}
     </>
   )
 }
