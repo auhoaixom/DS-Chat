@@ -143,15 +143,25 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
     }
 
     const resolved = resolveSide(spaceAbove, spaceBelow, side, minSpace)
-    const available = Math.max(0, resolved === 'top' ? spaceAbove : spaceBelow)
+    /**
+     * 上限按**整个视口**算，而不是只算锚点这一侧剩下的空间：
+     * 横屏时锚点下方只剩 264px，浮层本身 276px，只差一点点就被裁掉底部两个按钮。
+     * 既然浮层可以往上挪，可用高度就应该是「视口减去上下留白」。
+     */
+    const viewportCap = window.innerHeight - 2 * VIEWPORT_PADDING
     // 内容比可用空间小时按内容收口，避免浮层留出多余空白
-    const height = Math.max(40, Math.min(maxHeight, available, floating.scrollHeight + 2))
+    const height = Math.max(40, Math.min(maxHeight, viewportCap, floating.scrollHeight + 2))
+    const top = resolved === 'top' ? rect.top - offset - height : rect.bottom + offset
+    /**
+     * 这一支按 `right` 定位、宽度由 CSS 给，所以要反过来限制右边的余量：
+     * 否则窄屏上「贴住锚点右侧」会把浮层的左边推出屏幕（320px 宽时实测被切掉 38px）。
+     */
+    const width = floating.getBoundingClientRect().width
+    const maxRight = Math.max(VIEWPORT_PADDING, window.innerWidth - width - VIEWPORT_PADDING)
     applyPosition({
-      top:
-        resolved === 'top'
-          ? Math.max(VIEWPORT_PADDING, rect.top - offset - height)
-          : rect.bottom + offset,
-      right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
+      // 放不下时向上顶，宁可压住一点头部，也不要把最后一行按钮挤到屏幕外
+      top: Math.min(Math.max(VIEWPORT_PADDING, top), window.innerHeight - VIEWPORT_PADDING - height),
+      right: Math.min(maxRight, Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right)),
       maxHeight: height,
     })
   }, [align, alignOffset, applyPosition, floatingRef, getAnchor, maxHeight, minSpace, offset, side])

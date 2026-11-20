@@ -231,7 +231,7 @@ export const en = {
   compactionFailed: 'Compaction failed. Please try again later.',
   contextAria: '{percent} of context used',
   contextTitle: 'Context usage',
-  contextUsed: 'of context used',
+  contextUsed: 'Context used',
   contextMessages: 'Messages',
   contextSystem: 'System prompt',
   contextCompactHint: 'Condenses earlier messages into a summary; the originals stay on this device',
