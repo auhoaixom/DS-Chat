@@ -6,6 +6,16 @@
   overflow: hidden;
 }
 
+/* 展开原文时吸顶：实背景 + 阴影，内容从下面滚过也不会透出来 */
+.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-top: 0;
+  background-color: var(--dsw-alias-bg-base);
+  box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.45);
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -141,4 +151,41 @@
   &:hover {
     text-decoration: underline;
   }
+}
+
+/* ---------- 已压缩原文（只读回看） ---------- */
+
+.originals {
+  margin: 0 0 10px;
+  padding: 10px 12px 4px;
+  border-radius: 14px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  background-color: transparent;
+  opacity: 0.72;
+}
+
+.originalsTitle {
+  margin-bottom: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.originalUser {
+  width: fit-content;
+  max-width: 82%;
+  margin: 0 0 14px auto;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background-color: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.originalReply {
+  margin-bottom: 14px;
+  color: var(--dsw-alias-label-primary);
 }

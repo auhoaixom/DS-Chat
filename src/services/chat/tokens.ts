@@ -11,6 +11,9 @@ import type { Message } from './types.js'
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-flash': 1_048_576,
   'deepseek-v4-pro': 1_048_576,
+  // 服务端回报的真实模型名，别名换了也能对上
+  'deepseek-v4.1-flash': 1_048_576,
+  'deepseek-v4.1-pro': 1_048_576,
 }
 
 /** 图片经 Files API 展开成视觉 token；按偏大估，宁可提前压缩 */

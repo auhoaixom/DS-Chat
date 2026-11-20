@@ -202,6 +202,10 @@ export const en = {
   compactionModeManual: 'Manual',
   compactionTokenFlow: '{before} → {after}',
   compactionUndo: 'Undo compaction',
+  compactionShowOriginals: 'View originals',
+  compactionHideOriginals: 'Hide originals',
+  compactionOriginalsTitle:
+    'These messages were compacted. Read-only: they are not part of the conversation anymore',
   compactionDescription:
     'The earliest {count} messages will be condensed into a summary; the latest {keep} messages stay verbatim.',
   compactionEstimate: 'Request context about {before} → {after}',
@@ -209,6 +213,8 @@ export const en = {
     'Original messages stay on this device. Open the card to read the summary, and undo at any time.',
   compactionStart: 'Compact',
   compactionNoNeed: 'This conversation is still short — nothing to compact yet',
+  compactionNoGain:
+    'Compacting would not shrink this conversation, so it was discarded (existing record untouched)',
   compactionDone: 'Context compacted',
   compactionBusy: 'Compaction is already running',
   compactionFailed: 'Compaction failed. Please try again later.',
@@ -217,5 +223,5 @@ export const en = {
   contextUsed: 'of context used',
   contextMessages: 'Messages',
   contextSystem: 'System prompt',
-  contextCompactHint: 'Condenses earlier messages into a summary; the originals stay readable',
+  contextCompactHint: 'Condenses earlier messages into a summary; the originals stay on this device',
 } satisfies Record<keyof typeof zh, string>

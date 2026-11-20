@@ -79,7 +79,12 @@ export const applyEvent = (
     reply.status === 'streaming' ? reply : { ...reply, status: 'streaming' }
   switch (event.type) {
     case 'message_start':
-      return { ...next, usage: event.message.usage ?? next.usage }
+      return {
+        ...next,
+        // 别名可能解析到别的模型，服务端回报的名字才是真的
+        servedModel: event.message.model || next.servedModel,
+        usage: event.message.usage ?? next.usage,
+      }
     case 'content_block_start': {
       blockIndexes.delete(event.index)
       const block = toReplyBlock(event.content_block, now)

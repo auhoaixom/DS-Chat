@@ -53,6 +53,8 @@ const SESSION_CACHE_LIMIT = 5
 const SAFETY_CHECK = { level: 'high' } as const
 /** 服务端判定 file_id 失效后，重新补传并重发的最多次数（不含首次请求） */
 const FILE_RETRY_LIMIT = 2
+/** 服务端判定超长后，压缩并重发的最多次数（第 2 次换成抢救式压缩） */
+const OVERFLOW_RETRY_LIMIT = 2
 /** 退避基数，第 n 次重试等待 2^n 倍；连续失败达到上限就放弃，把原始报错展示出来 */
 const FILE_RETRY_BASE_DELAY = 1000
 
@@ -581,15 +583,15 @@ const runCompaction = async (
   sessionId: string,
   mode: 'manual' | 'auto',
   signal: AbortSignal,
-  { force = false }: { force?: boolean } = {}
-): Promise<boolean> => {
+  { force = false, aggressive = false }: { force?: boolean; aggressive?: boolean } = {}
+): Promise<'done' | 'empty' | 'no-gain' | 'skipped'> => {
   const session = getSession(sessionId)
   const apiKey = useSettings.getState().apiKey ?? ''
   if (!session || !apiKey) {
-    return false
+    return 'skipped'
   }
   if (!force && !needsCompaction(session)) {
-    return false
+    return 'skipped'
   }
   const startedAt = Date.now()
   setCompactionRun(sessionId, {
@@ -601,26 +603,28 @@ const runCompaction = async (
     startedAt,
   })
   try {
-    const compaction = await buildCompaction({
+    const outcome = await buildCompaction({
       session,
       apiKey,
       model: getSessionModel(session),
       mode,
       signal,
+      aggressive,
       onProgress: (progress) => setCompactionRun(sessionId, { ...progress, mode, startedAt }),
     })
-    if (!compaction) {
-      return false
+    if (!outcome.ok) {
+      return outcome.reason
     }
-    updateSession(sessionId, (current) => ({ ...current, compaction }))
+    updateSession(sessionId, (current) => ({ ...current, compaction: outcome.compaction }))
     persist(sessionId)
-    return true
+    return 'done'
   } finally {
     setCompactionRun(sessionId, null)
   }
 }
 
-export type CompactionResult = 'done' | 'skipped' | 'busy' | 'failed'
+/** empty：消息太少；no-gain：压完省不下上下文，已作废 */
+export type CompactionResult = 'done' | 'empty' | 'no-gain' | 'busy' | 'failed'
 
 /** 手动压缩当前分支：消息太少、正在生成或已在压缩时不做 */
 export const compactSession = async (sessionId: string): Promise<CompactionResult> => {
@@ -634,15 +638,15 @@ export const compactSession = async (sessionId: string): Promise<CompactionResul
     return 'busy'
   }
   if (!getSession(sessionId)) {
-    return 'skipped'
+    return 'empty'
   }
   const controller = new AbortController()
   compactionControllers.set(sessionId, controller)
   try {
-    const done = await runCompaction(sessionId, 'manual', controller.signal, { force: true })
-    return done ? 'done' : 'skipped'
+    const result = await runCompaction(sessionId, 'manual', controller.signal, { force: true })
+    return result === 'skipped' ? 'empty' : result
   } catch {
-    return controller.signal.aborted ? 'skipped' : 'failed'
+    return controller.signal.aborted ? 'empty' : 'failed'
   } finally {
     compactionControllers.delete(sessionId)
   }
@@ -1093,7 +1097,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
   let frame = 0
   /** 发送前是否已经做过一次压缩判断；超限重试单独记一次，避免反复压缩 */
   let compactionTried = false
-  let overflowRetried = false
+  let overflowRetries = 0
   const flush = () => {
     cancelAnimationFrame(frame)
     frame = 0
@@ -1113,7 +1117,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           const current = getSession(sessionId)
           if (current && needsCompaction(current, request.question)) {
             await runCompaction(sessionId, 'auto', controller.signal, { force: true }).catch(
-              () => false
+              () => 'skipped' as const
             )
           }
         }
@@ -1194,12 +1198,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           })
           break
         }
-        // 超出上下文长度：压缩一次后重发，仍失败就按原始报错收尾
-        if (!overflowRetried && isContextOverflowError(error)) {
-          overflowRetried = true
-          await runCompaction(sessionId, 'auto', controller.signal, { force: true }).catch(
-            () => false
-          )
+        // 超出上下文长度：压缩后重发；两次仍超限就按原始报错收尾。
+        // 第二次改成"抢救式"压缩：只留最后一轮原文，把能削的头部都削掉。
+        if (overflowRetries < OVERFLOW_RETRY_LIMIT && isContextOverflowError(error)) {
+          overflowRetries += 1
+          await runCompaction(sessionId, 'auto', controller.signal, {
+            force: true,
+            aggressive: overflowRetries > 1,
+          }).catch(() => 'skipped' as const)
           if (controller.signal.aborted) {
             reply = settleReply(reply, 'stopped', Date.now())
             break

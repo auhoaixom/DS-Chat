@@ -51,7 +51,9 @@ export const ContextMeter = ({ session }: { session: Session }) => {
       showToast({ key: 'compactionDone' })
     } else if (result === 'busy') {
       showToast({ key: 'compactionBusy' })
-    } else if (result === 'skipped') {
+    } else if (result === 'no-gain') {
+      showToast({ key: 'compactionNoGain' })
+    } else if (result === 'empty') {
       showToast({ key: 'compactionNoNeed' })
     } else {
       showToast({ key: 'compactionFailed' })

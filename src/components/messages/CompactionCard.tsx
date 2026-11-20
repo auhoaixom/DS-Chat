@@ -8,21 +8,28 @@ import {
   type CompactionRun,
 } from '../../services/chat/store.js'
 import { formatTokens } from '../../services/chat/tokens.js'
-import type { Compaction } from '../../services/chat/types.js'
+import type { Compaction, Message } from '../../services/chat/types.js'
 import { IconChevronDownOutline14, IconCompressOutline14 } from '../base/icons.js'
 import { Markdown } from '../markdown/Markdown.js'
 import styles from './CompactionCard.module.css'
 
 /**
- * 消息列表顶部的压缩卡片：正在压缩时显示进度，压缩后显示摘要入口与撤销。
- * 被摘要覆盖的原始消息不再渲染，展开卡片可以查看摘要正文。
+ * 消息列表顶部的压缩卡片：正在压缩时显示进度；压缩后给出摘要、原文与撤销。
+ * 「查看原文」只展开被覆盖的消息，不改变压缩状态、也不影响请求。
  */
 export const CompactionCard = ({
   sessionId,
   compaction,
+  coveredCount,
+  originalsOpen,
+  onToggleOriginals,
 }: {
   sessionId: string
   compaction?: Compaction
+  /** 当前分支上真正被覆盖的消息条数；0 表示覆盖段已失效 */
+  coveredCount: number
+  originalsOpen: boolean
+  onToggleOriginals: () => void
 }) => {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
@@ -65,8 +72,10 @@ export const CompactionCard = ({
   }
 
   const saved = Math.max(0, compaction.beforeTokens - compaction.afterTokens)
+  // 展开原文后卡片吸顶：翻到多深都能直接收起或撤销，不用再滚回顶部
+  const sticky = originalsOpen && !open
   return (
-    <div className={styles.card}>
+    <div className={clsx(styles.card, sticky && styles.sticky)}>
       <button
         type="button"
         className={styles.head}
@@ -107,6 +116,16 @@ export const CompactionCard = ({
             after: formatTokens(compaction.afterTokens),
           })}
         </span>
+        {coveredCount > 0 ? (
+          <button
+            type="button"
+            className={styles.action}
+            aria-expanded={originalsOpen}
+            onClick={onToggleOriginals}
+          >
+            {t(originalsOpen ? 'compactionHideOriginals' : 'compactionShowOriginals')}
+          </button>
+        ) : null}
         <button
           type="button"
           className={styles.action}
@@ -115,6 +134,35 @@ export const CompactionCard = ({
           {t('compactionUndo')}
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 已压缩原文的只读展示：变暗、不参与版本切换与编辑，纯粹是为了让人回看。
+ * 展开它不会让这些消息重新进入请求。
+ */
+export const CompactedOriginals = ({ messages }: { messages: Message[] }) => {
+  const t = useTranslate()
+  return (
+    <div className={styles.originals} aria-label={t('compactionOriginalsTitle')}>
+      <div className={styles.originalsTitle}>{t('compactionOriginalsTitle')}</div>
+      {messages.map((message) =>
+        message.role === 'user' ? (
+          <div key={message.id} className={styles.originalUser}>
+            {message.content || message.files.map((file) => file.name).join('、')}
+          </div>
+        ) : (
+          <div key={message.id} className={styles.originalReply}>
+            <Markdown
+              content={message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')}
+              loading={false}
+              cacheKey={`original-${message.id}`}
+              disableLink={false}
+            />
+          </div>
+        )
+      )}
     </div>
   )
 }

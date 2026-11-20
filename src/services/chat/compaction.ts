@@ -177,19 +177,22 @@ const requestSummary = async (
 /**
  * 选出一段要被压缩的早期消息。
  * - 自动压缩：从末尾往前留够 RETAIN_RATIO 的原文，尽量不丢最近的上下文；
- * - 手动压缩：固定保留最近两轮问答，用户点了就压，不再按 token 余量判断。
+ * - 手动压缩：固定保留最近两轮问答，用户点了就压，不再按 token 余量判断；
+ * - aggressive（超限抢救）：只留最后一轮，把能削的头部都削掉。
  * 保留段必须从提问开始，避免留下没有提问的孤立回答。
  */
 export const planCompaction = (
   messages: Message[],
   window: number,
-  { manual = false }: { manual?: boolean } = {}
+  { manual = false, aggressive = false }: { manual?: boolean; aggressive?: boolean } = {}
 ): CompactionPlan | null => {
   if (messages.length < MIN_COVER_MESSAGES + MIN_RETAIN_MESSAGES) {
     return null
   }
   let start: number
-  if (manual) {
+  if (aggressive) {
+    start = Math.max(0, messages.length - MIN_RETAIN_MESSAGES)
+  } else if (manual) {
     start = Math.max(0, messages.length - MANUAL_RETAIN_MESSAGES)
   } else {
     const retainTokens = Math.min(
@@ -240,6 +243,22 @@ export const getSessionModel = (session: Session): ChatModel => {
   }
   return 'deepseek-flash'
 }
+
+/** 服务端回报的真实模型名；旧消息没有这个记录时为 undefined */
+export const getServedModel = (session: Session): string | undefined => {
+  const visible = getVisibleMessages(session)
+  for (let index = visible.length - 1; index >= 0; index -= 1) {
+    const message = visible[index]
+    if (message?.role === 'assistant' && message.servedModel) {
+      return message.servedModel
+    }
+  }
+  return undefined
+}
+
+/** 查容量时优先用服务端回报的真实模型，认不出再退回请求别名 */
+const resolveWindow = (session: Session): number =>
+  getContextWindow(getServedModel(session) ?? getSessionModel(session))
 
 /** 一次请求的提示侧估算：进入请求的消息 + 固定开销（系统提示与工具声明） */
 export const estimateRequestTokens = (messages: Message[], overhead = REQUEST_OVERHEAD) =>
@@ -296,7 +315,7 @@ const measureContext = (
   const measured = anchorUsage !== undefined && anchorEstimate !== undefined
   // 明细按比例归到真实用量上：否则估算出来的分解会比总数还大，看着像 bug
   const scale = rawTotal > 0 ? used / rawTotal : 1
-  const window = getContextWindow(getSessionModel(session))
+  const window = resolveWindow(session)
   return {
     used: Math.round(used),
     window,
@@ -318,7 +337,7 @@ export const estimatePromptTokens = (session: Session, question?: UserMessage): 
 
 /** 是否需要自动压缩 */
 export const needsCompaction = (session: Session, question?: UserMessage): boolean => {
-  const window = getContextWindow(getSessionModel(session))
+  const window = resolveWindow(session)
   return (
     estimatePromptTokens(session, question) > window * COMPACT_RATIO &&
     planCompaction(getVisibleMessages(session), window) !== null
@@ -369,14 +388,22 @@ export const getCoveredCount = (messages: Message[], compaction?: Compaction): n
 }
 
 /** 服务端判定超出上下文长度时返回 true，用于压缩后重试一次 */
+/**
+ * 服务端判定超出上下文长度时返回 true，用于压缩后重试。
+ * 措辞各版本不一样，所以按关键词表匹配；状态码只认常见的几个，避免把权限、参数错误也当成超限。
+ */
+const OVERFLOW_STATUSES = new Set([400, 413, 422, 500, 529])
+const OVERFLOW_PATTERN =
+  /context|token|too long|too large|too many|maximum|exceed|over limit|reduce the length|prompt is too|input is too|输入|长度|过长|超长|超出|超过|上限|太大|过长/i
+
 export const isContextOverflowError = (error: unknown): boolean => {
   if (!(error instanceof ApiError) || error.kind !== 'http') {
     return false
   }
-  if (error.status !== 400 && error.status !== 413) {
+  if (error.status === undefined || !OVERFLOW_STATUSES.has(error.status)) {
     return false
   }
-  return /context|token|length|too long|maximum|prompt|输入|长度|过长|超长/i.test(error.message)
+  return OVERFLOW_PATTERN.test(error.message)
 }
 
 /** 已有摘要时追加的合并要求：不照抄、不丢仍然成立的事实 */
@@ -391,10 +418,19 @@ const continuesFrom = (previous: Compaction, covered: Message[]): boolean =>
   previous.coveredIds.length < covered.length &&
   previous.coveredIds.every((id, index) => covered[index]?.id === id)
 
+/** 压缩结果：要么给出记录，要么说明为什么没压 */
+export type CompactionOutcome =
+  | { ok: true; compaction: Compaction }
+  /** empty：消息还不够；no-gain：压完省不下上下文（摘要比被吞掉的原文还长） */
+  | { ok: false; reason: 'empty' | 'no-gain' }
+
+/** 允许的估算误差：缩小不到 5% 就当作没收益 */
+const NO_GAIN_RATIO = 0.05
+
 /**
  * 生成一份压缩记录：先按消息边界分段（必要时逐段总结），最后合成结构化摘要。
  * 已经压缩过、且旧覆盖段仍然成立时，只把「旧摘要 + 上次裁剪点之后的新增」交给模型合并，
- * 不再重发早已被摘要掉的原文。返回 null 表示这段对话不值得压缩（消息太少）。
+ * 不再重发早已被摘要掉的原文。压完没有变小则作废，不覆盖现有记录。
  */
 export const buildCompaction = async ({
   session,
@@ -402,7 +438,8 @@ export const buildCompaction = async ({
   model,
   mode,
   signal,
-  window = getContextWindow(getSessionModel(session)),
+  aggressive = false,
+  window = resolveWindow(session),
   onProgress,
 }: {
   session: Session
@@ -410,13 +447,15 @@ export const buildCompaction = async ({
   model: ChatModel
   mode: Compaction['mode']
   signal: AbortSignal
+  /** 超限抢救：只留最后一轮原文，尽量削掉头部 */
+  aggressive?: boolean
   window?: number
   onProgress?: (progress: CompactionProgress) => void
-}): Promise<Compaction | null> => {
+}): Promise<CompactionOutcome> => {
   const visible = getVisibleMessages(session)
-  const plan = planCompaction(visible, window, { manual: mode === 'manual' })
+  const plan = planCompaction(visible, window, { manual: mode === 'manual', aggressive })
   if (!plan) {
-    return null
+    return { ok: false, reason: 'empty' }
   }
   const covered = visible.slice(0, plan.coveredIds.length)
   // 能接着上次压：只总结「旧摘要 + 上次之后新增的原文」
@@ -473,13 +512,20 @@ export const buildCompaction = async ({
       estimateTokens(summary) -
       (merge && previous ? estimateTokens(previous.summary) : 0)
   )
+  // 摘要没比被吞掉的原文短，等于白花一次钱：作废，不改动现有记录
+  if (afterTokens >= beforeTokens * (1 - NO_GAIN_RATIO)) {
+    return { ok: false, reason: 'no-gain' }
+  }
   return {
-    summary,
-    coveredIds: plan.coveredIds,
-    createdAt: Date.now(),
-    mode,
-    beforeTokens,
-    afterTokens,
-    model,
+    ok: true,
+    compaction: {
+      summary,
+      coveredIds: plan.coveredIds,
+      createdAt: Date.now(),
+      mode,
+      beforeTokens,
+      afterTokens,
+      model,
+    },
   }
 }
