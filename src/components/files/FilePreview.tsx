@@ -52,7 +52,15 @@ export const FilePreview = () => {
             <IconCropOutline16 />
           </button>
         ) : null}
-        <button type="button" className={styles.button} aria-label={name} onClick={close}>
+        <button
+          type="button"
+          className={styles.button}
+          aria-label={t('close')}
+          onClick={(event) => {
+            event.stopPropagation()
+            close()
+          }}
+        >
           <IconCloseFill14 />
         </button>
       </div>
