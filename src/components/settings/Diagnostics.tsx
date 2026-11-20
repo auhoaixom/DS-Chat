@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useTranslate, translate } from '../../i18n/index.js'
 import { getVisibleMessages } from '../../services/chat/branches.js'
-import { getCacheStats, getContextUsage } from '../../services/chat/compaction.js'
+import { getCacheStats, getContextUsage, estimateRequestTokens } from '../../services/chat/compaction.js'
 import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
-import { formatTokens } from '../../services/chat/tokens.js'
+import { estimateTokens, formatTokens } from '../../services/chat/tokens.js'
 import type { Session } from '../../services/chat/types.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { copyText } from '../../utils/clipboard.js'
@@ -46,6 +46,42 @@ const buildReport = (session: Session): string => {
   if (cache) {
     lines.push(
       `${t('contextCacheHit')}: ${cache.percent}% (${cache.read} / ${cache.total}, ${cache.requests} ${t('diagnosticsRequests')})`
+    )
+  }
+  // 估算口径：把"估了多少"拆成字数与固定开销，方便和服务端的真实用量对照
+  {
+    const text = visible.map((message) =>
+      message.role === 'user'
+        ? message.content
+        : message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
+    )
+    const joined = text.join('')
+    let cjk = 0
+    for (const char of joined) {
+      if (/[\u2e80-\u9fff\uac00-\ud7af\u3000-\u303f\uff00-\uff60]/.test(char)) {
+        cjk += 1
+      }
+    }
+    lines.push(
+      `${t('diagnosticsEstimateBasis')}: ${t('diagnosticsChars')} ${joined.length}` +
+        ` (CJK ${cjk} / ASCII ${joined.length - cjk})` +
+        ` · ${t('diagnosticsEstimate')} ${estimateRequestTokens(visible)}` +
+        ` · ${t('diagnosticsSystemEstimate')} ${estimateTokens(SYSTEM_PROMPT)}`
+    )
+    // 附件按 1500/2000 计入估算，但只有带 serverId 的才会真正进入请求
+    const files = visible.flatMap((message) => (message.role === 'user' ? message.files : []))
+    const orphan = files.filter((file) => file.serverId === null)
+    // 抓取结果块的正文加密在 signature 里，估算只能按每处固定值计
+    const fetched = visible.reduce(
+      (sum, message) =>
+        message.role === 'user'
+          ? sum
+          : sum + message.blocks.filter((block) => block.type === 'web_fetch_tool_result').length,
+      0
+    )
+    lines.push(
+      `${t('diagnosticsFiles')}: ${files.length} (${t('diagnosticsFileOrphans')} ${orphan.length})` +
+        ` · ${t('diagnosticsFetched')}: ${fetched}`
     )
   }
 

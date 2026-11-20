@@ -42,6 +42,29 @@ test('助手消息只累计文本块', () => {
   assert.equal(estimateMessageTokens(assistantMessage('hello')), 8 + 2)
 })
 
+test('抓取结果块按固定小值计，不按页面长度计', () => {
+  /**
+   * 页面正文加密在 signature 里，`content.source.data` 是空串——请求里只有一段不透明签名，
+   * 服务端不按页面长度计费。实测 42 个抓取块的会话，整个请求只算 11145 token，
+   * 而正文估算本身就有 12480，所以每块必须是几十 token 的量级。
+   */
+  const withFetch = {
+    ...assistantMessage(''),
+    blocks: [
+      {
+        type: 'web_fetch_tool_result' as const,
+        tool_use_id: 'tool_1',
+        kind: 'read_link' as const,
+        content: { type: 'web_fetch_tool_result_error' as const, error_code: 'url_not_accessible' as const },
+      },
+    ],
+  }
+  const perBlock = estimateMessageTokens(withFetch) - estimateMessageTokens(assistantMessage(''))
+  assert.equal(perBlock, 60)
+  // 关键回归：不能再回到"每页正文都算 800"的老口径
+  assert.ok(perBlock < 100)
+})
+
 test('提示侧用量把缓存写入与缓存命中都算进来', () => {
   assert.equal(getPromptTokens(undefined), 0)
   assert.equal(

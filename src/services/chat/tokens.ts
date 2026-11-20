@@ -20,8 +20,16 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 const IMAGE_TOKENS = 1_500
 /** 文档按解析后的文本量差异很大，取一个保守的均价 */
 const DOCUMENT_TOKENS = 2_000
-/** 阅读链接的页面正文会随签名一起回传，按每处留一点余量 */
-const READ_LINK_TOKENS = 800
+/**
+ * 抓取结果块的固定开销。页面正文加密在 signature 里、`content.source.data` 是空串，
+ * 请求只带一个不透明的签名，服务端不按页面长度计费。
+ *
+ * 实测（2026-11，Rust 会话）：42 个抓取块，整个请求服务端只算 11145 token，
+ * 而正文本身的估算就有 12480，说明每块的真实成本只有几十 token 的量级。
+ * 旧的 800/块让这个会话的估算虚高到 47372（占 71%），进度环和压缩阈值全被带偏。
+ * 取 60：仍是实测上界的保守值，但不再是凭空多出来的三万。
+ */
+const READ_LINK_TOKENS = 60
 
 const CJK = /[\u2e80-\u9fff\uac00-\ud7af\u3000-\u303f\uff00-\uff60]/
 
