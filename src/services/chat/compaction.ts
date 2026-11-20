@@ -1,5 +1,6 @@
 import { ApiError, streamMessage } from '../api/client.js'
 import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types.js'
+import { useSettings } from '../settings.js'
 import { getVisibleMessages } from './branches.js'
 import { SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
@@ -264,7 +265,7 @@ export const planCompaction = (
   }
 }
 
-/** 会话当前用的模型；没有记录时用默认模型 */
+/** 会话当前用的模型；没有记录时用设置里的模型 */
 export const getSessionModel = (session: Session): ChatModel => {
   const visible = getVisibleMessages(session)
   for (let index = visible.length - 1; index >= 0; index -= 1) {
@@ -273,7 +274,7 @@ export const getSessionModel = (session: Session): ChatModel => {
       return message.model
     }
   }
-  return 'deepseek-flash'
+  return useSettings.getState().model
 }
 
 /** 服务端回报的真实模型名；旧消息没有这个记录时为 undefined */

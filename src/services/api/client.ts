@@ -98,6 +98,36 @@ export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promis
   })
 }
 
+/** 服务端回报的一个模型：id 是调用名，name 是展示名 */
+export type ModelInfo = { id: string; name: string }
+
+/**
+ * 拉取当前可用的模型清单。用来校验用户手填的模型名——
+ * 名字填错会变成"每条消息都发不出去"，所以在保存那一刻就要挡住。
+ */
+export const fetchModels = async (apiKey: string, signal?: AbortSignal): Promise<ModelInfo[]> => {
+  const response = await request(`${API_ORIGIN}/models`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal,
+  })
+  const body: unknown = await response.json()
+  const data =
+    body !== null && typeof body === 'object' && Array.isArray((body as { data?: unknown }).data)
+      ? ((body as { data: unknown[] }).data ?? [])
+      : []
+  return data.flatMap((item) => {
+    if (item === null || typeof item !== 'object') {
+      return []
+    }
+    const model = item as { id?: unknown; name?: unknown }
+    if (typeof model.id !== 'string' || !model.id) {
+      return []
+    }
+    return [{ id: model.id, name: typeof model.name === 'string' ? model.name : model.id }]
+  })
+}
+
 /**
  * POST /anthropic/v1/files 上传附件（不设过期时间，会话里的历史附件一直可用）。
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。

@@ -4,11 +4,13 @@ import {
   applyCompaction,
   getContextUsage,
   getCoveredCount,
+  getSessionModel,
   hasGain,
   isContextOverflowError,
   planCompaction,
 } from '../src/services/chat/compaction.js'
 import { ApiError } from '../src/services/api/client.js'
+import { useSettings } from '../src/services/settings.js'
 import type { Session } from '../src/services/chat/types.js'
 import { assistantMessage, at, compactionRecord, conversation, userMessage } from './helpers.js'
 
@@ -248,4 +250,19 @@ test('压缩记录比锚点更早时，锚点照常有效', () => {
   )
   assert.ok(usage)
   assert.equal(usage.measured, true)
+})
+
+// ── getSessionModel：模型名不再写死 ────────────────────────────
+
+test('会话里记过模型就用记的那个，没记过就用设置里的', () => {
+  const original = useSettings.getState().model
+  try {
+    useSettings.setState({ model: 'deepseek-chat-v9' })
+    assert.equal(getSessionModel(sessionOf([])), 'deepseek-chat-v9')
+
+    const replied = sessionOf([userMessage('问'), { ...answered('答', 100, 100), model: 'recorded-model' }])
+    assert.equal(getSessionModel(replied), 'recorded-model')
+  } finally {
+    useSettings.setState({ model: original })
+  }
 })

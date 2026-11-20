@@ -6,9 +6,11 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-/** 本机设置，存 localStorage：API Key、语言、主题、位置、深度思考与智能搜索开关、侧边栏收起状态 */
+/** 本机设置，存 localStorage：API Key、模型名、语言、主题、位置、深度思考与智能搜索开关、侧边栏收起状态 */
 type Settings = {
   apiKey: string | null
+  /** 模型调用名；首次安装用 DEFAULT_MODEL，之后完全以用户填的为准 */
+  model: string
   locale: Locale
   themePreference: ThemePreference
   location: UserLocation | null
@@ -16,6 +18,12 @@ type Settings = {
   search: boolean
   siderCollapsed: boolean
 }
+
+/**
+ * 首次安装时的模型名。官方改名时用户可以在设置里直接改，不必等新版本——
+ * 所以这里只当作初值，不是"唯一可用的模型"。
+ */
+export const DEFAULT_MODEL = 'deepseek-flash'
 
 /**
  * 1Mi：deepseek-flash（DeepSeek-V4.1-Flash）官方 /models 声明的窗口。
@@ -26,6 +34,7 @@ export const DEFAULT_CONTEXT_WINDOW = 1_048_576
 
 const KEYS = {
   apiKey: 'chat-demo:api-key',
+  model: 'chat-demo:model',
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
@@ -90,6 +99,7 @@ const initialThemePreference = (): ThemePreference => {
 
 export const useSettings = create<Settings>(() => ({
   apiKey: read(KEYS.apiKey),
+  model: read(KEYS.model)?.trim() || DEFAULT_MODEL,
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
@@ -117,6 +127,13 @@ export const setThemePreference = (themePreference: ThemePreference) => {
 export const setApiKey = (apiKey: string | null) => {
   write(KEYS.apiKey, apiKey)
   useSettings.setState({ apiKey })
+}
+
+/** 模型名由用户在设置里填、由 /models 校验后才调用这里 */
+export const setModel = (model: string) => {
+  const trimmed = model.trim()
+  write(KEYS.model, trimmed)
+  useSettings.setState({ model: trimmed || DEFAULT_MODEL })
 }
 
 export const setThinking = (thinking: boolean) => {

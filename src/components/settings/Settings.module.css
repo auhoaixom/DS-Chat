@@ -463,3 +463,58 @@
   font-weight: 400;
   font-size: 13px;
 }
+/* 模型名：值可以直接选中复制；编辑态下面是一排操作按钮 */
+.modelValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.modelActions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* 和 API Key 的整行「确定」同色同高，但这一行还要并排放「取消」，所以撑满剩余宽度而不是整行 */
+.modelConfirm {
+  flex: 1;
+  height: 52px;
+  border: none;
+  border-radius: 100px;
+  background-color: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-static-neutral-bluish-00);
+  font: inherit;
+  font-size: 17px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.modelConfirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.modelCancel {
+  flex: 0 0 auto;
+  height: 52px;
+  padding: 0 22px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modelAvailable {
+  margin-top: 6px;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+  word-break: break-all;
+}

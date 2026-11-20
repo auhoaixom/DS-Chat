@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import type { ChatModel } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
@@ -17,7 +16,7 @@ import {
   type CompactionProgress,
 } from './compaction.js'
 import * as db from './db.js'
-import { DEFAULT_MODEL, SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
+import { SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
 import { estimateTokens } from './tokens.js'
 import {
   clearAllDrafts,
@@ -45,7 +44,6 @@ import {
 } from './types.js'
 
 /** deepseek-flash 同时支持深度思考与图片输入 */
-const MODEL: ChatModel = DEFAULT_MODEL
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 服务端判定 file_id 失效后，重新补传并重发的最多次数（不含首次请求） */
@@ -268,7 +266,7 @@ const createReply = (): AssistantMessage => {
     id: createId(),
     role: 'assistant',
     createdAt: Date.now(),
-    model: MODEL,
+    model: useSettings.getState().model,
     thinking,
     search,
     prefix: true,
@@ -822,8 +820,8 @@ export const continueReply = (sessionId: string, messageId: string) => {
   const { thinking, search } = useSettings.getState()
   const reply: AssistantMessage = {
     ...previous,
-    // 未记录请求配置的回复，续写时使用默认模型和当前开关。
-    model: previous.model ?? MODEL,
+    // 未记录请求配置的回复，续写时使用当前设置的模型和开关。
+    model: previous.model ?? useSettings.getState().model,
     thinking: previous.thinking ?? thinking,
     search: previous.search ?? search,
     status: 'pending',
@@ -1136,7 +1134,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const events = streamMessage(
           useSettings.getState().apiKey ?? '',
           {
-            model: initial.model ?? MODEL,
+            model: initial.model ?? useSettings.getState().model,
             system,
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },

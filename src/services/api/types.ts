@@ -4,7 +4,11 @@
  * 声明 deepseek_web_search / deepseek_read_url 或设置 safety_check.level 为 high 时进入扩展模式。
  */
 
-export type ChatModel = 'deepseek-flash' | 'deepseek-v4-pro'
+/**
+ * 模型调用名。**不再写死成字面量联合**：官方随时可能新增或改名，
+ * 名字由用户在设置里填、由服务端 `/models` 校验，客户端只负责照发。
+ */
+export type ChatModel = string
 
 // ---------- 响应：内容块 ----------
 
