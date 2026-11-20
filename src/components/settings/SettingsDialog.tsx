@@ -14,16 +14,13 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
-  CONTEXT_WINDOW_OPTIONS,
   isChineseBrowser,
-  setContextWindow,
   setLocale,
   setLocation,
   setThemePreference,
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
-import { formatTokens } from '../../services/chat/tokens.js'
 import { fetchBalance, formatBalance } from '../../services/balance.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
@@ -96,7 +93,6 @@ const SettingsContent = () => {
             <>
               <ThemeSetting />
               <LocaleSetting />
-              <ContextWindowSetting />
               <LocationSetting />
             </>
           ) : (
@@ -358,29 +354,6 @@ const BalanceSetting = () => {
             {t('refresh')}
           </Button>
         </div>
-      }
-    />
-  )
-}
-
-/** 上下文窗口大小：接口不返回窗口长度，用于判断何时自动压缩上下文 */const ContextWindowSetting = () => {
-  const t = useTranslate()
-  const contextWindow = useSettings((state) => state.contextWindow)
-  return (
-    <SettingCell
-      label={t('settingsContextWindow')}
-      description={t('settingsContextWindowHint')}
-      status={null}
-      action={
-        <Select
-          ariaLabel={t('settingsContextWindow')}
-          value={String(contextWindow)}
-          options={CONTEXT_WINDOW_OPTIONS.map((value) => ({
-            value: String(value),
-            label: formatTokens(value),
-          }))}
-          onChange={(value) => setContextWindow(Number(value))}
-        />
       }
     />
   )

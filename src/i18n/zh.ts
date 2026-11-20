@@ -191,7 +191,6 @@ export const zh = {
   refresh: '刷新',
   settingsLocaleZhCN: '简体中文',
   settingsLocaleEnUS: 'English',
-  settingsContextWindow: '上下文窗口',  settingsContextWindowHint: '模型自己声明窗口时以模型为准，这里只在认不出模型时生效',
   compactionButton: '压缩上下文',
   compactionTooltip: '把较早的对话压缩成一段摘要，腾出上下文空间',
   compactionTitle: '压缩上下文',

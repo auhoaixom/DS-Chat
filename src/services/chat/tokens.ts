@@ -1,5 +1,5 @@
 import type { MessageUsage } from '../api/types.js'
-import { DEFAULT_CONTEXT_WINDOW, useSettings } from '../settings.js'
+import { DEFAULT_CONTEXT_WINDOW } from '../settings.js'
 import type { Message } from './types.js'
 
 /**
@@ -84,14 +84,9 @@ export const formatTokens = (tokens: number): string => {
 }
 
 /**
- * 上下文窗口：优先用模型自己声明的容量，认不出的模型退回设置里的值。
- * 模型容量来自服务端 /models 的声明，改别名时这张表要跟着改。
+ * 上下文窗口：一律用模型自己声明的容量。
+ * 模型容量来自服务端 /models 的声明，改别名时这张表要跟着改；
+ * 认不出的模型退回 1Mi，而不是退回某个用户选过的数字。
  */
-export const getContextWindow = (model?: string | null): number => {
-  const declared = model ? MODEL_CONTEXT_WINDOWS[model] : undefined
-  if (declared) {
-    return declared
-  }
-  const value = useSettings.getState().contextWindow
-  return value > 0 ? value : DEFAULT_CONTEXT_WINDOW
-}
+export const getContextWindow = (model?: string | null): number =>
+  (model ? MODEL_CONTEXT_WINDOWS[model] : undefined) ?? DEFAULT_CONTEXT_WINDOW

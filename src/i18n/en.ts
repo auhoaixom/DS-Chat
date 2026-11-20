@@ -199,9 +199,6 @@ export const en = {
   refresh: 'Refresh',
   settingsLocaleZhCN: 'Simplified Chinese',
   settingsLocaleEnUS: 'English',
-  settingsContextWindow: 'Context window',
-  settingsContextWindowHint:
-    'The model’s own declared window wins; this value applies only when the model is unknown',
   compactionButton: 'Compact context',
   compactionTooltip: 'Condense earlier messages into a summary to free up context',
   compactionTitle: 'Compact context',

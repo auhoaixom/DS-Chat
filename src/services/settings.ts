@@ -15,13 +15,13 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
-  /** 上下文窗口大小，用于判断何时自动压缩上下文 */
-  contextWindow: number
 }
 
-/** 上下文窗口的可选值：模型自己声明的容量优先，认不出的模型按这里选的值算 */
-export const CONTEXT_WINDOW_OPTIONS = [128_000, 262_144, 524_288, 1_048_576] as const
-/** 1Mi：deepseek-flash（DeepSeek-V4.1-Flash）官方 /models 声明的窗口 */
+/**
+ * 1Mi：deepseek-flash（DeepSeek-V4.1-Flash）官方 /models 声明的窗口。
+ * 窗口一律以模型自己声明的为准，认不出的模型才退回这个值——不接受用户调，界面上的
+ * 「上限」因此永远是模型的事实，而不是某个人选的数字。
+ */
 export const DEFAULT_CONTEXT_WINDOW = 1_048_576
 
 const KEYS = {
@@ -32,7 +32,6 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
-  contextWindow: 'chat-demo:context-window',
 } as const
 
 const read = (key: string) => {
@@ -89,11 +88,6 @@ const initialThemePreference = (): ThemePreference => {
   return saved === 'light' || saved === 'dark' ? saved : 'system'
 }
 
-const initialContextWindow = (): number => {
-  const saved = Number(read(KEYS.contextWindow))
-  return Number.isFinite(saved) && saved >= 1_000 ? saved : DEFAULT_CONTEXT_WINDOW
-}
-
 export const useSettings = create<Settings>(() => ({
   apiKey: read(KEYS.apiKey),
   locale: initialLocale(),
@@ -102,7 +96,6 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
-  contextWindow: initialContextWindow(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -139,9 +132,4 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
-}
-
-export const setContextWindow = (contextWindow: number) => {
-  write(KEYS.contextWindow, String(contextWindow))
-  useSettings.setState({ contextWindow })
 }
