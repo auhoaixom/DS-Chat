@@ -440,3 +440,26 @@
     max-width: 100%;
   }
 }
+
+.balanceRow {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.balanceValue {
+  min-width: 64px;
+  text-align: right;
+  color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.balanceValueError {
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 400;
+  font-size: 13px;
+}

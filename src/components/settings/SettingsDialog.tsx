@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconDarkOutline16,
   IconDataOutline16,
@@ -30,6 +30,7 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { formatTokens } from '../../services/chat/tokens.js'
+import { fetchBalance, formatBalance } from '../../services/balance.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
@@ -107,6 +108,7 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
+              <BalanceSetting />
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
@@ -294,8 +296,80 @@ const LocaleSetting = () => {
   )
 }
 
-/** 上下文窗口大小：接口不返回窗口长度，用于判断何时自动压缩上下文 */
-const ContextWindowSetting = () => {
+/** 账户余额：打开时查一次，右上角可按需刷新 */
+const BalanceSetting = () => {
+  const t = useTranslate()
+  const apiKey = useSettings((state) => state.apiKey)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [text, setText] = useState('')
+  const [detail, setDetail] = useState('')
+  const [hint, setHint] = useState('')
+  const controllerRef = useRef<AbortController | null>(null)
+
+  const load = useCallback(async () => {
+    controllerRef.current?.abort()
+    if (!apiKey) {
+      setStatus('error')
+      setText(t('balanceNoKey'))
+      setHint('')
+      return
+    }
+    const controller = new AbortController()
+    controllerRef.current = controller
+    setStatus('loading')
+    setText(t('balanceLoading'))
+    const result = await fetchBalance(apiKey, controller.signal)
+    if (controller.signal.aborted) {
+      return
+    }
+    if (result.ok) {
+      const info =
+        result.snapshot.infos.find((item) => item.currency === 'CNY') ?? result.snapshot.infos[0]
+      setStatus('done')
+      setText(info ? formatBalance(info) : '—')
+      setDetail(result.snapshot.available ? t('balanceAvailable') : t('balanceUnavailable'))
+      setHint('')
+    } else {
+      setStatus('error')
+      setText(t('balanceFailed'))
+      setDetail('')
+      setHint(result.message)
+    }
+  }, [apiKey, t])
+
+  useEffect(() => {
+    void load()
+    return () => controllerRef.current?.abort()
+    // apiKey 变化时重新查询，其余情况不重复请求
+  }, [load])
+
+  return (
+    <SettingCell
+      label={t('settingsBalance')}
+      description={hint || detail || undefined}
+      status={null}
+      action={
+        <div className={styles.balanceRow}>
+          <span
+            className={clsx(styles.balanceValue, status === 'error' && styles.balanceValueError)}
+          >
+            {status === 'idle' ? '—' : text}
+          </span>
+          <Button
+            variant="outlined"
+            size="s"
+            disabled={status === 'loading'}
+            onClick={() => void load()}
+          >
+            {t('refresh')}
+          </Button>
+        </div>
+      }
+    />
+  )
+}
+
+/** 上下文窗口大小：接口不返回窗口长度，用于判断何时自动压缩上下文 */const ContextWindowSetting = () => {
   const t = useTranslate()
   const contextWindow = useSettings((state) => state.contextWindow)
   return (
