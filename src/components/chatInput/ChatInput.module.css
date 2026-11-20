@@ -44,9 +44,10 @@
   position: relative;
   flex-shrink: 0;
   box-sizing: border-box;
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
+  /* 缩略图放大：把删除热区从图片中心推开，拇指落点有偏差也不会点到删除 */
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
   border: 1px solid var(--dsw-alias-border-l2);
   overflow: hidden;
   background-color: var(--dsw-alias-bg-skeleton);
@@ -150,8 +151,8 @@
 
 .remove {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 6px;
+  right: 6px;
   z-index: 1;
   display: flex;
   align-items: center;
@@ -169,11 +170,11 @@
   opacity: 1;
   transition: opacity var(--ds-transition-duration) var(--ds-ease-in-out);
 
-  /* 视觉 22px，热区 34px；外扩只留 6px，避免热区吃掉缩略图靠近中心的位置 */
+  /* 视觉 22px、热区 32px；外扩只留 5px，别把热区往图片中心带 */
   &::after {
     content: '';
     position: absolute;
-    inset: -6px;
+    inset: -5px;
   }
 }
 
