@@ -3,6 +3,7 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
+import { useAttachPanelOpen } from '../chatInput/attachPanelState.js'
 import { MessageList } from '../messages/MessageList.js'
 import { MobileHeader } from './MobileHeader.js'
 import styles from './SessionView.module.css'
@@ -19,6 +20,8 @@ export const SessionView = ({
 }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
+  // 附件面板展开时占住底部，免责声明让位
+  const attachPanelOpen = useAttachPanelOpen()
   const title = session.title || t('untitledChat')
   return (
     <div className={styles.view}>
@@ -37,7 +40,9 @@ export const SessionView = ({
         footer={
           <div className={styles.inputContainer}>
             <ChatInput sessionId={session.id} />
-            <div className={styles.caveat}>{t('contentCaveat')}</div>
+            {attachPanelOpen ? null : (
+              <div className={styles.caveat}>{t('contentCaveat')}</div>
+            )}
           </div>
         }
       />

@@ -1,9 +1,8 @@
 import clsx from 'clsx'
-import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
-  IconCameraOutline16,
   IconGlobeLanguageOutline14,
-  IconPaperclipOutline16,
+  IconPlusOutline16,
   IconSendOutline16,
   IconStopFill16,
   IconThinkOutline14,
@@ -27,8 +26,8 @@ import { capturePhoto } from '../../services/camera.js'
 import { cropImage } from '../camera/cropState.js'
 import { openInAppCamera } from '../camera/inAppCameraState.js'
 import { useFilePreview } from '../files/filePreviewState.js'
-import { ActionSheet } from '../base/ActionSheet.js'
-import { IconButton } from '../base/IconButton.js'
+import { AttachPanel, type AttachSource } from './AttachPanel.js'
+import { closeAttachPanel, toggleAttachPanel, useAttachPanelOpen } from './attachPanelState.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 import { DragMask, useFileDrop } from './DragMask.js'
@@ -57,7 +56,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const panelOpen = useAttachPanelOpen()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -68,7 +67,6 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (!toggles) {
       return
     }
-
     const updateLabels = () => {
       toggles.classList.remove(styles.collapsedToggles)
       toggles.classList.toggle(styles.collapsedToggles, toggles.scrollWidth > toggles.clientWidth)
@@ -79,6 +77,22 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     observer.observe(toggles)
     return () => observer.disconnect()
   }, [t])
+
+  // 点输入框与面板以外的地方收起附件面板（键盘也是这样收的）
+  useEffect(() => {
+    if (!panelOpen) {
+      return
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (target instanceof Element && target.closest('[data-attach-scope]')) {
+        return
+      }
+      closeAttachPanel()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [panelOpen])
 
   const acceptFiles = (files: File[]) => {
     if (files.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
@@ -130,15 +144,28 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const canSend = !importingHistory && !streaming && draftReady
 
   /**
-   * 打开来源选择面板；实际取图在 choosePhotoSource 里做。
-   * 不做 picking 防重入：相机被系统返回键关闭时 Capacitor 的回调可能不返回，
-   * picking 会一直停在 true，那样会永久挡住这个入口。面板本身已经挡住重复点击。
+   * 「＋」展开附件面板（拍照 / 相册 / 文件），面板占住键盘的位置。
+   * 不做防重入：相机被系统返回键关闭时 Capacitor 的回调可能不返回，
+   * 死锁的标记会永久挡住这个入口；面板本身已经挡住重复点击。
    */
-  const openCamera = () => {
+  const openAttach = () => {
     if (importingHistory || !ensureApiKey()) {
       return
     }
-    setSheetOpen(true)
+    textareaRef.current?.blur()
+    toggleAttachPanel()
+  }
+
+  /** 面板里的三个入口：先收起面板，再走各自的取图 / 取文件流程 */
+  const pickAttachment = (source: AttachSource) => {
+    closeAttachPanel()
+    if (source === 'camera') {
+      void takePhoto()
+    } else if (source === 'album') {
+      openImagePicker()
+    } else {
+      openFilePicker()
+    }
   }
 
   /**
@@ -147,7 +174,6 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
    * 自建相机不可用（老 WebView 或没有可用摄像头）时退回系统相机。
    */
   const takePhoto = async () => {
-    setSheetOpen(false)
     for (;;) {
       const shot = await openInAppCamera()
       if (!shot) {
@@ -217,11 +243,18 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
    * 不需要相册读取权限，系统会给出「照片/文件」来源选择，并且支持多选。
    */
   const openImagePicker = () => {
-    setSheetOpen(false)
     if (!ensureApiKey()) {
       return
     }
     imageInputRef.current?.click()
+  }
+
+  /** 文件走 WebView 原生的 file input，白名单由 ACCEPT 控制 */
+  const openFilePicker = () => {
+    if (!ensureApiKey()) {
+      return
+    }
+    fileInputRef.current?.click()
   }
 
   /** 放大预览后裁剪草稿附件：结果替换同一个附件并重新上传。 */
@@ -257,6 +290,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     if (!ensureApiKey() || !sendMessage(sessionId)) {
       return
     }
+    closeAttachPanel()
     if (isMobile) {
       textareaRef.current?.blur()
     } else {
@@ -265,14 +299,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   }
 
   return (
-    <div
-      className={clsx(styles.wrapper, sessionId === null ? styles.home : styles.session)}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          textareaRef.current?.focus({ preventScroll: true })
-        }
-      }}
-    >
+    <>
+      <div
+        className={clsx(styles.wrapper, sessionId === null ? styles.home : styles.session)}
+        data-attach-scope
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            textareaRef.current?.focus({ preventScroll: true })
+          }
+        }}
+      >
       <DraftAttachments
         items={attachments}
         onRetry={retryFile}
@@ -290,6 +326,8 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           disabled={importingHistory}
           value={text}
           onChange={(event) => setText(event.target.value)}
+          // 点输入框等于要用键盘：先收附件面板
+          onFocus={() => closeAttachPanel()}
           onMouseDown={(event) => {
             // 首次点击时手动聚焦，避免 Safari 把整个页面滚到输入框位置。
             if (isMobile && event.button === 0 && document.activeElement !== event.currentTarget) {
@@ -344,22 +382,6 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           </Tooltip>
         </div>
         <div className={styles.right}>
-          <IconButton
-            size="m"
-            tone="primary"
-            icon={<IconCameraOutline16 />}
-            tooltip={t('attachPhoto')}
-            disabled={importingHistory}
-            onClick={() => void openCamera()}
-          />
-          <IconButton
-            size="m"
-            tone="primary"
-            icon={<IconPaperclipOutline16 />}
-            tooltip={t('uploadFile')}
-            disabled={importingHistory}
-            onClick={() => ensureApiKey() && fileInputRef.current?.click()}
-          />
           <input
             ref={fileInputRef}
             type="file"
@@ -382,6 +404,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               event.target.value = ''
             }}
           />
+          {/* 相机与文件合并成一个「＋」，展开后是拍照 / 相册 / 文件三块 */}
+          <button
+            type="button"
+            className={clsx(styles.attachButton, panelOpen && styles.attachButtonOpen)}
+            aria-label={t('attachMore')}
+            aria-expanded={panelOpen}
+            disabled={importingHistory}
+            onClick={openAttach}
+          >
+            <IconPlusOutline16 />
+          </button>
           {streaming && sessionId ? (
             <button
               type="button"
@@ -407,22 +440,8 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         </div>
       </div>
       {dragging ? <DragMask /> : null}
-      <ActionSheet
-        open={sheetOpen}
-        title={t('attachPhoto')}
-        items={[
-          { key: 'camera', label: t('cameraPromptTake') },
-          { key: 'photos', label: t('cameraPromptLibrary') },
-        ]}
-        onSelect={(key) => {
-          if (key === 'camera') {
-            void takePhoto()
-          } else {
-            openImagePicker()
-          }
-        }}
-        onClose={() => setSheetOpen(false)}
-      />
-    </div>
+      </div>
+      {panelOpen ? <AttachPanel onPick={pickAttachment} /> : null}
+    </>
   )
 }

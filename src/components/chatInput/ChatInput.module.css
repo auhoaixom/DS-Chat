@@ -263,6 +263,10 @@
   gap: 8px;
   margin-top: 4px;
   padding: 12px;
+  /* 输入框是绝对定位（绘制层级高于普通流内元素），背景透明却会吞掉这一行的点击；
+     这里把按钮行抬到它上面，否则「＋」与开关点了没反应、只会聚焦输入框 */
+  position: relative;
+  z-index: 1;
 }
 
 .toggles {
@@ -351,4 +355,39 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
+}
+
+/* 「＋」：描边圆形，与发送按钮同尺寸；展开时旋转成叉，兼作关闭 */
+.attachButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+
+  &:active {
+    background: var(--dsw-alias-interactive-bg-active);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.attachButtonOpen {
+  transform: rotate(45deg);
+  border-color: var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-interactive-bg-active);
 }

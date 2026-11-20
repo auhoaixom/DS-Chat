@@ -574,6 +574,41 @@ export const IconSwitchCameraOutline16 = () => (
   </svg>
 )
 
+/** 加号：输入框右下角的附件入口 */
+export const IconPlusOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M8 3.4v9.2M3.4 8h9.2"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+/** 相册：圆角画框 + 山与太阳，附件面板里的「相册」入口 */
+export const IconImageOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect
+      x={2.2}
+      y={2.9}
+      width={11.6}
+      height={10.2}
+      rx={2.4}
+      stroke="currentColor"
+      strokeWidth={1.3}
+    />
+    <circle cx={6.1} cy={6.4} r={1.15} fill="currentColor" />
+    <path
+      d="M3.2 11.4 6.3 8.5l2.5 2.3 1.6-1.5 2.4 2.1"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const IconToastError16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
