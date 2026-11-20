@@ -1,7 +1,8 @@
 import { ApiError, streamMessage } from '../api/client.js'
-import type { ChatModel, CreateMessageRequest } from '../api/types.js'
+import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types.js'
 import { getVisibleMessages } from './branches.js'
-import { getReplyText } from './reply.js'
+import { SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
+import { getReplyText, toHistoryParams } from './reply.js'
 import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
 import type { Compaction, FileAttachment, Message, Session, UserMessage } from './types.js'
 
@@ -120,20 +121,26 @@ const chunkEntries = (entries: string[]): string[] => {
   return chunks.length > MAX_CHUNKS ? chunks.slice(-MAX_CHUNKS) : chunks
 }
 
+/** 收集摘要正文，同时记下这次摘要请求自己的用量（用于核对缓存命中） */
 const collectSummary = async (
   apiKey: string,
   body: CreateMessageRequest,
   signal: AbortSignal,
   onText?: (text: string) => void
-): Promise<string> => {
+): Promise<{ text: string; usage?: MessageUsage }> => {
   let text = ''
+  let usage: MessageUsage | undefined
   for await (const event of streamMessage(apiKey, body, signal)) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+    if (event.type === 'message_start') {
+      usage = event.message.usage ?? usage
+    } else if (event.type === 'message_delta') {
+      usage = event.usage ?? usage
+    } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       text += event.delta.text
       onText?.(text)
     }
   }
-  return text.trim()
+  return { text: text.trim(), usage }
 }
 
 /** 摘要请求：思考关闭、默认不声明任何工具（记录里的链接不需要真的去读） */
@@ -144,34 +151,59 @@ const requestSummary = async (
   input: string,
   signal: AbortSignal,
   onText?: (text: string) => void
-): Promise<string> => {
+): Promise<SummarizeResult> => {
   const body: CreateMessageRequest = {
     model,
     system,
     messages: [{ role: 'user', content: input }],
     thinking: { type: 'disabled' },
     tools: [],
-    safety_check: { level: 'high' },
+    safety_check: SAFETY_CHECK,
   }
-  let summary: string
+  let result: SummarizeResult
   try {
-    summary = await collectSummary(apiKey, body, signal, onText)
+    result = await collectSummary(apiKey, body, signal, onText)
   } catch (error) {
     // 空工具声明被服务端拒绝时，带一个不会主动触发的阅读工具再试一次
     if (!(error instanceof ApiError) || error.status !== 400) {
       throw error
     }
-    summary = await collectSummary(
-      apiKey,
-      { ...body, tools: [{ type: 'deepseek_read_url', name: 'deepseek_read_url' }] },
-      signal,
-      onText
-    )
+    result = await collectSummary(apiKey, { ...body, tools: serverTools(false) }, signal, onText)
   }
-  if (!summary) {
+  if (!result.text) {
     throw new ApiError('protocol', 'summary is empty')
   }
-  return summary
+  return result
+}
+
+/** 一次摘要请求的产物：正文与服务端回报的用量（用量用于核对缓存是否命中） */
+type SummarizeResult = { text: string; usage?: MessageUsage }
+
+/**
+ * 回放式摘要（只对纯文字会话启用）：把被压缩的那段历史按**聊天时的原样**发出去，
+ * 只在末尾追加一条压缩指令——前缀与上一轮真实请求逐字一致，服务端缓存才能命中。
+ */
+const requestReplaySummary = async (
+  apiKey: string,
+  model: ChatModel,
+  history: Message[],
+  search: boolean,
+  signal: AbortSignal,
+  onText?: (text: string) => void
+): Promise<SummarizeResult> => {
+  const body: CreateMessageRequest = {
+    model,
+    system: SYSTEM_PROMPT,
+    messages: [...toHistoryParams(history), { role: 'user', content: REPLAY_INSTRUCTION }],
+    thinking: { type: 'disabled' },
+    tools: serverTools(search),
+    safety_check: SAFETY_CHECK,
+  }
+  const result = await collectSummary(apiKey, body, signal, onText)
+  if (!result.text) {
+    throw new ApiError('protocol', 'summary is empty')
+  }
+  return result
 }
 
 /**
@@ -331,6 +363,45 @@ const measureContext = (
 export const getContextUsage = (session: Session, systemBase = ''): ContextUsage | null =>
   measureContext(session, [], systemBase)
 
+/** 一场对话的累计缓存命中情况（只看带服务端用量的回答） */
+export type CacheStats = {
+  /** 命中率百分比 */
+  percent: number
+  /** 参与统计的请求数 */
+  requests: number
+  /** 命中的 token 与提示侧总量，用于诊断 */
+  read: number
+  total: number
+}
+
+/**
+ * 累计命中率：把当前分支上每个回答的提示侧用量加起来，
+ * 用「命中 / 全部」表示这场对话有多少输入是按缓存价计费的。
+ * 压缩会让下一次请求必然全价，但它只是一次请求，累计值只会被摊薄一点。
+ */
+export const getCacheStats = (session: Session): CacheStats | null => {
+  let read = 0
+  let total = 0
+  let requests = 0
+  for (const message of getVisibleMessages(session)) {
+    if (message.role !== 'assistant' || !message.usage) {
+      continue
+    }
+    const { input_tokens, cache_creation_input_tokens, cache_read_input_tokens } = message.usage
+    const prompt = input_tokens + cache_creation_input_tokens + cache_read_input_tokens
+    if (prompt <= 0) {
+      continue
+    }
+    read += cache_read_input_tokens
+    total += prompt
+    requests += 1
+  }
+  if (requests === 0 || total <= 0) {
+    return null
+  }
+  return { percent: Math.round((read / total) * 100), requests, read, total }
+}
+
 /** 带上待发提问后的提示侧 token，用于判断是否该自动压缩 */
 export const estimatePromptTokens = (session: Session, question?: UserMessage): number =>
   measureContext(session, question ? [question] : [], '')?.used ?? 0
@@ -406,6 +477,26 @@ export const isContextOverflowError = (error: unknown): boolean => {
   return OVERFLOW_PATTERN.test(error.message)
 }
 
+/**
+ * 回放式摘要的末尾指令：前缀必须保持原样，所以压缩要求只能放在这里，
+ * 且要明确禁止模型"接着回答"而不是"总结"。
+ */
+const REPLAY_INSTRUCTION = `以上是对话的全部内容。现在请你**只做一件事**：把这段对话压缩成一份结构化摘要，供同一场对话继续时作为背景使用。
+
+硬性要求：
+1. 只输出摘要本身。不要回答上面任何一个问题，不要接着对话，不要评论，不要开场白。
+2. 不得编造对话里没有的信息；记录中没有的细节不要补全，存疑的写"未确认"。
+3. 代码、命令、路径、文件名、URL、数字、专有名词、人名逐字保留，不翻译、不改写、不缩写。
+4. 使用与对话主要语言一致的语言。
+5. 用 Markdown，严格按下面六个小标题组织；某一节确实没有内容就写"无"。总长 800–1500 字。
+
+## 用户目标与背景
+## 已确认的事实与结论
+## 已完成的操作与产出
+## 未决问题与下一步
+## 用户明确提出的要求与偏好
+## 必须逐字保留的内容`
+
 /** 已有摘要时追加的合并要求：不照抄、不丢仍然成立的事实 */
 const MERGE_SYSTEM = `${SUMMARY_SYSTEM}
 
@@ -462,45 +553,82 @@ export const buildCompaction = async ({
   const previous = session.compaction
   const merge = previous !== undefined && continuesFrom(previous, covered)
   const fresh = merge ? covered.slice(previous.coveredIds.length) : covered
-  const entries = fresh.map((message, index) =>
-    toTranscriptEntry(message, merge ? index + previous.coveredIds.length : index)
+  /**
+   * 回放式摘要的启用条件：
+   * - 没有旧摘要（增量合并的原料是摘要文本，回放无从对齐）；
+   * - 被压缩的这段里没有用户附件（回放会让服务端真的去解析 file_id，风险与费用都不可控）；
+   * - 一次性发得下（不分段，分段会打乱前缀）。
+   */
+  const textOnly = covered.every(
+    (message) => message.role !== 'user' || message.files.length === 0
   )
-  const head =
-    merge && previous
-      ? `#### 既有摘要（更早的对话）\n${previous.summary.trim()}`
-      : null
-  const chunks = chunkEntries(head === null ? entries : [head, ...entries])
-  let input: string
-  if (chunks.length <= 1) {
-    input = merge
-      ? `下面是上一份摘要，以及它之后新增的聊天记录：\n\n${[head, ...entries].join('\n\n')}`
-      : `下面是需要压缩的聊天记录：\n\n${entries.join('\n\n')}`
+  const coveredTokens = covered.reduce((sum, message) => sum + estimateMessageTokens(message), 0)
+  const replayable = !merge && textOnly && coveredTokens < window * 0.5
+  let result: SummarizeResult
+  if (replayable) {
+    const lastReply = [...visible]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.search !== undefined)
+    result = await requestReplaySummary(
+      apiKey,
+      model,
+      covered,
+      lastReply?.role === 'assistant' ? (lastReply.search ?? false) : false,
+      signal,
+      (text) =>
+        onProgress?.({ phase: 'summary', done: 0, total: 1, chars: text.length })
+    )
   } else {
-    const notes: string[] = []
-    for (const [index, chunk] of chunks.entries()) {
-      signal.throwIfAborted()
-      const note = await requestSummary(
-        apiKey,
-        model,
-        CHUNK_SYSTEM,
-        `这是同一段对话的第 ${index + 1}/${chunks.length} 部分（按时间顺序）：\n\n${chunk}`,
-        signal,
-        (text) =>
-          onProgress?.({ phase: 'chunk', done: index, total: chunks.length, chars: text.length })
-      )
-      notes.push(`### 第 ${index + 1} 段\n${note}`)
+    const entries = fresh.map((message, index) =>
+      toTranscriptEntry(message, merge ? index + previous.coveredIds.length : index)
+    )
+    const head =
+      merge && previous
+        ? `#### 既有摘要（更早的对话）\n${previous.summary.trim()}`
+        : null
+    const chunks = chunkEntries(head === null ? entries : [head, ...entries])
+    let input: string
+    if (chunks.length <= 1) {
+      input = merge
+        ? `下面是上一份摘要，以及它之后新增的聊天记录：\n\n${[head, ...entries].join('\n\n')}`
+        : `下面是需要压缩的聊天记录：\n\n${entries.join('\n\n')}`
+    } else {
+      const notes: string[] = []
+      for (const [index, chunk] of chunks.entries()) {
+        signal.throwIfAborted()
+        const note = await requestSummary(
+          apiKey,
+          model,
+          CHUNK_SYSTEM,
+          `这是同一段对话的第 ${index + 1}/${chunks.length} 部分（按时间顺序）：\n\n${chunk}`,
+          signal,
+          (text) =>
+            onProgress?.({ phase: 'chunk', done: index, total: chunks.length, chars: text.length })
+        )
+        notes.push(`### 第 ${index + 1} 段\n${note.text}`)
+      }
+      input = `下面是同一段对话按时间顺序排列的分段要点：\n\n${notes.join('\n\n')}\n\n请据此写出最终摘要。`
     }
-    input = `下面是同一段对话按时间顺序排列的分段要点：\n\n${notes.join('\n\n')}\n\n请据此写出最终摘要。`
+    signal.throwIfAborted()
+    result = await requestSummary(
+      apiKey,
+      model,
+      merge ? MERGE_SYSTEM : SUMMARY_SYSTEM,
+      input,
+      signal,
+      (text) =>
+        onProgress?.({ phase: 'summary', done: chunks.length, total: chunks.length, chars: text.length })
+    )
   }
-  signal.throwIfAborted()
-  const summary = await requestSummary(
-    apiKey,
-    model,
-    merge ? MERGE_SYSTEM : SUMMARY_SYSTEM,
-    input,
-    signal,
-    (text) =>
-      onProgress?.({ phase: 'summary', done: chunks.length, total: chunks.length, chars: text.length })
+  const summary = result.text
+  // 诊断留痕：核对摘要请求是否吃到前缀缓存（真机可读 logcat 的 chromium 控制台）
+  // eslint-disable-next-line no-console
+  console.info(
+    `[compaction] replay=${replayable} input=${result.usage?.input_tokens ?? -1} cacheRead=${
+      result.usage?.cache_read_input_tokens ?? -1
+    } cacheWrite=${result.usage?.cache_creation_input_tokens ?? -1} out=${
+      result.usage?.output_tokens ?? -1
+    }`
   )
   const beforeTokens = estimatePromptTokens(session)
   // 压缩后 = 现状 - 这次新吞掉的原文 + 新摘要 - 被替换掉的旧摘要
@@ -526,6 +654,14 @@ export const buildCompaction = async ({
       beforeTokens,
       afterTokens,
       model,
+      viaReplay: replayable,
+      summaryUsage: result.usage
+        ? {
+            input: result.usage.input_tokens,
+            cacheRead: result.usage.cache_read_input_tokens,
+            cacheWrite: result.usage.cache_creation_input_tokens,
+          }
+        : undefined,
     },
   }
 }

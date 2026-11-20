@@ -302,16 +302,16 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
 }
 
 /**
- * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
- * 失败或没有回答的轮次不进上下文。续写时末尾再带上本轮 assistant。
+ * 把成对的历史轮次序列化为请求的 messages。
+ * 与 toRequestMessages 共用同一套转换，因此「历史前缀」在两条路径下逐字一致——
+ * 摘要请求正是靠这一点命中聊天的前缀缓存。
  */
-export const toRequestMessages = (
-  history: Message[],
-  question: UserMessage,
-  prefix?: AssistantMessage,
-  thinking = prefix?.thinking ?? false,
-  latestReminder?: string
-): MessageParam[] => {
+export const toHistoryParams = (history: Message[]): MessageParam[] =>
+  buildHistoryParams(history).messages
+
+const buildHistoryParams = (
+  history: Message[]
+): { messages: MessageParam[]; reminder?: string } => {
   const messages: MessageParam[] = []
   let previousReminder: string | undefined
   const appendReminder = (reminder: string | undefined) => {
@@ -329,7 +329,25 @@ export const toRequestMessages = (
     appendReminder(reply.latestReminder)
     messages.push(toUserParam(user), toAssistantParam(reply))
   }
-  appendReminder(latestReminder)
+  return { messages, reminder: previousReminder }
+}
+
+/**
+ * 把会话转成请求的 messages：只保留「提问 + 有回答的回复」成对的轮次，最后接上本轮提问。
+ * 失败或没有回答的轮次不进上下文。续写时末尾再带上本轮 assistant。
+ */
+export const toRequestMessages = (
+  history: Message[],
+  question: UserMessage,
+  prefix?: AssistantMessage,
+  thinking = prefix?.thinking ?? false,
+  latestReminder?: string
+): MessageParam[] => {
+  const { messages, reminder } = buildHistoryParams(history)
+  // 仅在当前分支首次出现或内容变化时插入快照
+  if (latestReminder && latestReminder !== reminder) {
+    messages.push({ role: 'latest_reminder', content: latestReminder })
+  }
   messages.push(toUserParam(question))
   if (prefix?.prefix) {
     const assistant = toAssistantParam(prefix, true, thinking)

@@ -161,7 +161,8 @@
 }
 
 .swatchMessages::before,
-.swatchSystem::before {
+.swatchSystem::before,
+.swatchCache::before {
   content: '';
   position: absolute;
   top: 6px;
@@ -177,6 +178,11 @@
 
 .swatchSystem::before {
   background-color: var(--dsw-alias-border-l3);
+}
+
+/* 缓存命中不是占用的一部分，用品牌色区分，也不参与上面那条比例条 */
+.swatchCache::before {
+  background-color: var(--dsw-alias-brand-primary);
 }
 
 .hint {

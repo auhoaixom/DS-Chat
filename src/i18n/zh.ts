@@ -211,4 +211,6 @@ export const zh = {
   contextMessages: '对话消息',
   contextSystem: '系统提示词',
   contextCompactHint: '把较早的对话浓缩成一段摘要，原文保存在本机，随时可查看',
+  contextCacheHit: '缓存命中',
+  contextCacheHitAria: '缓存命中 {percent}，基于 {count} 次请求',
 } as const

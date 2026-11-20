@@ -224,4 +224,6 @@ export const en = {
   contextMessages: 'Messages',
   contextSystem: 'System prompt',
   contextCompactHint: 'Condenses earlier messages into a summary; the originals stay on this device',
+  contextCacheHit: 'Cache hit',
+  contextCacheHitAria: 'Cache hit {percent} across {count} requests',
 } satisfies Record<keyof typeof zh, string>

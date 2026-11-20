@@ -125,6 +125,10 @@ export type Compaction = {
   beforeTokens: number
   afterTokens: number
   model: string | null
+  /** 摘要请求自身的用量，用于核对是否吃到了前缀缓存（诊断用） */
+  summaryUsage?: { input: number; cacheRead: number; cacheWrite: number }
+  /** 摘要请求是否走了「回放历史」的模式 */
+  viaReplay?: boolean
 }
 
 export type Session = {

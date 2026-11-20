@@ -2,14 +2,9 @@ import clsx from 'clsx'
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
-import { getContextUsage } from '../../services/chat/compaction.js'
-import {
-  SYSTEM_PROMPT,
-  cancelCompaction,
-  compactSession,
-  undoCompaction,
-  useChatStore,
-} from '../../services/chat/store.js'
+import { getCacheStats, getContextUsage } from '../../services/chat/compaction.js'
+import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
+import { cancelCompaction, compactSession, undoCompaction, useChatStore } from '../../services/chat/store.js'
 import { formatTokens } from '../../services/chat/tokens.js'
 import type { Session } from '../../services/chat/types.js'
 import { useAnchoredPosition, useDismiss } from '../base/anchored.js'
@@ -29,6 +24,7 @@ export const ContextMeter = ({ session }: { session: Session }) => {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const usage = useMemo(() => getContextUsage(session, SYSTEM_PROMPT), [session])
+  const cache = useMemo(() => getCacheStats(session), [session])
   const run = useChatStore((state) => state.compacting[session.id])
   const { anchorRef, floatingRef, position } = useAnchoredPosition<HTMLSpanElement, HTMLDivElement>(
     open,
@@ -127,6 +123,18 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                   <dt className={styles.swatchSystem}>{t('contextSystem')}</dt>
                   <dd>{formatTokens(usage.systemTokens)}</dd>
                 </div>
+                {cache ? (
+                  <div
+                    className={styles.row}
+                    title={t('contextCacheHitAria', {
+                      percent: `${cache.percent}%`,
+                      count: cache.requests,
+                    })}
+                  >
+                    <dt className={styles.swatchCache}>{t('contextCacheHit')}</dt>
+                    <dd>{`${cache.percent}%`}</dd>
+                  </div>
+                ) : null}
               </dl>
 
               <div className={styles.divider} />
