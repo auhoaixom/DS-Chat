@@ -128,7 +128,7 @@ const CameraView = () => {
   }, [torchOn])
 
   return (
-    <div className={styles.overlay}>
+    <div className={clsx(styles.overlay, ready && styles.ready)}>
       <video
         ref={videoRef}
         className={clsx(styles.video, mirrored && styles.mirrored)}
@@ -137,7 +137,6 @@ const CameraView = () => {
         autoPlay
       />
       {flash ? <div className={styles.flash} /> : null}
-      {ready ? null : <div className={styles.starting}>{t('cameraStarting')}</div>}
       <div className={styles.header}>
         <button
           type="button"

@@ -160,7 +160,6 @@ export const en = {
   cameraPromptCancel: 'Cancel',
   cameraPermissionDenied: 'Camera permission is required. Enable it in system settings.',
   cameraFailed: 'Unable to open the camera. Please try again later.',
-  cameraStarting: 'Opening the camera…',
   cameraShutter: 'Take photo',
   cameraSwitch: 'Switch camera',
   cameraTorch: 'Flashlight',

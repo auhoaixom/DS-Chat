@@ -152,7 +152,6 @@ export const zh = {
   cameraPromptCancel: '取消',
   cameraPermissionDenied: '需要相机权限才能拍照，请在系统设置中开启',
   cameraFailed: '无法打开相机，请稍后再试',
-  cameraStarting: '正在打开相机…',
   cameraShutter: '拍照',
   cameraSwitch: '切换摄像头',
   cameraTorch: '手电筒',
