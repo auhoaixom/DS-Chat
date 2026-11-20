@@ -332,13 +332,25 @@ const measureContext = (
   const rawTotal = rawSystem + rawMessages
   let anchorUsage: number | undefined
   let anchorEstimate: number | undefined
+  let anchorCreatedAt = 0
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const message = visible[index]
     if (message?.role === 'assistant' && message.usage) {
       anchorUsage = getPromptTokens(message.usage)
       anchorEstimate = message.promptEstimate
+      anchorCreatedAt = message.createdAt
       break
     }
+  }
+  /**
+   * 压缩之后的锚点不再可信：实测值和服务端口径、估算值和我们自己的字数口径，
+   * 本来就是两把尺子，靠"表面净增减"把误差抵消掉。压缩一次就抹掉上万 token，
+   * 这个巨大负增量会把两把尺子的偏差直接放大到看得见（夹成 0/1.0M）。
+   * 所以压缩之后退回纯估算，等下一次回复重新锚定。
+   */
+  if (session.compaction && anchorCreatedAt < session.compaction.createdAt) {
+    anchorUsage = undefined
+    anchorEstimate = undefined
   }
   let used = rawTotal
   if (anchorUsage !== undefined && anchorEstimate !== undefined) {
@@ -518,6 +530,10 @@ export type CompactionOutcome =
 /** 允许的估算误差：缩小不到 5% 就当作没收益 */
 const NO_GAIN_RATIO = 0.05
 
+/** 摘要没比被替换掉的原文短，等于白花一次钱：作废，不改动现有记录 */
+export const hasGain = (beforeTokens: number, afterTokens: number): boolean =>
+  afterTokens < beforeTokens * (1 - NO_GAIN_RATIO)
+
 /**
  * 生成一份压缩记录：先按消息边界分段（必要时逐段总结），最后合成结构化摘要。
  * 已经压缩过、且旧覆盖段仍然成立时，只把「旧摘要 + 上次裁剪点之后的新增」交给模型合并，
@@ -630,18 +646,14 @@ export const buildCompaction = async ({
       result.usage?.output_tokens ?? -1
     }`
   )
-  const beforeTokens = estimatePromptTokens(session)
-  // 压缩后 = 现状 - 这次新吞掉的原文 + 新摘要 - 被替换掉的旧摘要
+  // 只丈量这次真正被替换掉的东西：被吞掉的原文（合并时再加上旧摘要）换成新摘要。
+  // 两边都走同一套字数估算，不和进度环的实测值混着算——混着算时 after 会被夹成 0，
+  // 卡片会把「全都省掉了」写在脸上，下面的 no-gain 判据也会失效。
   const freshTokens = fresh.reduce((sum, message) => sum + estimateMessageTokens(message), 0)
-  const afterTokens = Math.max(
-    0,
-    beforeTokens -
-      freshTokens +
-      estimateTokens(summary) -
-      (merge && previous ? estimateTokens(previous.summary) : 0)
-  )
-  // 摘要没比被吞掉的原文短，等于白花一次钱：作废，不改动现有记录
-  if (afterTokens >= beforeTokens * (1 - NO_GAIN_RATIO)) {
+  const beforeTokens = freshTokens + (merge && previous ? estimateTokens(previous.summary) : 0)
+  const afterTokens = estimateTokens(summary)
+  // 摘要没比被替换掉的原文短，等于白花一次钱：作废，不改动现有记录
+  if (!hasGain(beforeTokens, afterTokens)) {
     return { ok: false, reason: 'no-gain' }
   }
   return {

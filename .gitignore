@@ -22,3 +22,6 @@ android/app/src/main/res/xml/config.xml
 *.keystore
 keystore.properties
 android/keystore/
+
+# 单元测试的编译产物
+.test/

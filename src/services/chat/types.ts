@@ -121,8 +121,9 @@ export type Compaction = {
   createdAt: number
   /** manual：用户点按；auto：发送前按阈值或超限时自动触发 */
   mode: 'manual' | 'auto'
-  /** 压缩前后的提示侧 token 估算，用于展示省下的量 */
+  /** 这次压缩替换掉的东西的 token 估算：被吞掉的原文，合并时再加上旧摘要 */
   beforeTokens: number
+  /** 新摘要自身的 token 估算；与 beforeTokens 同一套口径 */
   afterTokens: number
   model: string | null
   /** 摘要请求自身的用量，用于核对是否吃到了前缀缓存（诊断用） */

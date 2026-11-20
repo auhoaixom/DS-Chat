@@ -1,6 +1,6 @@
 {
   "name": "ds-chat",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "DS Chat：基于 DeepSeek API 的静态聊天应用的本地安卓改造版。",
   "license": "MIT",
   "private": true,
@@ -9,7 +9,8 @@
     "dev": "rspack serve -c rspack.config.ts",
     "build": "cross-env NODE_ENV=production rspack build -c rspack.config.ts",
     "type": "tsc -p tsconfig.json",
-    "lint": "oxlint src rspack.config.ts",
+    "lint": "oxlint src test rspack.config.ts",
+    "test": "tsc -p tsconfig.test.json && node --import ./test/setup.mjs --test \".test/test/*.test.js\"",
     "format": "oxfmt --write .",
     "android:sync": "pnpm build && cap sync android",
     "android:debug": "cd android && gradlew.bat assembleDebug"
