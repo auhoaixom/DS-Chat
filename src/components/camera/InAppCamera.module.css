@@ -1,0 +1,137 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  /* 与裁剪页同层；裁剪页在 DOM 中更靠后，叠在相机之上 */
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  background-color: #000;
+  touch-action: none;
+  user-select: none;
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: #000;
+}
+
+/* 前置摄像头预览是镜像的，抓图时同样镜像，保持一致 */
+.mirrored {
+  transform: scaleX(-1);
+}
+
+/* 快门瞬间的白闪 */
+.flash {
+  position: absolute;
+  inset: 0;
+  background-color: #fff;
+  pointer-events: none;
+  animation: flash 120ms ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.starting {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  text-align: center;
+}
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+}
+
+.footer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 28px);
+}
+
+/* 顶栏与底栏按钮：44px 触摸热区，半透明黑底保证在浅色画面上也看得见 */
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.32);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &:active {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+}
+
+.active {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #000;
+}
+
+/* 快门：72px 白色圆环 + 内圈，与系统相机的视觉习惯一致 */
+.shutter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background-color: transparent;
+  cursor: pointer;
+
+  &:active .shutterInner {
+    transform: scale(0.9);
+  }
+}
+
+.shutterInner {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #fff;
+  transition: transform 0.12s ease-out;
+}
+
+.shutterDisabled {
+  opacity: 0.5;
+}
+
+/* 与左侧按钮对称，快门才会居中 */
+.spacer {
+  width: 44px;
+  height: 44px;
+}

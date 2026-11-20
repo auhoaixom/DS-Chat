@@ -17,6 +17,7 @@ import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
 import { ensureApiKey } from '../components/settings/settingsDialogState.js'
 import { ImageCropper } from '../components/camera/ImageCropper.js'
+import { InAppCamera } from '../components/camera/InAppCamera.js'
 import { FilePreview } from '../components/files/FilePreview.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
 import { Toast } from '../components/base/Toast.js'
@@ -136,6 +137,8 @@ export const App = () => {
       </div>
       <SettingsDialog />
       <FilePreview />
+      {/* 相机在裁剪页之下：拍完先关相机，裁剪页随后接管 */}
+      <InAppCamera />
       <ImageCropper />
       <Toast />
     </>

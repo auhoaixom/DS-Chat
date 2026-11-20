@@ -535,6 +535,45 @@ export const IconCropOutline16 = () => (
 )
 
 /** 错误提示图标：圆环 + 感叹号，颜色跟随 currentColor */
+/** 手电筒：闪电，用于自建相机的补光开关 */
+export const IconFlashOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.7 1.2 3.9 9.05h3.06l-.72 5.75 5.86-7.9H8.98l.72-5.7z" fill="currentColor" />
+  </svg>
+)
+
+/** 切换前后摄像头：首尾相接的循环箭头 */
+export const IconSwitchCameraOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M13.2 8a5.2 5.2 0 0 1-8.9 3.66"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+    />
+    <path
+      d="M2.8 8a5.2 5.2 0 0 1 8.9-3.66"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+    />
+    <path
+      d="M2.6 3.2v2.6h2.6"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M13.4 12.8v-2.6h-2.6"
+      stroke="currentColor"
+      strokeWidth={1.3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const IconToastError16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path

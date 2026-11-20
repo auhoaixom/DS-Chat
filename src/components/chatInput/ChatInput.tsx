@@ -24,6 +24,7 @@ import {
 } from '../../services/chat/drafts.js'
 import { capturePhoto } from '../../services/camera.js'
 import { cropImage } from '../camera/cropState.js'
+import { openInAppCamera } from '../camera/inAppCameraState.js'
 import { useFilePreview } from '../files/filePreviewState.js'
 import { ActionSheet } from '../base/ActionSheet.js'
 import { IconButton } from '../base/IconButton.js'
@@ -121,12 +122,47 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   }
 
   /**
-   * 拍照并裁剪，结果并入同一份草稿附件。
-   * 裁剪页点「取消」只放弃这张照片、重新回到相机，不退出整个拍照流程；
-   * 只有在系统相机里直接返回才会真正结束。
+   * 拍照：默认用自建相机（拍完直接进裁剪，没有系统相机那个确认页）。
+   * 裁剪页点「取消」只放弃这张照片、重新回到相机；在相机里关闭则结束整个流程。
+   * 自建相机不可用（老 WebView 或没有可用摄像头）时退回系统相机。
    */
   const takePhoto = async () => {
     setSheetOpen(false)
+    for (;;) {
+      const shot = await openInAppCamera()
+      if (!shot) {
+        return
+      }
+      if ('error' in shot) {
+        if (shot.error === 'unsupported') {
+          await takeSystemPhoto()
+          return
+        }
+        showToast({ key: shot.error === 'denied' ? 'cameraPermissionDenied' : 'cameraFailed' })
+        return
+      }
+      if (await addCroppedPhoto(shot.file)) {
+        return
+      }
+    }
+  }
+
+  /** 裁剪并加入草稿；返回 false 表示用户取消裁剪，需要回到相机重拍 */
+  const addCroppedPhoto = async (file: File): Promise<boolean> => {
+    // 裁剪框没动过时直接用原图
+    const cropped = await cropImage(file)
+    if (!cropped) {
+      return false
+    }
+    const error = addDraftFiles(sessionId, [cropped], useSettings.getState().apiKey ?? '')
+    if (error) {
+      showToast(error)
+    }
+    return true
+  }
+
+  /** 兜底：自建相机打不开时仍用系统相机 */
+  const takeSystemPhoto = async () => {
     for (;;) {
       let result: Awaited<ReturnType<typeof capturePhoto>>
       try {
@@ -150,16 +186,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
         })
         return
       }
-      // 裁剪框没动过时直接用原图；取消则回到相机重拍
-      const cropped = await cropImage(result.file)
-      if (!cropped) {
-        continue
+      if (await addCroppedPhoto(result.file)) {
+        return
       }
-      const error = addDraftFiles(sessionId, [cropped], useSettings.getState().apiKey ?? '')
-      if (error) {
-        showToast(error)
-      }
-      return
     }
   }
 
