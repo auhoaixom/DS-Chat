@@ -33,6 +33,13 @@ const toBase64 = (blob: Blob) =>
   })
 
 /**
+ * 分块写入的块大小。把整包一次性转成 base64，会在 WebView 堆上留下约 1.33 倍体积的字符串，
+ * 几十 MB 的历史归档直接 OOM（Failed to allocate ... byte allocation）。
+ * 每块独立编解码，峰值只跟块大小有关。块长取 3 的整数倍，base64 分块拼接不会错位。
+ */
+const CHUNK_SIZE = 3 * 1024 * 1024
+
+/**
  * 把 Blob 交给系统处理。
  * 原生容器没有下载管理器接管 <a download>，也没有可用于 _blank 的窗口管理，
  * 因此写入应用缓存目录后交给系统分享面板：用户可以存到文件管理器，或选择其他应用打开。
@@ -43,12 +50,15 @@ export const shareBlob = async (blob: Blob, name: string): Promise<void> => {
     downloadInBrowser(blob, name)
     return
   }
-  const data = await toBase64(blob)
-  await Filesystem.writeFile({
-    path: name,
-    data,
-    directory: Directory.Cache,
-  })
+  for (let offset = 0; offset <= blob.size; offset += CHUNK_SIZE) {
+    const data = await toBase64(blob.slice(offset, offset + CHUNK_SIZE))
+    if (offset === 0) {
+      // 第一块用 writeFile 覆盖同名旧文件，后续块接着追加
+      await Filesystem.writeFile({ path: name, data, directory: Directory.Cache })
+    } else {
+      await Filesystem.appendFile({ path: name, data, directory: Directory.Cache })
+    }
+  }
   const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache })
   await Share.share({ title: name, files: [uri] })
 }

@@ -9,15 +9,9 @@ import {
   IconSettingsOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
-import {
-  BackupError,
-  clearHistory,
-  exportHistory,
-  importHistory,
-} from '../../services/chat/backup.js'
+import { clearHistory, exportToShare, importHistory } from '../../services/chat/backup.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
-import { shareBlob } from '../../services/exportFile.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
   CONTEXT_WINDOW_OPTIONS,
@@ -473,15 +467,6 @@ const ThemeSetting = () => {
 /** `reason` 为失败原因的文案 key，展示时按当前语言翻译后填入 `message` 参数。 */
 type Status = (TranslationMessage & { error?: boolean; reason?: TranslationKey }) | null
 
-/** 导出失败附带原因：预期的错误用对应文案作原因，其他错误用错误信息。 */
-const errorStatus = (key: TranslationKey, error: unknown): Status => ({
-  key,
-  ...(error instanceof BackupError
-    ? { reason: error.key }
-    : { params: { message: error instanceof Error ? error.message : String(error) } }),
-  error: true,
-})
-
 const SettingCell = ({
   label,
   description,
@@ -599,14 +584,15 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
   const onExport = async () => {
     setBusy(true)
     setStatus(null)
-    try {
-      const { name, blob } = await exportHistory()
-      await shareBlob(blob, name)
-    } catch (error) {
-      setStatus(errorStatus('historyExportFailed', error))
-    } finally {
-      setBusy(false)
+    const failure = await exportToShare()
+    if (failure) {
+      setStatus(
+        'key' in failure
+          ? { key: 'historyExportFailed', reason: failure.key, error: true }
+          : { key: 'historyExportFailed', params: { message: failure.message }, error: true }
+      )
     }
+    setBusy(false)
   }
 
   return (

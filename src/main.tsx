@@ -1,5 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './app/App.js'
+import { CrashScreen } from './app/CrashScreen.js'
+import { ErrorBoundary } from './app/ErrorBoundary.js'
 import { setupTheme } from './app/theme.js'
 import { ensureKatex } from './services/markdown/katex.js'
 import './app/theme.css'
@@ -8,4 +10,12 @@ import './app/global.css'
 ensureKatex()
 setupTheme()
 
-createRoot(document.getElementById('root') as HTMLElement).render(<App />)
+createRoot(document.getElementById('root') as HTMLElement).render(
+  <ErrorBoundary
+    fallback={(error, reset, componentStack) => (
+      <CrashScreen error={error} componentStack={componentStack} onReset={reset} />
+    )}
+  >
+    <App />
+  </ErrorBoundary>
+)

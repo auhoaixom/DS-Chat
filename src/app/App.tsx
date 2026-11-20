@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
 import { bindBackButton } from './backButton.js'
@@ -10,6 +10,7 @@ import {
   selectSession,
   useChatStore,
 } from '../services/chat/store.js'
+import { exportToShare } from '../services/chat/backup.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
 import { closeSearchPanel } from '../components/search/searchPanelState.js'
 import { SessionView } from '../components/session/SessionView.js'
@@ -52,6 +53,21 @@ export const App = () => {
     state.activeId === null ? false : Object.hasOwn(state.streaming, state.activeId)
   )
   const activeId = useChatStore((state) => state.activeId)
+  const [exporting, setExporting] = useState(false)
+
+  // 保存一直失败时重试没有意义，先把内存里这份导出来
+  const onExport = async () => {
+    setExporting(true)
+    const failure = await exportToShare()
+    setExporting(false)
+    if (failure) {
+      showToast(
+        'key' in failure
+          ? { key: failure.key, type: 'error' }
+          : { key: 'historyExportFailed', params: { message: failure.message }, type: 'error' }
+      )
+    }
+  }
 
   usePreventPageScroll(isMobile)
 
@@ -87,10 +103,18 @@ export const App = () => {
               <Button
                 variant="outlined"
                 size="s"
-                disabled={importingHistory}
+                disabled={importingHistory || exporting}
                 onClick={retrySaveSessions}
               >
                 {t('retry')}
+              </Button>
+              <Button
+                variant="outlined"
+                size="s"
+                disabled={importingHistory || exporting}
+                onClick={() => void onExport()}
+              >
+                {t('crashExport')}
               </Button>
             </div>
           ) : null}

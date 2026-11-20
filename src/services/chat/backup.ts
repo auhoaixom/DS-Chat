@@ -1,9 +1,12 @@
+import type { TranslationKey } from '../../i18n/index.js'
 import { formatDate } from '../../utils/format.js'
+import { shareBlob } from '../exportFile.js'
 import * as db from './db.js'
+import { BackupError } from './history/errors.js'
 import { replaceHistory, useChatStore } from './store.js'
 import type { Session } from './types.js'
 
-export { BackupError } from './history/errors.js'
+export { BackupError }
 
 // 导入、导出与全部删除串行处理，避免读取归档时数据被清空或两个替换事务交错。
 let backupQueue: Promise<unknown> = Promise.resolve()
@@ -22,7 +25,9 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
     // 列表和已加载内容保留导出开始时的快照；未打开的会话逐条读取，不填满详情缓存。
     const { sessions, sessionCache } = useChatStore.getState()
     async function* readSessions(): AsyncGenerator<Session> {
-      for (const summary of sessions) {
+      // 崩溃兜底页可能在 initChat 之前导出，此时内存清单还是空的，直接按数据库列一遍
+      const list = sessions.length > 0 ? sessions : await db.loadSessionSummaries()
+      for (const summary of list) {
         const session = Object.hasOwn(sessionCache, summary.id)
           ? sessionCache[summary.id]
           : await db.loadSession(summary.id)
@@ -55,3 +60,22 @@ export const clearHistory = (): Promise<void> =>
   enqueueBackup(async () => {
     await replaceHistory(async () => {})
   })
+
+/** 导出失败的原因：可预期的失败带文案 key，其余带原始信息 */
+export type ExportFailure = { key: TranslationKey } | { message: string }
+
+/**
+ * 导出全部会话并交给系统分享面板。设置页、「保存失败」横幅和崩溃兜底页共用这一条路径，
+ * 失败只返回原因，由调用方决定是弹 toast、写在行内还是留在页面上。
+ */
+export const exportToShare = async (): Promise<ExportFailure | null> => {
+  try {
+    const { name, blob } = await exportHistory()
+    await shareBlob(blob, name)
+    return null
+  } catch (error) {
+    return error instanceof BackupError
+      ? { key: error.key }
+      : { message: error instanceof Error ? error.message : String(error) }
+  }
+}
