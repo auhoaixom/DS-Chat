@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
 import { bindBackButton } from './backButton.js'
+import { useSiderSwipe } from './siderSwipe.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
   bindChatPersistence,
@@ -26,7 +27,7 @@ import { showToast } from '../components/base/toastState.js'
 import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider, openMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
@@ -70,6 +71,8 @@ export const App = () => {
   }
 
   usePreventPageScroll(isMobile)
+  // 移动端除了顶栏按钮，也能在左侧右滑打开侧边栏
+  useSiderSwipe(isMobile, openMobileSider)
 
   useEffect(() => {
     document.documentElement.lang = locale
