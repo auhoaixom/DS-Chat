@@ -1,10 +1,16 @@
 import { BackupError, fail } from './errors.js'
 import {
+  DS_CHAT_VERSION,
   EXPORT_FORMAT_VERSION,
+  type ArchivedCompaction,
+  type ArchivedUsage,
   type ChatMessage,
+  type DsChat,
   type FileEntry,
   type Fragment,
+  type MessageExtension,
   type SearchResult,
+  type SessionExtension,
   type SessionFile,
   type SessionIndexEntry,
 } from './format.js'
@@ -199,6 +205,7 @@ const fragment: Read<Fragment | null> = (value) => {
 
 const message: Read<ChatMessage> = (value) => {
   const item = record(value)
+  const extension = messageExtension(item.ds_chat)
   return {
     id: count(item.id),
     parent_id: nullable(count)(item.parent_id),
@@ -217,11 +224,79 @@ const message: Read<ChatMessage> = (value) => {
     accumulated_token_usage: count(item.accumulated_token_usage),
     inserted_at: time(item.inserted_at),
     fragments: list(fragment)(item.fragments).filter((item): item is Fragment => item !== null),
+    // 扩展缺失时不写这个键：官方包不该被我们补出一个空壳
+    ...(extension ? { ds_chat: extension } : {}),
   }
 }
 
-/** 会话 ID 用于拼接条目名，不能含路径分隔符 */
-const sessionId: Read<string> = (value) => {
+/**
+ * 扩展块（ds_chat）：官方包里没有，读不懂就当没有。
+ * 这里是唯一"宽松"的地方——扩展字段坏了不该让整份导入失败，
+ * 落回默认值的代价只是上下文计量退化成估算。
+ */
+const dsChat =
+  <T extends object>(read: (item: Record<string, unknown>) => T): Read<DsChat<T> | undefined> =>
+  (value) => {
+    try {
+      const item = record(value)
+      return item.version === DS_CHAT_VERSION
+        ? { version: DS_CHAT_VERSION, ...read(item) }
+        : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+const archivedUsage: Read<ArchivedUsage> = (value) => {
+  const item = record(value)
+  return {
+    input_tokens: count(item.input_tokens),
+    cache_creation_input_tokens: count(item.cache_creation_input_tokens),
+    cache_read_input_tokens: count(item.cache_read_input_tokens),
+    output_tokens: count(item.output_tokens),
+  }
+}
+
+const archivedCompaction: Read<ArchivedCompaction> = (value) => {
+  const item = record(value)
+  return {
+    summary: string(item.summary),
+    covered_ids: list(count)(item.covered_ids),
+    created_at: time(item.created_at),
+    mode: oneOf('manual', 'auto')(item.mode),
+    before_tokens: count(item.before_tokens),
+    after_tokens: count(item.after_tokens),
+    model: nullable(string)(item.model),
+    ...('summary_usage' in item
+      ? {
+          summary_usage: (() => {
+            const usageItem = record(item.summary_usage)
+            return {
+              input: count(usageItem.input),
+              cache_read: count(usageItem.cache_read),
+              cache_write: count(usageItem.cache_write),
+            }
+          })(),
+        }
+      : {}),
+    ...('via_replay' in item ? { via_replay: boolean(item.via_replay) } : {}),
+  }
+}
+
+const sessionExtension = dsChat((item): SessionExtension => ({
+  ...('compaction' in item ? { compaction: archivedCompaction(item.compaction) } : {}),
+}))
+
+const messageExtension = dsChat((item): MessageExtension => ({
+  ...('usage' in item ? { usage: archivedUsage(item.usage) } : {}),
+  ...('prompt_estimate' in item ? { prompt_estimate: count(item.prompt_estimate) } : {}),
+  ...('latest_reminder' in item ? { latest_reminder: string(item.latest_reminder) } : {}),
+  ...('served_model' in item ? { served_model: string(item.served_model) } : {}),
+  ...('model' in item ? { model: string(item.model) } : {}),
+  ...('prefix' in item ? { prefix: boolean(item.prefix) } : {}),
+}))
+
+/** 会话 ID 用于拼接条目名，不能含路径分隔符 */const sessionId: Read<string> = (value) => {
   const id = string(value)
   return id && !/[/\\]/.test(id) && id !== '.' && id !== '..' ? id : invalid()
 }
@@ -251,6 +326,7 @@ export const readSessionIndex: Read<SessionIndexEntry[]> = list((value) => {
 
 export const readSessionFile: Read<SessionFile> = (value) => {
   const item = record(value)
+  const extension = sessionExtension(item.ds_chat)
   return {
     id: sessionId(item.id),
     title: nullable(string)(item.title),
@@ -259,5 +335,6 @@ export const readSessionFile: Read<SessionFile> = (value) => {
     inserted_at: time(item.inserted_at),
     updated_at: time(item.updated_at),
     messages: list(message)(item.messages),
+    ...(extension ? { ds_chat: extension } : {}),
   }
 }

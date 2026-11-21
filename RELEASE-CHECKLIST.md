@@ -111,6 +111,13 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - `settleReply` 在 `stop_reason: 'refusal'` 时丢弃全部 thinking/text、只留工具块——这条路径真机很难复现（不再声明 safety_check），只能靠 `test/reply.test.ts`。
 - `message_delta` 只带 `output_tokens` 时会被整份丢弃，`message_start` 报的输入侧必须保留；四个数字齐全才整体替换。别把"估算偏高"再误判成"服务端只回了输出侧"。
 
+**导出包的扩展字段（v0.9.12 起）**：
+
+- 官方格式（`EXPORT_FORMAT_VERSION = 3`）**一个字节都不改**。压缩记录、逐条用量、系统信息快照、模型名、可续写标记写进各条的 `ds_chat` 里，带自己的 `DS_CHAT_VERSION`。
+- 读的时候**宽松**：`ds_chat` 版本不认识或内容坏了就当没有，只是上下文退化成估算，绝不能让整份导入失败（这条由 `test/historyRoundTrip.test.ts` 的"扩展坏掉"用例守着）。
+- 导出的是**整棵消息树**（`parent_id` + `current_message_id`），不是当前选中路径；分支的全部版本都在包里。别为了"减小体积"改成只导出可见路径。
+- 往返测试覆盖：压缩记录、全部分支版本、逐条用量、系统信息快照、模型名、可续写标记，以及"官方包没有扩展也能导入"。
+
 **安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。

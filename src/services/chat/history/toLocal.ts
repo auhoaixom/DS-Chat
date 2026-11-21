@@ -212,15 +212,21 @@ const toAssistant = (message: ChatMessage): AssistantMessage => {
   const id = String(message.id)
   const blocks = toBlocks(message.fragments, id)
   const refused = message.status === 'CONTENT_FILTER'
+  // 扩展块（只有本应用导出的包才有）：用量、提示侧估算、系统信息快照、模型名
+  const extra = message.ds_chat
   return {
     id,
     role: 'assistant',
     createdAt: time(message.inserted_at),
-    model: null,
+    model: extra?.model ?? null,
+    ...(extra?.served_model ? { servedModel: extra.served_model } : {}),
     thinking: message.thinking_enabled,
     search: message.search_enabled,
-    prefix: false,
+    prefix: extra?.prefix ?? false,
     status: replyStatus[message.status],
+    ...(extra?.usage ? { usage: { ...extra.usage } } : {}),
+    ...(extra?.prompt_estimate === undefined ? {} : { promptEstimate: extra.prompt_estimate }),
+    ...(extra?.latest_reminder ? { latestReminder: extra.latest_reminder } : {}),
     // 拒绝回复丢弃模型正文和思考，保留模板提示与工具步骤。
     ...(refused ? { stopReason: 'refusal' as const } : {}),
     blocks: refused
@@ -272,12 +278,37 @@ const buildTree = (file: SessionFile): Pick<Session, 'messages' | 'rootMessageId
 
 /** 转换单个会话，并列出本会话目录下需要从 ZIP 读取的图片。 */
 export const toLocalSession = (file: SessionFile): LocalSession => {
+  const archived = file.ds_chat?.compaction
   const session: Session = {
     id: file.id,
     // 空标题按「新对话」显示，导出时还原为 null。
     title: file.title ?? '',
     createdAt: time(file.inserted_at),
     updatedAt: time(file.updated_at),
+    ...(archived
+      ? {
+          compaction: {
+            summary: archived.summary,
+            // 归档里是数字 id，本地消息 id 就是它的字符串形式
+            coveredIds: archived.covered_ids.map(String),
+            createdAt: time(archived.created_at),
+            mode: archived.mode,
+            beforeTokens: archived.before_tokens,
+            afterTokens: archived.after_tokens,
+            model: archived.model,
+            ...(archived.summary_usage
+              ? {
+                  summaryUsage: {
+                    input: archived.summary_usage.input,
+                    cacheRead: archived.summary_usage.cache_read,
+                    cacheWrite: archived.summary_usage.cache_write,
+                  },
+                }
+              : {}),
+            ...(archived.via_replay ? { viaReplay: true } : {}),
+          },
+        }
+      : {}),
     ...buildTree(file),
   }
   const images = new Map<string, string>()

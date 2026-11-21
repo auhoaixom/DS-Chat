@@ -11,6 +11,61 @@ export type Iso8601Utc = string
 
 export const EXPORT_FORMAT_VERSION = 3
 
+/**
+ * 本应用的扩展字段版本。
+ *
+ * 官方格式（EXPORT_FORMAT_VERSION）一个字节都不改：压缩记录、逐条用量这些是
+ * DeepSeek 官方没有的东西，塞进 `ds_chat` 里当附加信息。官方包读不到就忽略，
+ * 我们自己靠 version 判断「这份包有没有带扩展」。
+ */
+export const DS_CHAT_VERSION = 1
+
+/** 追加在官方字段旁边的扩展块；缺省表示这份包不是本应用导出的 */
+export type DsChat<T> = { version: number } & T
+
+/** 压缩记录。covered_ids 用归档里的消息 id（官方包没有，所以只在自己的包里出现） */
+export type ArchivedCompaction = {
+  summary: string
+  covered_ids: number[]
+  created_at: Iso8601Utc
+  mode: 'manual' | 'auto'
+  before_tokens: number
+  after_tokens: number
+  model: string | null
+  /** 摘要请求自身的用量 */
+  summary_usage?: { input: number; cache_read: number; cache_write: number }
+  /** 摘要是否走了回放历史 */
+  via_replay?: boolean
+}
+
+/** 会话级扩展 */
+export type SessionExtension = {
+  compaction?: ArchivedCompaction
+}
+
+/** 逐条回复的用量：没有它，导入后上下文只能按字数估算（进度环失去锚点） */
+export type ArchivedUsage = {
+  input_tokens: number
+  cache_creation_input_tokens: number
+  cache_read_input_tokens: number
+  output_tokens: number
+}
+
+/** 消息级扩展 */
+export type MessageExtension = {
+  usage?: ArchivedUsage
+  /** 发出请求时记录的提示侧估算 */
+  prompt_estimate?: number
+  /** 本轮的系统信息快照（时间/地点/语言） */
+  latest_reminder?: string
+  /** 服务端实际回报的模型名 */
+  served_model?: string
+  /** 请求时选用的模型 */
+  model?: string
+  /** 能否作为续写前缀 */
+  prefix?: boolean
+}
+
 /** manifest.json，ZIP 的第一个条目 */
 export type Manifest = { export_format_version: typeof EXPORT_FORMAT_VERSION }
 
@@ -35,6 +90,8 @@ export type SessionFile = {
   updated_at: Iso8601Utc
   /** 消息树，分支靠 parent_id */
   messages: ChatMessage[]
+  /** 本应用的扩展；官方包里没有 */
+  ds_chat?: DsChat<SessionExtension>
 }
 
 export type ChatRole = 'USER' | 'ASSISTANT'
@@ -62,6 +119,8 @@ export type ChatMessage = {
   inserted_at: Iso8601Utc
   /** 按发生顺序排列 */
   fragments: Fragment[]
+  /** 本应用的扩展；官方包里没有 */
+  ds_chat?: DsChat<MessageExtension>
 }
 
 /** 用户的提问 */

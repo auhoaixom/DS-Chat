@@ -11,6 +11,7 @@ import type {
   SessionFile,
   SessionIndexEntry,
 } from './format.js'
+import { DS_CHAT_VERSION } from './format.js'
 
 /** 返回图片原件在 ZIP 里的条目名；无原件或非图片附件返回 null，仅导出元数据。 */
 export type ExportImage = (file: { id: string; name: string; isImage: boolean }) => string | null
@@ -206,9 +207,70 @@ const contextTokens = ({ usage }: AssistantMessage) =>
       usage.output_tokens
     : 0
 
+/**
+ * 会话级扩展：压缩记录。covered_ids 用归档里的消息编号；
+ * 映射不到的 id（分支被剪掉）直接丢掉，不让一条脏数据带坏整份扩展。
+ */
+const dsSession = (session: Session, ids: Map<string, number>): SessionFile['ds_chat'] => {
+  const compaction = session.compaction
+  if (!compaction) {
+    return { version: DS_CHAT_VERSION }
+  }
+  return {
+    version: DS_CHAT_VERSION,
+    compaction: {
+      summary: compaction.summary,
+      covered_ids: compaction.coveredIds.flatMap((id) => {
+        const mapped = ids.get(id)
+        return mapped === undefined ? [] : [mapped]
+      }),
+      created_at: iso(compaction.createdAt),
+      mode: compaction.mode,
+      before_tokens: compaction.beforeTokens,
+      after_tokens: compaction.afterTokens,
+      model: compaction.model,
+      ...(compaction.summaryUsage
+        ? {
+            summary_usage: {
+              input: compaction.summaryUsage.input,
+              cache_read: compaction.summaryUsage.cacheRead,
+              cache_write: compaction.summaryUsage.cacheWrite,
+            },
+          }
+        : {}),
+      ...(compaction.viaReplay ? { via_replay: true } : {}),
+    },
+  }
+}
+
+/**
+ * 消息级扩展：用量、提示侧估算、系统信息快照、模型名与可续写标记。
+ * 官方包没有这些，缺了只让上下文计量退化成估算，不影响内容。
+ */
+const dsMessage = (message: AssistantMessage): ChatMessage['ds_chat'] => {
+  const parts = {
+    ...(message.usage
+      ? {
+          usage: {
+            input_tokens: message.usage.input_tokens,
+            cache_creation_input_tokens: message.usage.cache_creation_input_tokens,
+            cache_read_input_tokens: message.usage.cache_read_input_tokens,
+            output_tokens: message.usage.output_tokens,
+          },
+        }
+      : {}),
+    ...(message.promptEstimate === undefined ? {} : { prompt_estimate: message.promptEstimate }),
+    ...(message.latestReminder ? { latest_reminder: message.latestReminder } : {}),
+    ...(message.servedModel ? { served_model: message.servedModel } : {}),
+    ...(message.model ? { model: message.model } : {}),
+    ...(message.prefix ? { prefix: true } : {}),
+  }
+  // 一个字段都没有就不写这个键，免得空对象把包撑大
+  return Object.keys(parts).length > 0 ? { version: DS_CHAT_VERSION, ...parts } : undefined
+}
+
 /** 消息按父节点优先重新编号为 1…n，保证 parent_id 小于 id。 */
-const numberMessages = (messages: Message[]) => {
-  const byId = new Map(messages.map((message) => [message.id, message]))
+const numberMessages = (messages: Message[]) => {  const byId = new Map(messages.map((message) => [message.id, message]))
   const ids = new Map<string, number>()
   const ordered: Message[] = []
   const visit = (message: Message, depth: number) => {
@@ -253,6 +315,7 @@ export const toSessionFile = (original: Session, exportImage: ExportImage): Sess
       inserted_at: iso(message.createdAt),
       fragments:
         message.role === 'user' ? userFragments(message, exportImage) : assistantFragments(message),
+      ...(message.role === 'assistant' ? { ds_chat: dsMessage(message) } : {}),
     }
   })
   const current = getVisibleMessages(session).at(-1)
@@ -265,6 +328,7 @@ export const toSessionFile = (original: Session, exportImage: ExportImage): Sess
     inserted_at: iso(session.createdAt),
     updated_at: iso(session.updatedAt),
     messages,
+    ds_chat: dsSession(session, ids),
   }
 }
 
