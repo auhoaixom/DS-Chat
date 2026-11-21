@@ -50,9 +50,14 @@ export const startFakeStream = () => {
     },
     /** 结束流：客户端会把它当成断流（不是正常结束） */
     end() {
-      if (!closed) {
-        closed = true
+      if (closed) {
+        return
+      }
+      closed = true
+      try {
         controller?.close()
+      } catch {
+        // 已经被 abort 取消了（reader.cancel 会关掉 controller），这里不用再管
       }
     },
     restore() {
