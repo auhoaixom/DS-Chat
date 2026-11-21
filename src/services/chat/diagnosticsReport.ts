@@ -203,12 +203,15 @@ export const buildDiagnosticsReport = (
       ` · ${t('diagnosticsFileOrphans')} ${orphan.length}` +
       ` · ${t('diagnosticsFetched')} ${fetched}`
   )
-  // 摘要要压在一行内（真机 720 宽只有约 24 个汉字的位置），所以只给前后值与条数
+  // 只给"省了多少"与条数：before/after 两个绝对值在 v0.7.7 换过含义，
+  // 旧记录按新含义读必然对不上；差值在两种含义下相同，怎么写都不会误导
   brief.push(
     compaction
       ? `${t('diagnosticsCompaction')}: ${clock(compaction.createdAt)}` +
           ` ${t(compaction.mode === 'auto' ? 'diagnosticsModeAuto' : 'diagnosticsModeManual')}` +
-          ` ${formatTokens(compaction.beforeTokens)} → ${formatTokens(compaction.afterTokens)}` +
+          ` · ${t('compactionCardSaved', {
+            tokens: formatTokens(Math.max(0, compaction.beforeTokens - compaction.afterTokens)),
+          })}` +
           ` · ${t('diagnosticsCoveredCount', { count: compaction.coveredIds.length })}`
       : `${t('diagnosticsCompaction')}: ${t('diagnosticsNone')}`
   )
