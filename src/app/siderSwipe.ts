@@ -12,14 +12,11 @@ import {
   useMobileSider,
 } from '../components/sider/mobileSiderState.js'
 
-/** 收起时从左侧起手区的宽度上限（CSS px），随着视口收窄 */
-const START_LIMIT = 160
-const START_RATIO = 0.4
 /**
- * 松手判定：从起手那一侧移动抽屉宽度的三成就算数（300dp 抽屉约 90dp ≈ 1.4cm），
- * 两个方向共用同一个距离；或者甩得够快也换。官方 App 的手感是 1.5cm 左右。
+ * 松手判定：从起手那一侧移动抽屉宽度的 0.22 就算数（300dp 抽屉约 66dp ≈ 1.05cm），
+ * 两个方向共用同一个距离；或者甩得够快也换。
  */
-const COMMIT_TRAVEL = 0.27
+const COMMIT_TRAVEL = 0.22
 const FLING_VELOCITY = 0.35
 /** 位移小于这个值一律回弹，免得指尖抖一下就切换 */
 const MIN_TRAVEL = 32
@@ -94,10 +91,7 @@ export const useSiderSwipe = (enabled: boolean) => {
         // 收起：屏幕任意位置起手都行，和展开对称（抽屉里、遮罩上都算）
         startProgress = 1
       } else {
-        const touch = event.touches[0]
-        if (touch.clientX > Math.min(START_LIMIT, window.innerWidth * START_RATIO)) {
-          return
-        }
+        // 展开：也从屏幕任意位置起手，只要避开输入框和可横向滚动的内容
         if (target.closest('input, textarea, [contenteditable="true"]')) {
           return
         }
