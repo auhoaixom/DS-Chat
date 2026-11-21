@@ -13,10 +13,10 @@ import {
 } from '../components/sider/mobileSiderState.js'
 
 /**
- * 松手判定：从起手那一侧移动抽屉宽度的 0.18 就算数（300dp 抽屉约 54dp ≈ 0.86cm，
- * 所以按 0.9cm 划必然生效），两个方向共用同一个距离；或者甩得够快也换。
+ * 松手判定：从起手那一侧移动抽屉宽度的 0.15 就算数（300dp 抽屉约 45dp ≈ 0.71cm），
+ * 两个方向共用同一个距离；或者甩得够快也换。
  */
-const COMMIT_TRAVEL = 0.18
+const COMMIT_TRAVEL = 0.15
 const FLING_VELOCITY = 0.35
 /** 位移小于这个值一律回弹，免得指尖抖一下就切换 */
 const MIN_TRAVEL = 32
