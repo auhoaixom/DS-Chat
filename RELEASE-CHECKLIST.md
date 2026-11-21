@@ -141,7 +141,7 @@ adb shell dumpsys gfxinfo com.dschat.app | Select-String "Total frames|Janky|per
 |---|---|---|
 | 浅色主题 | 设置 → 浅色 | 面板边框、气泡、代码块、Toast 对比度 |
 | English | 设置 → English | 文案截断、按钮变宽后是否压线 |
-| 横屏 | `adb shell settings put system user_rotation 1`（还原：`0`） | 头部、输入框、浮层 |
+| 旋转设备 | 打开系统「自动旋转」后把手机横过来 | **界面保持竖屏不变**（`android:screenOrientation="portrait"`，对齐官方 App）；侧边栏、输入框不重排 |
 | 小屏 | `adb shell wm size 640x1440` + `adb shell wm density 320`（还原：`wm size reset` / `wm density reset`） | 文字换行、按钮是否贴边 |
 
 > 小屏最容易暴露间距问题——720 宽下看着正常的"文字贴按钮""按钮贴边框"，换尺寸就现形。
