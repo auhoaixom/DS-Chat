@@ -27,6 +27,12 @@ $env:ANDROID_SDK_ROOT="E:\Android\Sdk"
 | `android/app/build.gradle` | `versionName` |
 | `android/app/build.gradle` | `versionCode`（每版 +1，只增不减） |
 
+**1.0 意味着什么（别往上加意思）**：
+
+- 它是**里程碑**，不是兼容性承诺书。功能面到此为止算齐了：多会话与分支、压缩上下文、附件与图片、导入导出、移动端布局，加上契约层的测试与这份清单。
+- 真正能承诺的只有一层：记录带 `CONTENT_VERSION`，读到旧记录先迁移再写回（`contentVersion.ts`）。所以 **0.9.x 的数据在 1.x 里能读**；反过来不保证 —— 1.x 写的记录被 0.9.x 打开时，程序只用不改、也不会写回。
+- 发版流程不因为叫 1.0 而加码：还是下面这几节，十项回归里只做**这次改动真正碰到**的部分，其余引用上一次的回归证据。
+
 改 gradle 文件**不要用 `Set-Content`**（会写 BOM，gradle 解析失败），用：
 
 ```powershell
