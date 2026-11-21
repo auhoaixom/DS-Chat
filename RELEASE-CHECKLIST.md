@@ -156,6 +156,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 | `test/store-save-failure.test.ts` | 落盘失败要亮错误；重试成功后错误消失且数据真的进库 |
 | `test/store-delete-streaming.test.ts` | 删一条正在生成回答的对话：**先等流收尾再真删**（不是先中断） |
 | `test/store-pending-files.test.ts` | 落盘失败时图片原件留在 `pendingFiles`，重试成功才释放 |
+| `test/store-compact-busy.test.ts` | 正在生成回答时点压缩返回 `busy`，不动数据（否则回复会写到一段已被压掉的上下文后面） |
 
 两个测试缝，都不碰生产代码：
 
