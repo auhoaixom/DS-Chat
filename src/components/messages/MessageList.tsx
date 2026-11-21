@@ -30,6 +30,20 @@ import styles from './MessageList.module.css'
 /** 距底部小于该值时视为在底部，流式内容增长时跟随 */
 const STICKY_THRESHOLD = 40
 const EMPTY_VERSIONS: MessageVersions = { ids: [], index: -1 }
+/**
+ * 首屏最多挂多少条消息，以及往上滚到顶时一次补多少条。
+ *
+ * 打开一条长对话时所有消息会一次性建成 DOM 并解析 markdown：实测 258 条消息是
+ * 1.7 秒的主线程长任务（CPU profile 里是创建一万多个节点 + 解析，不是布局，
+ * 所以 v0.9.16 的 content-visibility 只能省 12%）。
+ *
+ * 挂 20 条约 200ms，补一批 10 条约几十毫秒且发生在用户主动往上滚的时候。
+ * 调整这两个数之前，先用页内 rAF 探针量「打开耗时」和「补一帧有没有跳」。
+ */
+const INITIAL_MESSAGES = 20
+const OLDER_CHUNK = 5
+/** 滚到离顶部这么近就补下一批（提前一点，别等贴到边才开始） */
+const LOAD_OLDER_THRESHOLD = 400
 
 export const MessageList = ({
   session,
@@ -58,6 +72,26 @@ export const MessageList = ({
   const covered = getCoveredCount(visible, session.compaction)
   const messages = covered > 0 ? visible.slice(covered) : visible
   const coveredMessages = covered > 0 ? visible.slice(0, covered) : []
+  /**
+   * 只挂末尾一段消息；往上滚到顶再往前补。
+   *
+   * 记的是「从第几条开始」，不是「挂多少条」：来新消息（流式回复）时窗口不能跟着往前滑，
+   * 否则正在往上翻旧消息的人会被顶一下。切会话时按当前条数重新算，而且是在渲染期间算的，
+   * 不让下一段对话先按上一个会话的窗口挂一次。
+   */
+  const [windowState, setWindowState] = useState(() => ({
+    sessionId: session.id,
+    start: Math.max(0, messages.length - INITIAL_MESSAGES),
+  }))
+  const start = Math.min(
+    windowState.sessionId === session.id
+      ? windowState.start
+      : Math.max(0, messages.length - INITIAL_MESSAGES),
+    Math.max(0, messages.length - 1),
+  )
+  const shown = start > 0 ? messages.slice(start) : messages
+  /** 补载前记下的锚点元素与它当时的视口位置 */
+  const olderAnchorRef = useRef<{ el: Element; top: number } | null>(null)
   /** 只读回看被覆盖的原文；与压缩状态无关，展开不影响请求 */
   const [originalsOpen, setOriginalsOpen] = useState(false)
   useEffect(() => {
@@ -81,6 +115,52 @@ export const MessageList = ({
       scrollTopRef.current = el.scrollTop
     }
   }, [])
+
+  /**
+   * 往前补一批更早的消息。
+   *
+   * 补偿**不能按 scrollHeight 差算**：消息上有 content-visibility，屏幕外的消息先按
+   * contain-intrinsic-size 估高，滚进视口才换成真实高度，滚动高度会在补载的同一帧里
+   * 被这批估值纠正（实测多算了 12.7 倍）。所以改记「某个元素当时在视口里的位置」，
+   * 渲染后把它挪回原处——估值怎么变都不影响这条。
+   */
+  const loadOlder = useCallback(() => {
+    const el = scrollRef.current
+    const column = contentRef.current
+    if (!el || !column || olderAnchorRef.current) {
+      return
+    }
+    const anchor = column.children[0]
+    if (!anchor) {
+      return
+    }
+    olderAnchorRef.current = { el: anchor, top: anchor.getBoundingClientRect().top }
+    setWindowState((state) => ({
+      sessionId: session.id,
+      start: Math.max(
+        0,
+        (state.sessionId === session.id
+          ? state.start
+          : Math.max(0, messages.length - INITIAL_MESSAGES)) - OLDER_CHUNK,
+      ),
+    }))
+  }, [session.id, messages.length])
+
+  // 补载之后的补偿必须在绘制前做完，所以放 useLayoutEffect
+  useLayoutEffect(() => {
+    const anchor = olderAnchorRef.current
+    const el = scrollRef.current
+    if (!anchor || !el) {
+      return
+    }
+    olderAnchorRef.current = null
+    // 浏览器有时自己做滚动锚定；这时差值是 0，就不会重复补偿
+    const delta = anchor.el.getBoundingClientRect().top - anchor.top
+    if (delta !== 0) {
+      el.scrollTop += delta
+      scrollTopRef.current = el.scrollTop
+    }
+  }, [start])
 
   // 内容、键盘和输入框高度变化时，继续遵循当前跟随状态。
   useLayoutEffect(() => {
@@ -181,10 +261,15 @@ export const MessageList = ({
         metrics.top = el.scrollTop
         metrics.height = el.scrollHeight
       }
+      // 滚到已挂内容的最上面，往前补一批。补完滚动位置会被补偿拉高，
+      // 条件自然不再成立，不会连着触发。
+      if (start > 0 && el.scrollHeight > el.clientHeight && el.scrollTop < LOAD_OLDER_THRESHOLD) {
+        loadOlder()
+      }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [isMobile, scrollToBottom])
+  }, [isMobile, scrollToBottom, start, loadOlder])
 
   const lastIndex = messages.length - 1
   const uploadRetryId = getUploadRetryId(messages, streaming)
@@ -201,8 +286,10 @@ export const MessageList = ({
               onToggleOriginals={() => setOriginalsOpen((value) => !value)}
             />
             {originalsOpen ? <CompactedOriginals messages={coveredMessages} /> : null}
-            {messages.map((message, index) =>
-              message.role === 'user' ? (
+            {shown.map((message, offset) => {
+              // 下标按整段消息算：窗口只影响挂多少，不影响"是不是第一条/最后一条"
+              const index = start + offset
+              return message.role === 'user' ? (
                 <UserMessage
                   key={message.id}
                   sessionId={session.id}
@@ -226,7 +313,7 @@ export const MessageList = ({
                   onSelectVersion={selectVersion}
                 />
               )
-            )}
+            })}
           </div>
         </div>
         {footer}
