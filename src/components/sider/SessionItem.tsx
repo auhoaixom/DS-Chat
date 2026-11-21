@@ -119,7 +119,7 @@ export const SessionItem = memo(function SessionItem({
     >
       {({ open, toggle }) => (
         <div
-          className={clsx(styles.item, active && styles.active)}
+          className={clsx(styles.item, active && styles.active, menuOpen && styles.pressed)}
           // 触屏走长按；桌面鼠标用右键，长按也兼容
           onContextMenu={(event) => {
             event.preventDefault()

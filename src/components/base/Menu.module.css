@@ -2,6 +2,13 @@
   display: inline-flex;
 }
 
+/* 菜单开着时盖住整屏的透明遮罩：点任意位置都只关菜单，不会触发下层 */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 899;
+}
+
 .menu {
   position: fixed;
   z-index: 900;

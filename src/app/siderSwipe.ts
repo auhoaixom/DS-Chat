@@ -32,6 +32,8 @@ const overlayOpen = () =>
   useFilePreview.getState().url !== null ||
   useSettingsDialog.getState().open ||
   useSearchPanel.getState().entry !== null ||
+  // 会话行菜单开着时不接管横滑，否则会连菜单带抽屉一起动
+  document.querySelector('[role="menu"]') !== null ||
   document.querySelector('[role="dialog"]') !== null
 
 /** 起手点落在可横向滚动的内容里（代码块、宽表格）时，右滑留给它自己滚 */

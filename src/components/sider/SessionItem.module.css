@@ -16,13 +16,19 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 
+  /* 长按弹出菜单时这一行也要有选中标记，但文字颜色不变 */
+  &.pressed {
+    background-color: var(--dsw-specific-sidebar-nav-item-active-accent);
+  }
+
+  /* 当前正在聊天界面打开的会话：蓝色文字 + 选中底色 */
   &.active {
     background-color: var(--dsw-specific-sidebar-nav-item-active-accent);
-    color: var(--dsw-alias-brand-primary-invert);
+    color: var(--dsw-alias-brand-primary);
   }
 
   @media (hover: hover) {
-    &:not(.active):hover {
+    &:not(.active):not(.pressed):hover {
       background-color: var(--dsw-specific-sidebar-nav-item-hover);
     }
   }
