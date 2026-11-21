@@ -33,3 +33,9 @@ export const PROGRESS_STEP = 10
  */
 export const shouldReportProgress = (done: number, final: boolean) =>
   final || done % PROGRESS_STEP === 0
+
+/**
+ * 读完最后一条之后，界面先停在「已读 N / N」再切到「正在替换本地数据…」。
+ * 这几百毫秒是留给人眼看见解压走到底的 —— 直接跳阶段的话数字永远停在最后一个整十数。
+ */
+export const WRITING_PHASE_DELAY_MS = 350

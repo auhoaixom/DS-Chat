@@ -184,6 +184,7 @@ export const zh = {
   backupExportWriting: '正在生成 ZIP 文件…',
   backupExportWritingBytes: '正在写入文件 {percent}%',
   backupImportReading: '正在解压，已读 {done} 条对话',
+  backupImportReadingTotal: '正在解压，已读 {done} / {total} 条对话',
   backupImportWriting: '已读完 {done} 条，正在替换本地数据…',
   deleteAllSessions: '删除所有对话',
   deleteAllSessionsModalTitle: '删除后，所有对话都将被清空且无法找回',

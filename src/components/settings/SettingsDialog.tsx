@@ -494,6 +494,13 @@ const useBackupStatus = (job: 'export' | 'import'): Status => {
       params: { done: progress.done ?? 0, total: progress.total ?? 0 },
     }
   }
+  // 解压阶段末尾会带上总数（读到多少 / 共多少），中间那些只报已读
+  if (progress.total !== null) {
+    return {
+      key: 'backupImportReadingTotal',
+      params: { done: progress.done ?? 0, total: progress.total },
+    }
+  }
   return { key: 'backupImportReading', params: { done: progress.done ?? 0 } }
 }
 

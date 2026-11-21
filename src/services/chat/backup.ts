@@ -1,6 +1,6 @@
 import type { TranslationKey } from '../../i18n/index.js'
 import { formatDate } from '../../utils/format.js'
-import { setBackupProgress, shouldReportProgress } from '../backupProgress.js'
+import { setBackupProgress, shouldReportProgress, WRITING_PHASE_DELAY_MS } from '../backupProgress.js'
 import { shareBlob } from '../exportFile.js'
 import * as db from './db.js'
 import { BackupError } from './history/errors.js'
@@ -69,13 +69,20 @@ export const importHistory = (file: File): Promise<number> =>
   enqueueBackup(async () => {
     const { checkArchiveFormat, importArchive } = await import('./history/importArchive.js')
     setBackupProgress({ job: 'import', stage: 'reading', done: 0, total: null })
+    /** 收尾时延迟切到「替换阶段」用的定时器；导入结束时必须清掉，否则会把进度又写回来 */
+    let switchToWriting: ReturnType<typeof setTimeout> | undefined
     try {
       await checkArchiveFormat(file)
       const count = await replaceHistory(() =>
         importArchive(file, (done, final) => {
           if (final) {
-            // 读完了，接下来是替换本地数据：把最终条数报出来，别停在 1230
-            setBackupProgress({ job: 'import', stage: 'writing', done, total: done })
+            // 先让解压阶段的数字落到底（1239 / 1239），再切到替换阶段。
+            // 直接跳去替换阶段的话，解压进度永远停在最后一个整十数（1230），看着像没走完。
+            setBackupProgress({ job: 'import', stage: 'reading', done, total: done })
+            switchToWriting = setTimeout(
+              () => setBackupProgress({ job: 'import', stage: 'writing', done, total: done }),
+              WRITING_PHASE_DELAY_MS,
+            )
           } else if (shouldReportProgress(done, false)) {
             setBackupProgress({ job: 'import', stage: 'reading', done, total: null })
           }
@@ -83,6 +90,7 @@ export const importHistory = (file: File): Promise<number> =>
       )
       return count
     } finally {
+      clearTimeout(switchToWriting)
       setBackupProgress(null)
     }
   })

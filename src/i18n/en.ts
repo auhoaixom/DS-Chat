@@ -192,6 +192,7 @@ export const en = {
   backupExportWriting: 'Building the ZIP file…',
   backupExportWritingBytes: 'Writing the file {percent}%',
   backupImportReading: 'Unpacking chats: {done} read',
+  backupImportReadingTotal: 'Unpacking chats: {done} / {total}',
   backupImportWriting: 'Read {done} chats, replacing local data…',
   deleteAllSessions: 'Delete all chats',
   deleteAllSessionsModalTitle: 'Once deleted, all chats will be cleared and cannot be recovered.',
