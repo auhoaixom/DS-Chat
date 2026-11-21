@@ -60,5 +60,15 @@ export const shareBlob = async (blob: Blob, name: string): Promise<void> => {
     }
   }
   const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache })
-  await Share.share({ title: name, files: [uri] })
+  try {
+    await Share.share({ title: name, files: [uri] })
+  } catch (error) {
+    // 用户关掉系统面板时，插件的 activityResult 里是
+    // `if (RESULT_CANCELED) call.reject("Share canceled")` —— 它把「不想分享了」
+    // 也当成异常抛出来。那是正常操作，不是失败，更不能在界面上报红字。
+    if (/cancel/i.test(error instanceof Error ? error.message : String(error))) {
+      return
+    }
+    throw error
+  }
 }

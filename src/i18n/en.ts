@@ -186,7 +186,8 @@ export const en = {
   exportAllLabel: 'Export all chats',
   historyExportDescription:
     'Includes all chat history and locally stored images. Other attachments retain file details only. Your API Key is not included.',
-  exportAllDownload: 'Download',
+  // 按下去打开的是系统分享面板，不是下载：叫「下载」等于界面在说假话
+  exportAllDownload: 'Share',
   deleteAllSessions: 'Delete all chats',
   deleteAllSessionsModalTitle: 'Once deleted, all chats will be cleared and cannot be recovered.',
   deleteAllSessionsModalDescription:
