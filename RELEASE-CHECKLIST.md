@@ -195,6 +195,16 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 导入的会话在 `toLocalSession` 里直接打当前版本号：那份是逐字段映射出来的当前形状，归档自身的兼容由 `EXPORT_FORMAT_VERSION` / `DS_CHAT_VERSION` 管，不在这里再判一次。
 - 真要改字段含义时：递增 `CONTENT_VERSION`，在 `MIGRATIONS` 里补一条把 n 变成 n+1 的函数，再补一条「旧记录按新含义读」的测试。缺迁移时迁移会停下且不盖版本号——宁可让它当旧记录，也不给它盖一个假的当前版本。
 
+**侧边栏长按菜单（v1.0.1 起，别再改回时间窗口）**：
+
+- 同一次长按会被 WebView 送好几遍：我们自己的 450ms 计时器、系统补发的 `contextmenu`、松手后补发的 `click`。**谁先谁后各机型不一样**：小米上系统那份来得早（先 toggle 开、计时器随后再开一次，看不出来），华为上计时器先到、菜单已开，系统那份再 toggle 一次就把它关掉了 —— 表现就是「弹窗一闪而过」。
+- 所以两条规矩：
+  - `contextmenu` **只开不关**（`openFromPress()`），它是同一次手势的第二份通知，不是"用户又要关"。
+  - `click` 的吞并**按手势认、不按时间认**（`pressMenu.ts` 的账本：`pressStart` / `opened` / `takeClick`）。v1.0.0 用的是「弹出后 400ms 内的 click 才吞」，手指在菜单弹出后还按着超过 400ms，松手那一下就把它关了。
+- `pressStart()` 必须放在 `startPress` 的 early return **之前**：菜单已经开着时再点这一行不会再开菜单，但那一下点击是真的点击（用来收起菜单），不能被上一次长按的标记吞掉。放到后面就变成「点两下才关」。
+- 桌面复现/回归（不需要手机）：`probe/99-longpress.mjs <holdMs>` 按住 → 松手 → 看菜单还在不在；`probe/99c-regress.mjs` 跑 contextmenu 补发、点行收起、点外收起、菜单项可点四项。前提是 `pnpm dev` 起着 + Edge 带 `--remote-debugging-port=9333`。
+- 这个 bug 只在按住时长上暴露，短按测不出来：**验的时候必须按住 ≥1 秒再松手**。
+
 **安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。

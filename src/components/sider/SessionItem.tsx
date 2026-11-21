@@ -7,14 +7,13 @@ import type { SessionSummary } from '../../services/chat/types.js'
 import { useDismiss } from '../base/anchored.js'
 import { Menu } from '../base/Menu.js'
 import { closeMobileSider } from './mobileSiderState.js'
+import { createPressMenu } from './pressMenu.js'
 import styles from './SessionItem.module.css'
 
 /** 长按多久弹出菜单；和系统「长按」的手感一致 */
 const LONG_PRESS_MS = 450
 /** 手指移动超过这个距离就当成滚动，不算长按 */
 const PRESS_SLOP = 10
-/** 长按弹出后这段时间内的 click 都要忽略（同一次手势会补发 click） */
-const IGNORE_CLICK_MS = 400
 
 export const SessionItem = memo(function SessionItem({
   session,
@@ -32,8 +31,11 @@ export const SessionItem = memo(function SessionItem({
   const timerRef = useRef<number | undefined>(undefined)
   const originRef = useRef({ x: 0, y: 0 })
   const inputRef = useRef<HTMLInputElement>(null)
-  /** 长按弹出菜单的时刻：之后这一串 click 都要忽略，否则松手那一下会把菜单关掉 */
-  const openedAtRef = useRef(0)
+  /**
+   * 同一次长按会被 WebView 送好几遍（计时器 / contextmenu / 松手后的 click），
+   * 顺序各机型不同。这个账本只认一次按下，不认时间窗口 —— 见 pressMenu.ts。
+   */
+  const press = useRef(createPressMenu())
 
   const cancelPress = () => {
     window.clearTimeout(timerRef.current)
@@ -41,6 +43,12 @@ export const SessionItem = memo(function SessionItem({
   }
 
   useEffect(() => cancelPress, [])
+
+  /** 这次手势弹出菜单：标记后面补发的 click 要吞掉 */
+  const openFromPress = () => {
+    press.current.opened()
+    setMenuOpen(true)
+  }
 
   /** 改名落盘：空标题或没改就当作放弃 */
   const commitRename = (title: string) => {
@@ -58,14 +66,17 @@ export const SessionItem = memo(function SessionItem({
 
   /** 按住不动到点就弹菜单；touch 与 pointer 两条路都走这里 */
   const startPress = (x: number, y: number) => {
+    // 每一次按下都是一次新手势：上一次手势遗留的「待吞 click」在这里作废。
+    // 必须放在下面那个 early return **之前** —— 菜单已经开着时再点这一行不会开菜单，
+    // 但那一下点击是真的点击（用来收起菜单），不能被上一次长按的标记吞掉。
+    press.current.pressStart()
     if (menuOpen || timerRef.current !== undefined) {
       return
     }
     originRef.current = { x, y }
     timerRef.current = window.setTimeout(() => {
       timerRef.current = undefined
-      openedAtRef.current = performance.now()
-      setMenuOpen(true)
+      openFromPress()
     }, LONG_PRESS_MS)
   }
 
@@ -133,10 +144,12 @@ export const SessionItem = memo(function SessionItem({
       {({ open, toggle }) => (
         <div
           className={clsx(styles.item, active && styles.active, menuOpen && styles.pressed)}
-          // 触屏走长按；桌面鼠标用右键，长按也兼容
+          // 触屏走长按；桌面鼠标用右键，长按也兼容。
+          // 这里**只开不关**：系统这份 contextmenu 和我们的计时器是同一次手势，
+          // 用 toggle 的话谁晚到谁就把菜单关掉（华为上 450ms 计时器先到，菜单当场消失）
           onContextMenu={(event) => {
             event.preventDefault()
-            toggle()
+            openFromPress()
           }}
           onTouchStart={(event) => {
             cancelPress()
@@ -166,8 +179,10 @@ export const SessionItem = memo(function SessionItem({
           onPointerLeave={cancelPress}
           onClick={() => {
             // 长按弹出菜单后，这一次手势跟着来的 click 一律忽略：
-            // 既不能切会话，也不能走到下面的「收起菜单」把刚弹出的菜单关掉
-            if (performance.now() - openedAtRef.current < IGNORE_CLICK_MS) {
+            // 既不能切会话，也不能走到下面的「收起菜单」把刚弹出的菜单关掉。
+            // 按手势认、不按时间认：手指在菜单弹出后按多久都不影响（按时间认的版本
+            // 在华为上只要按超过 400ms，松手就把菜单关了）
+            if (press.current.takeClick()) {
               return
             }
             // 菜单开着时点这一行是收起菜单，不是切换会话
