@@ -140,10 +140,13 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                       ≈ {formatTokensK(usage.systemTokens + usage.overheadTokens)}
                     </dd>
                   </div>
-                  <div className={styles.row}>
-                    <dt className={styles.swatchSummary}>{t('contextSummary')}</dt>
-                    <dd>≈ {formatTokensK(usage.summaryTokens)}</dd>
-                  </div>
+                  {/* 摘要只在真有压缩记录时出现：撤销压缩后它就该整行消失，而不是留一个 <1K */}
+                  {usage.compacted ? (
+                    <div className={styles.row}>
+                      <dt className={styles.swatchSummary}>{t('contextSummary')}</dt>
+                      <dd>≈ {formatTokensK(usage.summaryTokens)}</dd>
+                    </div>
+                  ) : null}
                   <div className={styles.row}>
                     <dt className={styles.swatchMessages}>{t('contextMessages')}</dt>
                     <dd>≈ {formatTokensK(usage.messageTokens)}</dd>
