@@ -175,6 +175,12 @@
   line-height: 16px;
 }
 
+/*
+ * 原文列表这里**故意不加** `.originals > * { content-visibility: auto }`：
+ * 挂载量已经被分段挂载压到一屏（20 条 + 每次补 5 条），再叠「滚到才排版」的话，
+ * 每条长回答滚进视口时都要现排一次，实测 75–180ms 的卡顿正好落在滚动过程中间，手感反而更差。
+ * 不加则是挂载时一次排完，滚动全程 16.8ms。
+ */
 .originalUser {
   width: fit-content;
   max-width: 82%;

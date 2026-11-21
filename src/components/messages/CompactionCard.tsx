@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import {
   cancelCompaction,
@@ -12,6 +12,24 @@ import type { Compaction, Message } from '../../services/chat/types.js'
 import { IconChevronDownOutline14, IconCompressOutline14 } from '../base/icons.js'
 import { Markdown } from '../markdown/Markdown.js'
 import styles from './CompactionCard.module.css'
+
+/** 原文列表首屏挂多少条（从头开始读，所以挂开头） */
+const INITIAL_ORIGINALS = 20
+/** 往下滚一次补多少条 */
+const ORIGINALS_CHUNK = 5
+/** 原文块下沿离视口底部这么近就补一批 */
+const ORIGINALS_LOAD_THRESHOLD = 900
+
+/** 找最近的可滚动祖先：原文块挂在消息滚动层里，补载靠它的滚动事件 */
+const findScrollParent = (node: HTMLElement | null): HTMLElement | null => {
+  for (let el = node?.parentElement ?? null; el; el = el.parentElement) {
+    const overflow = getComputedStyle(el).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') {
+      return el
+    }
+  }
+  return null
+}
 
 /**
  * 消息列表顶部的压缩卡片：正在压缩时显示进度；压缩后给出摘要、原文与撤销。
@@ -141,13 +159,62 @@ export const CompactionCard = ({
 /**
  * 已压缩原文的只读展示：变暗、不参与版本切换与编辑，纯粹是为了让人回看。
  * 展开它不会让这些消息重新进入请求。
+ *
+ * 分段挂载方向和会话正文**相反**：正文进入时停在最底端，所以挂末尾一屏；
+ * 原文是从头开始读的，所以挂**开头**一屏，往下滚再往末尾补。
+ * 补载只往末尾追加，不会顶动上面的位置，因此不需要做滚动锚定。
  */
 export const CompactedOriginals = ({ messages }: { messages: Message[] }) => {
   const t = useTranslate()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [shown, setShown] = useState(() => Math.min(INITIAL_ORIGINALS, messages.length))
+
+  // 换了一条对话或压缩记录变了：回到一屏
+  useEffect(() => {
+    setShown(Math.min(INITIAL_ORIGINALS, messages.length))
+  }, [messages.length])
+
+  /** 原文块下沿快进视口了就补一批 */
+  const loadMore = useCallback(() => {
+    const root = rootRef.current
+    const scroller = findScrollParent(root)
+    if (!root || !scroller) {
+      return
+    }
+    const box = root.getBoundingClientRect()
+    const view = scroller.getBoundingClientRect()
+    if (box.bottom - view.bottom >= ORIGINALS_LOAD_THRESHOLD) {
+      return
+    }
+    setShown((count) =>
+      count >= messages.length ? count : Math.min(messages.length, count + ORIGINALS_CHUNK),
+    )
+  }, [messages.length])
+
+  useEffect(() => {
+    const scroller = findScrollParent(rootRef.current)
+    if (!scroller) {
+      return
+    }
+    scroller.addEventListener('scroll', loadMore, { passive: true })
+    return () => scroller.removeEventListener('scroll', loadMore)
+  }, [loadMore])
+
+  /**
+   * 每次挂完再自检一次。
+   *
+   * 必须有这一步：用户一口气甩到 scroller 底部时，滚动位置已经加不动、不会再产生 scroll 事件，
+   * 光靠监听器会卡在中间某一批（实测停在 66 条，剩下的一直出不来）。这里补完一批就看一眼，
+   * 还够得着就继续补，直到补满或者下沿已经离得够远。
+   */
+  useEffect(() => {
+    loadMore()
+  }, [shown, loadMore])
+
   return (
-    <div className={styles.originals} aria-label={t('compactionOriginalsTitle')}>
+    <div ref={rootRef} className={styles.originals} aria-label={t('compactionOriginalsTitle')}>
       <div className={styles.originalsTitle}>{t('compactionOriginalsTitle')}</div>
-      {messages.map((message) =>
+      {messages.slice(0, shown).map((message) =>
         message.role === 'user' ? (
           <div key={message.id} className={styles.originalUser}>
             {message.content || message.files.map((file) => file.name).join('、')}
