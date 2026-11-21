@@ -2,7 +2,7 @@ import { ApiError, streamMessage } from '../api/client.js'
 import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types.js'
 import { useSettings } from '../settings.js'
 import { getVisibleMessages } from './branches.js'
-import { SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
+import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
 import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
 import type { Compaction, FileAttachment, Message, Session, UserMessage } from './types.js'
@@ -167,7 +167,7 @@ const requestSummary = async (
     messages: [{ role: 'user', content: input }],
     thinking: { type: 'disabled' },
     tools: [],
-    safety_check: SAFETY_CHECK,
+    ...safetyCheckField(),
   }
   let result: SummarizeResult
   try {
@@ -206,7 +206,7 @@ const requestReplaySummary = async (
     messages: [...toHistoryParams(history), { role: 'user', content: REPLAY_INSTRUCTION }],
     thinking: { type: 'disabled' },
     tools: serverTools(search),
-    safety_check: SAFETY_CHECK,
+    ...safetyCheckField(),
   }
   const result = await collectSummary(apiKey, body, signal, onText)
   if (!result.text) {

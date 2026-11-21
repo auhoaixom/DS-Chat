@@ -16,7 +16,7 @@ import {
   type CompactionProgress,
 } from './compaction.js'
 import * as db from './db.js'
-import { SAFETY_CHECK, SYSTEM_PROMPT, serverTools } from './prompt.js'
+import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { estimateTokens } from './tokens.js'
 import {
   clearAllDrafts,
@@ -1163,7 +1163,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             system,
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
-            safety_check: SAFETY_CHECK,
+            ...safetyCheckField(),
             tools: serverTools(initial.search ?? false),
             ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
           },

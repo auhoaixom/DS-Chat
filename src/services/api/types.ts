@@ -176,13 +176,17 @@ export type DeepseekReadUrlTool = {
   name: 'deepseek_read_url'
 }
 
+/** DeepSeek 扩展：high 开启服务端基础风控；low 与不传等价，都是 API 默认检查 */
+export type SafetyCheck = { level: 'low' | 'high' }
+
 export type CreateMessageRequest = {
   model: ChatModel
   system: string
   messages: MessageParam[]
   thinking: { type: 'enabled' | 'disabled' }
   tools: (DeepseekWebSearchTool | DeepseekReadUrlTool)[]
-  safety_check: { level: 'high' }
+  /** 不传即等同 level: 'low'；是否声明由 prompt.ts 的 SAFETY_CHECK 决定 */
+  safety_check?: SafetyCheck
   title?: { enabled: boolean }
 }
 
@@ -190,7 +194,11 @@ export type CreateMessageRequest = {
 
 export type StopReason = 'end_turn' | 'max_tokens' | 'tool_use' | 'refusal'
 
-export type StopDetails = { type: 'refusal'; category: null; explanation: null }
+/**
+ * 拒答详情。category / explanation 通常都是 null——响应对拒答原因不作说明；
+ * 只有图片被审核拦下时，explanation 会带一句「哪些图片被拦」的说明。
+ */
+export type StopDetails = { type: 'refusal'; category: null; explanation: string | null }
 
 export type MessageUsage = {
   /** 未命中缓存的输入 Token */

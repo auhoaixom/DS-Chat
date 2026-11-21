@@ -1,4 +1,4 @@
-import type { CreateMessageRequest } from '../api/types.js'
+import type { CreateMessageRequest, SafetyCheck } from '../api/types.js'
 
 /**
  * 请求的固定外围：聊天与摘要共用同一份，摘要请求才能命中聊天的前缀缓存。
@@ -18,5 +18,19 @@ export const serverTools = (search: boolean): CreateMessageRequest['tools'] => {
   return tools
 }
 
-/** 安全审核固定开启，所有请求都走扩展模式 */
-export const SAFETY_CHECK = { level: 'high' } as const
+/**
+ * 安全审核：默认**不声明**该字段（与 level: 'low' 等价，都是 API 默认检查）。
+ *
+ * 声明 level: 'high' 会把每次请求推进"基础风控"，额外付出三样东西：
+ * 输出写完后服务端要再审一遍才关连接、抓回来的网页要先过审才下发（未通过的
+ * 页面按 url_not_allowed 计费照收）、审核本身的 token 计入 output_tokens。
+ * 自用场景不需要这一层；要开只改这一行，三个注入点会跟着带上。
+ *
+ * 注意：关掉它不等于没有拒答——声明了联网工具的请求即使不传 safety_check，
+ * 也可能以 stop_reason: 'refusal' 结束，拒答分支必须一直留着。
+ */
+export const SAFETY_CHECK: SafetyCheck | undefined = undefined
+
+/** 请求体里的安全审核字段；未开启时整个字段都不出现 */
+export const safetyCheckField = (): { safety_check?: SafetyCheck } =>
+  SAFETY_CHECK ? { safety_check: SAFETY_CHECK } : {}

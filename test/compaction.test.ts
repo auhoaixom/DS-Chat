@@ -11,7 +11,7 @@ import {
   planCompaction,
 } from '../src/services/chat/compaction.js'
 import { ApiError } from '../src/services/api/client.js'
-import { SYSTEM_PROMPT } from '../src/services/chat/prompt.js'
+import { SAFETY_CHECK, SYSTEM_PROMPT, safetyCheckField } from '../src/services/chat/prompt.js'
 import { useSettings } from '../src/services/settings.js'
 import type { Session } from '../src/services/chat/types.js'
 import { assistantMessage, at, compactionRecord, conversation, userMessage } from './helpers.js'
@@ -307,8 +307,7 @@ test('压缩之后不再沿用更早的锚点，否则巨大负增量会把占�
   assert.equal(after.compacted, true)
 })
 
-test('压缩记录比锚点更早时，锚点照常有效', () => {
-  const first = userMessage(`问：${'甲'.repeat(2_000)}`)
+test('压缩记录比锚点更早时，锚点照常有效', () => {  const first = userMessage(`问：${'甲'.repeat(2_000)}`)
   const answer = answered(`答：${'乙'.repeat(2_000)}`, 100, 800)
   const later = answered(`答二：${'丁'.repeat(200)}`, 500, 1_200)
   const usage = getContextUsage(
@@ -331,4 +330,16 @@ test('会话里记过模型就用记的那个，没记过就用设置里的', ()
   } finally {
     useSettings.setState({ model: original })
   }
+})
+
+// ── safety_check：默认不声明 ─────────────────────────────────
+
+test('安全审核默认关闭：请求体里整个 safety_check 字段都不出现', () => {
+  /**
+   * 这是产品决定，不是随手写的默认值：开着会让服务端在输出结束后再审一遍
+   * （连接挂更久）、网页抓取先过审、审核 token 计入 output_tokens。
+   * 谁要把 SAFETY_CHECK 改回 { level: 'high' }，先让这条断言失败、再改它。
+   */
+  assert.equal(SAFETY_CHECK, undefined)
+  assert.deepEqual(safetyCheckField(), {})
 })
