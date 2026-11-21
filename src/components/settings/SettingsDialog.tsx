@@ -10,6 +10,7 @@ import {
   IconUploadOutline14,
 } from '../base/icons.js'
 import { clearHistory, exportToShare, importHistory } from '../../services/chat/backup.js'
+import { useBackupProgress } from '../../services/backupProgress.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
@@ -460,6 +461,38 @@ const ThemeSetting = () => {
 /** `reason` 为失败原因的文案 key，展示时按当前语言翻译后填入 `message` 参数。 */
 type Status = (TranslationMessage & { error?: boolean; reason?: TranslationKey }) | null
 
+/**
+ * 导入 / 导出正在进行时的状态行，替掉原本的说明文字。
+ *
+ * 大库导出要几十秒、导入更久，之前这段时间里界面上只有一颗变灰的按钮，
+ * 用户会以为点坏了。有进度就报进度；打包和替换本地数据这两段算不出条数，
+ * 也换一句话说清楚在干什么。
+ */
+const useBackupStatus = (job: 'export' | 'import'): Status => {
+  const progress = useBackupProgress((state) =>
+    state.value && state.value.job === job ? state.value : null
+  )
+  if (!progress) {
+    return null
+  }
+  if (progress.stage === 'writing') {
+    if (progress.unit === 'bytes' && progress.total) {
+      return {
+        key: 'backupExportWritingBytes',
+        params: { percent: Math.round(((progress.done ?? 0) / progress.total) * 100) },
+      }
+    }
+    return { key: job === 'export' ? 'backupExportWriting' : 'backupImportWriting' }
+  }
+  if (job === 'export') {
+    return {
+      key: 'backupExportReading',
+      params: { done: progress.done ?? 0, total: progress.total ?? 0 },
+    }
+  }
+  return { key: 'backupImportReading', params: { done: progress.done ?? 0 } }
+}
+
 const SettingCell = ({
   label,
   description,
@@ -530,12 +563,13 @@ const ImportHistory = ({
 }) => {
   const t = useTranslate()
   const inputRef = useRef<HTMLInputElement>(null)
+  const progress = useBackupStatus('import')
 
   return (
     <SettingCell
       label={t('historyImport')}
       description={t('historyImportDescription')}
-      status={historyImport.status}
+      status={progress ?? historyImport.status}
       action={
         <>
           <Button
@@ -573,6 +607,7 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
   const empty = useChatStore((state) => state.sessions.length === 0)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<Status>(null)
+  const progress = useBackupStatus('export')
 
   const onExport = async () => {
     setBusy(true)
@@ -592,7 +627,7 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
     <SettingCell
       label={t('exportAllLabel')}
       description={t('historyExportDescription')}
-      status={status}
+      status={progress ?? status}
       action={
         <Button
           variant="outlined"

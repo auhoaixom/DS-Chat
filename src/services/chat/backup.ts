@@ -1,5 +1,6 @@
 import type { TranslationKey } from '../../i18n/index.js'
 import { formatDate } from '../../utils/format.js'
+import { setBackupProgress, PROGRESS_STEP } from '../backupProgress.js'
 import { shareBlob } from '../exportFile.js'
 import * as db from './db.js'
 import { BackupError } from './history/errors.js'
@@ -24,9 +25,13 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
   enqueueBackup(async () => {
     // 列表和已加载内容保留导出开始时的快照；未打开的会话逐条读取，不填满详情缓存。
     const { sessions, sessionCache } = useChatStore.getState()
+    setBackupProgress({ job: 'export', stage: 'reading', done: 0, total: null })
     async function* readSessions(): AsyncGenerator<Session> {
       // 崩溃兜底页可能在 initChat 之前导出，此时内存清单还是空的，直接按数据库列一遍
       const list = sessions.length > 0 ? sessions : await db.loadSessionSummaries()
+      const total = list.length
+      let done = 0
+      setBackupProgress({ job: 'export', stage: 'reading', done, total })
       for (const summary of list) {
         const session = Object.hasOwn(sessionCache, summary.id)
           ? sessionCache[summary.id]
@@ -34,14 +39,26 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
         if (!session) {
           throw new Error(`History session disappeared during export: ${summary.id}`)
         }
+        done += 1
+        if (done % PROGRESS_STEP === 0 || done === total) {
+          setBackupProgress({ job: 'export', stage: 'reading', done, total })
+        }
         // 详情读取期间可能重命名，归档标题与开始时的列表保持一致。
         yield { ...session, ...summary }
       }
+      // 会话读完了，剩下的是打包与写缓存文件：这部分算不出条数，但必须让界面知道还在动
+      setBackupProgress({ job: 'export', stage: 'writing', done: null, total: null })
     }
-    const { exportArchive } = await import('./history/exportArchive.js')
-    const now = new Date()
-    const blob = await exportArchive(readSessions())
-    return { name: backupFileName(now), blob }
+    try {
+      const { exportArchive } = await import('./history/exportArchive.js')
+      const now = new Date()
+      const blob = await exportArchive(readSessions())
+      return { name: backupFileName(now), blob }
+    } catch (error) {
+      // 失败就把进度收掉；成功时由 exportToShare 负责，它还要写缓存再弹分享面板
+      setBackupProgress(null)
+      throw error
+    }
   })
 
 /**
@@ -51,8 +68,20 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
 export const importHistory = (file: File): Promise<number> =>
   enqueueBackup(async () => {
     const { checkArchiveFormat, importArchive } = await import('./history/importArchive.js')
-    await checkArchiveFormat(file)
-    return replaceHistory(() => importArchive(file))
+    setBackupProgress({ job: 'import', stage: 'reading', done: 0, total: null })
+    try {
+      await checkArchiveFormat(file)
+      const count = await replaceHistory(() =>
+        importArchive(file, (done) => {
+          if (done % PROGRESS_STEP === 0) {
+            setBackupProgress({ job: 'import', stage: 'reading', done, total: null })
+          }
+        }),
+      )
+      return count
+    } finally {
+      setBackupProgress(null)
+    }
   })
 
 /** 确认删除后调用：以空历史原子替换全部本地会话与附件，保留 API Key 和其他设置。 */
@@ -71,11 +100,15 @@ export type ExportFailure = { key: TranslationKey } | { message: string }
 export const exportToShare = async (): Promise<ExportFailure | null> => {
   try {
     const { name, blob } = await exportHistory()
-    await shareBlob(blob, name)
+    await shareBlob(blob, name, (written, total) => {
+      setBackupProgress({ job: 'export', stage: 'writing', done: written, total, unit: 'bytes' })
+    })
     return null
   } catch (error) {
     return error instanceof BackupError
       ? { key: error.key }
       : { message: error instanceof Error ? error.message : String(error) }
+  } finally {
+    setBackupProgress(null)
   }
 }

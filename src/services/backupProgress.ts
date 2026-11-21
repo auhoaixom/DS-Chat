@@ -1,0 +1,26 @@
+import { create } from 'zustand'
+
+/**
+ * 导入 / 导出的进行状态。设置页的两行就是靠它显示「还在动」的。
+ *
+ * 条数能给就给（导出总数一开始就知道；导入要读完 index 才知道，所以只有已完成的条数），
+ * 给不出来就只给阶段，界面照样能说清在干什么 —— 别让用户对着一颗不动的灰按钮等 37 秒。
+ */
+export type BackupProgress = {
+  job: 'export' | 'import'
+  /** reading：逐条读会话 / 解压；writing：打包、写缓存文件或替换本地数据 */
+  stage: 'reading' | 'writing'
+  done: number | null
+  total: number | null
+  /** done/total 的单位：条数，或写缓存文件时的字节数（默认条数） */
+  unit?: 'sessions' | 'bytes'
+} | null
+
+export const useBackupProgress = create<{ value: BackupProgress }>(() => ({ value: null }))
+
+export const setBackupProgress = (value: BackupProgress) => {
+  useBackupProgress.setState({ value })
+}
+
+/** 每处理这么多条才刷新一次界面：一两千条逐条 setState 会把设置页刷爆 */
+export const PROGRESS_STEP = 10

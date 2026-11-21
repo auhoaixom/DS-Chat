@@ -45,7 +45,12 @@ const CHUNK_SIZE = 3 * 1024 * 1024
  * 因此写入应用缓存目录后交给系统分享面板：用户可以存到文件管理器，或选择其他应用打开。
  * 导出 ZIP 与打开 PDF / 文档共用这一条路径。
  */
-export const shareBlob = async (blob: Blob, name: string): Promise<void> => {
+export const shareBlob = async (
+  blob: Blob,
+  name: string,
+  /** 写缓存文件时按块回报进度（已写字节 / 总字节）；80MB 要分二十多块，不给反馈就是干等 */
+  onProgress?: (written: number, total: number) => void,
+): Promise<void> => {
   if (!Capacitor.isNativePlatform()) {
     downloadInBrowser(blob, name)
     return
@@ -58,6 +63,7 @@ export const shareBlob = async (blob: Blob, name: string): Promise<void> => {
     } else {
       await Filesystem.appendFile({ path: name, data, directory: Directory.Cache })
     }
+    onProgress?.(Math.min(blob.size, offset + CHUNK_SIZE), blob.size)
   }
   const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache })
   try {

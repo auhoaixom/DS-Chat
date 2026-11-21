@@ -180,6 +180,11 @@ export const zh = {
     '包含所有历史对话及本地图片原件；其他附件仅保留文件信息，不包含 API Key。',
   // 按下去打开的是系统分享面板，不是下载：叫「下载」等于界面在说假话
   exportAllDownload: '分享',
+  backupExportReading: '正在读取会话 {done} / {total}',
+  backupExportWriting: '正在生成 ZIP 文件…',
+  backupExportWritingBytes: '正在写入文件 {percent}%',
+  backupImportReading: '正在解压，已读 {done} 条会话',
+  backupImportWriting: '正在替换本地数据…',
   deleteAllSessions: '删除所有对话',
   deleteAllSessionsModalTitle: '删除后，所有对话都将被清空且无法找回',
   deleteAllSessionsModalDescription: '本地保存的附件及未发送的草稿也将被删除。',
