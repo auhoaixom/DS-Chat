@@ -123,6 +123,32 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
   ])
 }
 
+/** 未打开的会话也可置顶，只读取该会话，原子更新详情和列表。 */
+export const setSessionPinned = async (id: string, pinned: boolean): Promise<void> => {
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  await Promise.all([
+    (async () => {
+      try {
+        const sessions = tx.objectStore('sessions')
+        const session = await sessions.get(id)
+        if (session) {
+          if (pinned) {
+            session.pinned = true
+          } else {
+            delete session.pinned
+          }
+          await sessions.put(session)
+          await tx.objectStore('sessionSummaries').put(storedSummary(session))
+        }
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    })(),
+    tx.done,
+  ])
+}
+
 /** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */
 export const deleteSession = async (sessionId: string): Promise<void> => {
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')

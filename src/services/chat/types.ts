@@ -143,10 +143,15 @@ export type Session = {
   rootMessageId?: string | null
   /** 当前的上下文压缩；缺省表示没有压缩过 */
   compaction?: Compaction
+  /** 置顶在会话列表顶部；本地偏好，不进导出包，导入的会话一律不置顶 */
+  pinned?: boolean
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */
-export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'>
+export type SessionSummary = Pick<
+  Session,
+  'id' | 'title' | 'createdAt' | 'updatedAt' | 'pinned'
+>
 
 /** 显式提取字段，避免将完整会话的消息带进列表。 */
 export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
@@ -154,4 +159,5 @@ export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
   title: session.title,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
+  pinned: session.pinned,
 })

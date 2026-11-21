@@ -113,6 +113,15 @@ export const IconEditOutline16 = () => (
   </svg>
 )
 
+/** 置顶用的图钉：圆头针帽 + 收窄的针身 + 针尖 */
+export const IconPinOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4.1" y="1.7" width="7.8" height="2.1" rx="1.05" fill="currentColor" />
+    <path d="M5.5 4.8h5L8.4 9.4h-.8L5.5 4.8Z" fill="currentColor" />
+    <rect x="7.55" y="9.2" width="0.9" height="5.1" rx="0.45" fill="currentColor" />
+  </svg>
+)
+
 export const IconEllipsisOutline16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
