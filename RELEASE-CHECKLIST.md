@@ -93,7 +93,31 @@ mSystemGestureExclusion=SkRegion((0,1190,48,1590))   # 上报整高 48px 宽，�
 改后：拖动首帧 → 绘制 1ms；抽屉常驻挂载给启动只加 30ms 渲染 + 9ms 绘制
 ```
 
-抽屉必须**常驻挂载**（收起时 `visibility: hidden`），否则第一次拖动又要现挂会话列表，跟手就废了。
+抽屉必须**常驻挂载**（收起时 `transform: translate3d(-100%, 0, 0)`），否则第一次拖动又要现挂会话列表，跟手就废了。
+
+**第 7 项的流畅度是怎么保住的（三处都别再改回去）**：
+
+| 别做的事 | 为什么 | 实测 |
+|---|---|---|
+| 用自定义属性 `--sider-x` 驱动 transform | 自定义属性会往下继承，每帧都要把整棵会话列表的样式重算一遍 | 拖动 54 帧 / 90 分位 28ms / 卡顿 7.4% |
+| 在每帧的 `touchmove` 里 `getComputedStyle` 走祖先链（`usePreventPageScroll`） | 强制同步结算样式，等于每帧一次全量样式重算 | 同上，合并修复后 90 分位回到 12ms |
+| 在起手/收敛那一帧切 `aria-hidden`、`inert`、`visibility` | Chromium 要重建无障碍子树，会话列表这个体量上是一次几百毫秒的主线程长任务 | 收敛动画只剩 1 帧 / 133ms 间隔 |
+| 用 CSS `transition` 做收敛动画 | Chrome 在动画开始时预栅格化整层 | 每次开启一次 250ms 尖峰 |
+
+正解：`transform` + `opacity` 直接写元素，收敛动画自己用 rAF 补间（`easeOutCubic`，220ms），和拖动共用同一个 `paint()`。
+
+量法（gfxinfo 对 WebView 的 rAF 动画不准，要用页内探针）：
+
+```powershell
+adb shell dumpsys gfxinfo com.dschat.app reset
+adb shell input swipe 60 820 360 820 2000      # 拖动
+adb shell dumpsys gfxinfo com.dschat.app | Select-String "Total frames|Janky|percentile"
+```
+
+```text
+目标：拖动 ≥240 帧 / 90 分位 ≤12ms / 卡顿帧 ≤0.5%
+收敛：页内 PerformanceObserver 的 longtask 必须为空，rAF 间隔 p90 = 17ms
+```
 
 
 ---

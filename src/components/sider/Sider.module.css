@@ -192,16 +192,17 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
+/* 位置由 JS 每帧写 transform（拖动和收敛同一套），这里不能留 transition：
+   CSS 过渡会让 Chrome 在动画开始时预栅格化整层，实测一次 250ms 的尖峰。 */
 .drawer {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   z-index: 800;
-  transform: translate3d(var(--sider-x, -100%), 0, 0);
-  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
-  visibility: hidden;
+  transform: translate3d(-100%, 0, 0);
   will-change: transform;
+  contain: layout paint;
 }
 
 .drawerMask {
@@ -210,8 +211,8 @@
   z-index: 799;
   opacity: 0;
   background-color: rgba(0, 0, 0, 0.32);
-  transition: opacity 220ms cubic-bezier(0.2, 0, 0, 1);
   pointer-events: none;
+  will-change: opacity;
 }
 
 .mobile {

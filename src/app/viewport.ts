@@ -10,12 +10,13 @@ const subscribe = (onChange: () => void) => {
 
 export const useIsMobile = () => useSyncExternalStore(subscribe, () => query.matches)
 
-const preventPageScroll = (event: TouchEvent) => {
-  if (event.touches.length !== 1) {
-    return
-  }
+/** 起手点能不能自己滚。每次手势只在第一帧算一次：getComputedStyle 会强制结算样式，
+ * 放在每帧的 touchmove 里会把拖动拖成 30fps。 */
+let scrollable: boolean | null = null
+
+const elementScrolls = (target: EventTarget | null) => {
   for (
-    let element = event.target instanceof Element ? event.target : null;
+    let element = target instanceof Element ? target : null;
     element && element !== document.body;
     element = element.parentElement
   ) {
@@ -25,10 +26,25 @@ const preventPageScroll = (event: TouchEvent) => {
     const scrollsX =
       /auto|scroll/.test(style.overflowX) && element.scrollWidth > element.clientWidth
     if (scrollsY || scrollsX) {
-      return
+      return true
     }
   }
+  return false
+}
+
+const preventPageScroll = (event: TouchEvent) => {
+  if (event.touches.length !== 1) {
+    return
+  }
+  scrollable ??= elementScrolls(event.target)
+  if (scrollable) {
+    return
+  }
   event.preventDefault()
+}
+
+const resetScrollable = () => {
+  scrollable = null
 }
 
 /** 阻止移动端整页滚动，保留内部可滚动区域的滚动和双指缩放。 */
@@ -37,8 +53,12 @@ export const usePreventPageScroll = (enabled: boolean) => {
     if (!enabled) {
       return
     }
+    document.addEventListener('touchstart', resetScrollable, { passive: true })
     document.addEventListener('touchmove', preventPageScroll, { passive: false })
-    return () => document.removeEventListener('touchmove', preventPageScroll)
+    return () => {
+      document.removeEventListener('touchstart', resetScrollable)
+      document.removeEventListener('touchmove', preventPageScroll)
+    }
   }, [enabled])
 }
 
