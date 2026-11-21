@@ -20,6 +20,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 压缩中这一行是 div（压完是 button，Chrome 默认 border-box）：
+     不写 border-box 时 width:100% 再加左右内边距会比卡片宽 24px，
+     右对齐的「已生成 N 字」就被卡片裁掉 */
+  box-sizing: border-box;
   width: 100%;
   padding: 10px 12px;
   border: none;

@@ -1,5 +1,7 @@
 .container {
   display: flex;
+  /* 同样的问题：width:100% + 左右各 6px 内边距，不写 border-box 会宽出 12px */
+  box-sizing: border-box;
   width: 100%;
   justify-content: space-between;
   align-items: center;
