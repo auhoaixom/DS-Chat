@@ -130,6 +130,11 @@ export type Compaction = {
   summaryUsage?: { input: number; cacheRead: number; cacheWrite: number }
   /** 摘要请求是否走了「回放历史」的模式 */
   viaReplay?: boolean
+  /**
+   * 由早期版本写入、本机无法重算的记录：只在读库升级时标上（见 contentVersion.ts），
+   * 用来解释为什么这里的分数字可能和当前口径对不上。
+   */
+  legacy?: boolean
 }
 
 export type Session = {
@@ -145,6 +150,11 @@ export type Session = {
   compaction?: Compaction
   /** 置顶在会话列表顶部；本地偏好，不进导出包，导入的会话一律不置顶 */
   pinned?: boolean
+  /**
+   * 写入时程序使用的持久化内容版本（见 contentVersion.ts）；缺省表示版本机制之前的记录。
+   * 与 IndexedDB 的结构版本无关，别拿它当 DB_VERSION 用。
+   */
+  schema?: number
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */

@@ -159,6 +159,8 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 | `test/store-compact-busy.test.ts` | 正在生成回答时点压缩返回 `busy`，不动数据（否则回复会写到一段已被压掉的上下文后面） |
 | `test/store-compact-concurrent.test.ts` | 正在压缩时再点也返回 `busy`；取消压缩要真的中止那条请求（返回 `empty`） |
 | `test/store-delete-other-stream.test.ts` | 删 A 只等 A 自己的流（`waitForIdle(id)`），不被 B 正在生成的回答拖住 |
+| `test/contentVersion.test.ts` | 迁移本身：旧记录打上版本号并标 legacy、当前版本原样返回同一个对象、更新的记录只用不改 |
+| `test/store-content-upgrade.test.ts` | 打开没有版本号的旧记录：升到当前版本并写回本地，摘要与消息原样保留 |
 
 两个已知的测不出差异的地方（别以为是漏了）：
 
@@ -176,6 +178,16 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - **一个用例一个文件**：`sessionAccess` / `historyEpoch` / `dbPromise` 都是模块级单例，同文件里跑两个用例会互相污染（踩过：第二个用例因为清单没刷新而假失败）。Node 每个测试文件跑在独立进程里，天然干净。
 - **不要 mock `db.ts`**：写回纪律、事务、游标都在里面，mock 掉等于把最该测的部分测没了。用 `test/setup.mjs` 里的 `fake-indexeddb` 让真实代码跑起来。
 - 判定“测试有没有牙齿”：把被守的那行代码故意改坏，确认对应测试变红，再还原。
+
+**持久化内容版本（v0.9.25 起）**：
+
+- 两个版本号管的是两件事，别混：`db.ts` 的 `DB_VERSION` 管 IndexedDB 的**结构**（建哪些存储、哪些索引），只在存取结构变化时递增；`contentVersion.ts` 的 `CONTENT_VERSION` 管记录里**字段的含义**。加一个可选字段动后者不动前者。
+- 每条会话记录写入时带 `schema`（当前是 1）。没有这个字段的就是版本机制之前写的记录，按 0 处理：在 `ensureSessionLoaded` 读完、进内存之前过一遍迁移表，**改了才写回**（`upgradeSession` 没改动时返回同一个对象，靠 `session !== stored` 判断，不再单独维护一个 `changed` 标志）。
+- 只能在**读整条会话**时迁移，不要在列表摘要上跑：摘要里既没有 `messages` 也没有 `compaction`，改了还要多写一次库。
+- 迁移 0→1 只做一件事：给旧记录的压缩摘要打 `legacy: true`。摘要正文是模型当时写出来的，本机没有原料重算，所以**不修正任何数字**，只让卡片说清楚"这份摘要由早期版本写入"。理由：`beforeTokens` / `afterTokens` 在 v0.7.7 换过含义，旧记录按新口径显示会是一堆对不上的数（卡片一直只显示差值，就是同一个原因）。
+- 比本程序新的记录（`schema > CONTENT_VERSION`）原样使用、**绝不写回**：那种记录里的字段我们不认识，照内存里的样子写回去等于把它们洗掉。`ensureSessionLoaded` 的写回条件里带了 `!upgraded.fromFuture`。
+- 导入的会话在 `toLocalSession` 里直接打当前版本号：那份是逐字段映射出来的当前形状，归档自身的兼容由 `EXPORT_FORMAT_VERSION` / `DS_CHAT_VERSION` 管，不在这里再判一次。
+- 真要改字段含义时：递增 `CONTENT_VERSION`，在 `MIGRATIONS` 里补一条把 n 变成 n+1 的函数，再补一条「旧记录按新含义读」的测试。缺迁移时迁移会停下且不盖版本号——宁可让它当旧记录，也不给它盖一个假的当前版本。
 
 **安全审核（v0.9.7 起默认不声明）**：
 

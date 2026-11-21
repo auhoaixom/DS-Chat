@@ -13,6 +13,7 @@ import type {
   Session,
   UserMessage,
 } from '../types.js'
+import { CONTENT_VERSION } from '../contentVersion.js'
 import { fail } from './errors.js'
 import type { ChatMessage, FileEntry, Fragment, SessionFile } from './format.js'
 import { sessionFilesDir } from './paths.js'
@@ -281,6 +282,12 @@ export const toLocalSession = (file: SessionFile): LocalSession => {
   const archived = file.ds_chat?.compaction
   const session: Session = {
     id: file.id,
+    /**
+     * 这里逐字段映射出来的就是当前版本的内容形状，所以直接打上当前版本号：
+     * 归档自身的兼容由 EXPORT_FORMAT_VERSION / DS_CHAT_VERSION 管，不在这里重新判一次。
+     * 不打的话，导入的会话第一次打开会被当成旧记录，白标一个 legacy、白写一次库。
+     */
+    schema: CONTENT_VERSION,
     // 空标题按「新对话」显示，导出时还原为 null。
     title: file.title ?? '',
     createdAt: time(file.inserted_at),

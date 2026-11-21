@@ -15,6 +15,7 @@ import {
   withCompactionSummary,
   type CompactionProgress,
 } from './compaction.js'
+import { upgradeSession } from './contentVersion.js'
 import * as db from './db.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { estimateTokens } from './tokens.js'
@@ -353,12 +354,16 @@ const ensureSessionLoaded = (id: string): Promise<void> => {
       if (!stored) {
         throw new Error(`Session ${id} is missing from local storage`)
       }
-      const settled = settleInterrupted(normalizeSession(stored))
+      // 先按内容版本把旧记录升到当前版本：没有改动时返回同一个对象。
+      const upgraded = upgradeSession(stored)
+      const settled = settleInterrupted(normalizeSession(upgraded.session))
       // 读取期间可能已在列表重命名，保留最新元数据，不能让旧读取覆盖它。
       const session = sameSummary(settled, summary) ? settled : { ...settled, ...summary }
       touchSession(id)
       set((state) => ({ sessionCache: { ...state.sessionCache, [id]: session } }))
-      if (session !== stored) {
+      // 读出来时被改过就写回，下次打开不必再迁一遍。
+      // 比本程序新的记录例外：那份里的字段我们不认识，照着内存里的样子写回去等于把它们洗掉。
+      if (session !== stored && !upgraded.fromFuture) {
         persist(id)
       }
       trimSessionCache()

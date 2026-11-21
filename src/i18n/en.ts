@@ -278,6 +278,8 @@ export const en = {
   compactionHideOriginals: 'Hide originals',
   compactionOriginalsTitle:
     'These messages were compacted. Read-only: they are not part of the conversation anymore',
+  compactionLegacyNote:
+    'This summary was written by an earlier build and is kept as-is; the originals are still on this device and can be undone',
   compactionDescription:
     'The earliest {count} messages will be condensed into a summary; the latest {keep} messages stay verbatim.',
   compactionEstimate: 'Request context about {before} → {after}',

@@ -133,6 +133,15 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
+/* 早期版本写入的摘要：一句话说明来源，不占 footer 那行（那里已经排满按钮） */
+.legacyNote {
+  padding: 2px 12px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
 .footnote {
   flex: 1;
   min-width: 0;

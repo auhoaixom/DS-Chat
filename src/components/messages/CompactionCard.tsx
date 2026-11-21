@@ -130,6 +130,9 @@ export const CompactionCard = ({
           />
         </div>
       ) : null}
+      {compaction.legacy ? (
+        <div className={styles.legacyNote}>{t('compactionLegacyNote')}</div>
+      ) : null}
       <div className={styles.footer}>
         <span className={styles.footnote}>
           {t(compaction.mode === 'auto' ? 'compactionModeAuto' : 'compactionModeManual')}

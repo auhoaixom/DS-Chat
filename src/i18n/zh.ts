@@ -268,6 +268,7 @@ export const zh = {
   compactionShowOriginals: '查看原文',
   compactionHideOriginals: '收起原文',
   compactionOriginalsTitle: '以下为已压缩的原文，仅可查看，不参与对话',
+  compactionLegacyNote: '这份摘要由早期版本写入，原样保留；原文仍在本机，可随时撤销',
   compactionDescription: '将把最早的 {count} 条消息压缩成摘要，最近 {keep} 条保留原文。',
   compactionEstimate: '请求上下文约 {before} → {after}',
   compactionKeepsOriginals: '原始消息仍保存在本机，卡片里可以查看摘要，随时撤销。',
