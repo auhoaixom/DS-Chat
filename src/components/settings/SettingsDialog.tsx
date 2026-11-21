@@ -482,7 +482,11 @@ const useBackupStatus = (job: 'export' | 'import'): Status => {
         params: { percent: Math.round(((progress.done ?? 0) / progress.total) * 100) },
       }
     }
-    return { key: job === 'export' ? 'backupExportWriting' : 'backupImportWriting' }
+    if (job === 'import') {
+      // 导入的收尾阶段也要把最终条数报出来，否则最后一条永远看不到
+      return { key: 'backupImportWriting', params: { done: progress.done ?? 0 } }
+    }
+    return { key: 'backupExportWriting' }
   }
   if (job === 'export') {
     return {

@@ -1,6 +1,6 @@
 import type { TranslationKey } from '../../i18n/index.js'
 import { formatDate } from '../../utils/format.js'
-import { setBackupProgress, PROGRESS_STEP } from '../backupProgress.js'
+import { setBackupProgress, shouldReportProgress } from '../backupProgress.js'
 import { shareBlob } from '../exportFile.js'
 import * as db from './db.js'
 import { BackupError } from './history/errors.js'
@@ -40,7 +40,7 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
           throw new Error(`History session disappeared during export: ${summary.id}`)
         }
         done += 1
-        if (done % PROGRESS_STEP === 0 || done === total) {
+        if (shouldReportProgress(done, done === total)) {
           setBackupProgress({ job: 'export', stage: 'reading', done, total })
         }
         // 详情读取期间可能重命名，归档标题与开始时的列表保持一致。
@@ -72,8 +72,11 @@ export const importHistory = (file: File): Promise<number> =>
     try {
       await checkArchiveFormat(file)
       const count = await replaceHistory(() =>
-        importArchive(file, (done) => {
-          if (done % PROGRESS_STEP === 0) {
+        importArchive(file, (done, final) => {
+          if (final) {
+            // 读完了，接下来是替换本地数据：把最终条数报出来，别停在 1230
+            setBackupProgress({ job: 'import', stage: 'writing', done, total: done })
+          } else if (shouldReportProgress(done, false)) {
             setBackupProgress({ job: 'import', stage: 'reading', done, total: null })
           }
         }),

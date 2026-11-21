@@ -24,3 +24,12 @@ export const setBackupProgress = (value: BackupProgress) => {
 
 /** 每处理这么多条才刷新一次界面：一两千条逐条 setState 会把设置页刷爆 */
 export const PROGRESS_STEP = 10
+
+/**
+ * 要不要把这一条报给界面。
+ *
+ * `final` 必须在收尾时置真：只按「每 10 条取模」的话，1239 条的最后一次会停在
+ * 1230（1239 % 10 = 9），用户永远看不到真实总数 —— v0.9.20 就是这么错的。
+ */
+export const shouldReportProgress = (done: number, final: boolean) =>
+  final || done % PROGRESS_STEP === 0

@@ -80,8 +80,13 @@ export const checkArchiveFormat = async (file: File): Promise<void> => {
  */
 export const importArchive = async (
   file: File,
-  /** 每读进一条会话报一次，设置页用它显示「已读多少条」 */
-  onSession?: (done: number) => void,
+  /**
+   * 每读进一条会话报一次，设置页用它显示「已读多少条」。
+   * 第二条参数 final 表示会话已经读完（接下来是替换本地数据），
+   * 调用方要靠它把最后一个数报出去 —— 只按「每 10 条」节流的话，
+   * 1239 条永远报不到 1239。
+   */
+  onSession?: (done: number, final?: boolean) => void,
 ): Promise<void> => {
   if (!(await isZipFile(file))) {
     fail('backupUnrecognized')
@@ -161,4 +166,6 @@ export const importArchive = async (
     fail('backupIncomplete')
   }
   await db.updateStagingFileTypes(stored)
+  // 收尾一定要报一次：节流是「每 10 条」，1239 条的最后一次会落在 1230
+  onSession?.(imported.size, true)
 }
