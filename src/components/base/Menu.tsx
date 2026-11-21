@@ -40,10 +40,10 @@ export const Menu = ({
   // 透明遮罩：菜单开着时它盖住整屏，既让"点任意位置关闭"生效，
   // 又保证这一下点击不会穿透到下面的会话行（否则会顺手切走对话）
   const backdropRef = useRef<HTMLDivElement>(null)
-  // 左侧对齐并再左移 5px，让菜单文字与触发元素图标对齐
+  // 右对齐：菜单贴住这一行（也就是抽屉）的右侧，不压住下方会话的名称
   const { anchorRef, floatingRef, position } = useAnchoredPosition<HTMLSpanElement, HTMLDivElement>(
     open,
-    { align: 'start', alignOffset: -5, offset: 4 }
+    { align: 'end', offset: 4 }
   )
   useDismiss(open, [anchorRef, floatingRef, backdropRef], close)
 
