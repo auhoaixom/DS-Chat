@@ -12,6 +12,13 @@ import 'fake-indexeddb/auto'
 
 globalThis.__API_ORIGIN__ = 'https://api.example.test'
 
+/**
+ * 流式回复把增量按帧批量提交（requestAnimationFrame / cancelAnimationFrame），
+ * Node 里没有动画帧，用定时器顶替：只要「下一拍回调一次」这个语义就够了。
+ */
+globalThis.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 0)
+globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle)
+
 const store = new Map()
 
 globalThis.localStorage = {

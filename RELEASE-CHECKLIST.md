@@ -153,6 +153,14 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 | `test/store-switch.test.ts` | 连点两条对话：两条都进缓存，`activeId` 停在最后点的那条 |
 | `test/store-epoch.test.ts` | 导入期间迟到的读取结果被 `historyEpoch` 挡住，不写进新数据 |
 | `test/store-cache.test.ts` | 缓存淘汰（上限 5）绝不踢当前打开的会话 |
+| `test/store-save-failure.test.ts` | 落盘失败要亮错误；重试成功后错误消失且数据真的进库 |
+| `test/store-delete-streaming.test.ts` | 删一条正在生成回答的对话：**先等流收尾再真删**（不是先中断） |
+| `test/store-pending-files.test.ts` | 落盘失败时图片原件留在 `pendingFiles`，重试成功才释放 |
+
+两个测试缝，都不碰生产代码：
+
+- **造 IO 错误**：把 `IDBObjectStore.prototype.put` 改成抛错。真实的失败就是 `QuotaExceededError` 这类 IndexedDB 抛出来的错，注入点越贴近真实现越好。
+- **造流式响应**：`test/fakeStream.ts` 换掉全局 `fetch`，手动喂 SSE（`message_start` → `content_block_delta` → 保持不关），URL 拼接、请求头、SSE 解析仍然走真实代码。`test/setup.mjs` 里补了 `requestAnimationFrame`（流式增量按帧批量提交，Node 没有动画帧）。附件上传这一步可以 `useUploads.setState` 直接置成 done，跳过真实上传。
 
 写这类测试的三条硬规矩：
 
