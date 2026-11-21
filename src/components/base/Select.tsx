@@ -36,7 +36,11 @@ export const Select = <T extends string>({
     HTMLDivElement
   >(open, { align: 'end', maxHeight: 320, minSpace: 160 })
   // Esc 只关菜单，不让外层弹窗一起关闭
-  useDismiss(open, [anchorRef, floatingRef], () => setOpen(false), { captureEscape: true })
+  // 外部那一下只用来收起下拉，不再触发下面的设置项
+  useDismiss(open, [anchorRef, floatingRef], () => setOpen(false), {
+    captureEscape: true,
+    swallowOutsideClick: true,
+  })
 
   return (
     <>

@@ -209,12 +209,41 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
   return { anchorRef, floatingRef, position }
 }
 
-/** 点击浮层与触发元素之外、或按 Esc 时关闭 */
+/**
+ * 吃掉接下来的一次 click。
+ * 浮层关闭后它的监听会被卸载，所以这一下必须挂在 window 上、自带超时清理，
+ * 否则「关浮层」的那一次点击会漏到下面的元素（比如顺手切走会话）。
+ */
+const swallowNextClick = () => {
+  let timer = 0
+  const cleanup = () => {
+    window.clearTimeout(timer)
+    window.removeEventListener('click', onClick, true)
+  }
+  function onClick(event: MouseEvent) {
+    cleanup()
+    event.preventDefault()
+    event.stopPropagation()
+  }
+  timer = window.setTimeout(cleanup, 400)
+  window.addEventListener('click', onClick, true)
+}
+
+/**
+ * 点击浮层与触发元素之外、或按 Esc 时关闭。
+ *
+ * `swallowOutsideClick` 打开时，关闭浮层的那一次点击不会再落到下面的元素上——
+ * 菜单、内联重命名这类「开着时不该顺手触发别的东西」的浮层都要开它，
+ * 否则点外面既关了浮层，又把下面的会话切走了。
+ */
 export const useDismiss = (
   open: boolean,
   refs: RefObject<HTMLElement | null>[],
   onDismiss: () => void,
-  { captureEscape = false }: { captureEscape?: boolean } = {}
+  {
+    captureEscape = false,
+    swallowOutsideClick = false,
+  }: { captureEscape?: boolean; swallowOutsideClick?: boolean } = {}
 ) => {
   const onDismissRef = useRef(onDismiss)
   onDismissRef.current = onDismiss
@@ -228,9 +257,18 @@ export const useDismiss = (
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
       const inside = refsRef.current.some((ref) => ref.current?.contains(target))
-      if (!inside) {
-        onDismissRef.current()
+      if (inside) {
+        return
       }
+      if (swallowOutsideClick) {
+        // 先挂上全局的一次性 click 拦截：浮层马上会被卸载，监听器活不到那一下
+        swallowNextClick()
+        if (event.cancelable) {
+          event.preventDefault()
+        }
+        event.stopPropagation()
+      }
+      onDismissRef.current()
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') {
@@ -241,13 +279,13 @@ export const useDismiss = (
       }
       onDismissRef.current()
     }
-    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, captureEscape)
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, captureEscape)
     }
-  }, [open, captureEscape])
+  }, [open, captureEscape, swallowOutsideClick])
 }
 
 /** 悬停类浮层的进出延迟：同一时间只有一个待执行的切换 */

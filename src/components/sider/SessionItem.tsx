@@ -4,6 +4,7 @@ import { useTranslate } from '../../i18n/index.js'
 import { IconEditOutline16, IconPinOutline16, IconTrashOutline16 } from '../base/icons.js'
 import { renameSession, selectSession, setSessionPinned } from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
+import { useDismiss } from '../base/anchored.js'
 import { Menu } from '../base/Menu.js'
 import { closeMobileSider } from './mobileSiderState.js'
 import styles from './SessionItem.module.css'
@@ -30,6 +31,7 @@ export const SessionItem = memo(function SessionItem({
   const displayTitle = session.title || t('untitledChat')
   const timerRef = useRef<number | undefined>(undefined)
   const originRef = useRef({ x: 0, y: 0 })
+  const inputRef = useRef<HTMLInputElement>(null)
   /** 长按弹出菜单的时刻：之后这一串 click 都要忽略，否则松手那一下会把菜单关掉 */
   const openedAtRef = useRef(0)
 
@@ -39,6 +41,20 @@ export const SessionItem = memo(function SessionItem({
   }
 
   useEffect(() => cancelPress, [])
+
+  /** 改名落盘：空标题或没改就当作放弃 */
+  const commitRename = (title: string) => {
+    setEditing(false)
+    const next = title.trim()
+    if (next && next !== displayTitle) {
+      renameSession(session.id, next)
+    }
+  }
+
+  // 点输入框外面 = 保存并退出（读当前输入框里的值），而且那一下点击不会穿透到下面的会话行
+  useDismiss(editing, [inputRef], () => commitRename(inputRef.current?.value ?? displayTitle), {
+    swallowOutsideClick: true,
+  })
 
   /** 按住不动到点就弹菜单；touch 与 pointer 两条路都走这里 */
   const startPress = (x: number, y: number) => {
@@ -66,23 +82,20 @@ export const SessionItem = memo(function SessionItem({
   }
 
   if (editing) {
-    const finish = (title: string) => {
-      setEditing(false)
-      if (title.trim() && title.trim() !== displayTitle) {
-        renameSession(session.id, title.trim())
-      }
-    }
     return (
       <input
+        ref={inputRef}
         className={styles.renameInput}
         defaultValue={displayTitle}
         autoFocus
         onFocus={(event) => event.target.select()}
-        onBlur={(event) => finish(event.target.value)}
+        // 失焦（包括点到别处）= 保存
+        onBlur={(event) => commitRename(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-            finish(event.currentTarget.value)
+            commitRename(event.currentTarget.value)
           } else if (event.key === 'Escape') {
+            // 只有 Esc 是放弃
             setEditing(false)
           }
         }}

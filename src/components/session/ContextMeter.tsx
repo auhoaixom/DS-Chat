@@ -38,7 +38,7 @@ export const ContextMeter = ({ session }: { session: Session }) => {
       measureKey: run ? `${run.phase}:${run.done}/${run.total}` : 'idle',
     }
   )
-  useDismiss(open, [anchorRef, floatingRef], () => setOpen(false))
+  useDismiss(open, [anchorRef, floatingRef], () => setOpen(false), { swallowOutsideClick: true })
 
   if (!usage) {
     return null
