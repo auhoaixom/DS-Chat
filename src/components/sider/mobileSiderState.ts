@@ -66,9 +66,6 @@ const animateTo = (target: number) => {
   settleFrame = requestAnimationFrame(step)
 }
 
-/** 抽屉节点：手势用它判断反向（关闭）拖动是否从抽屉上起手 */
-export const getSiderDrawer = () => drawerNode
-
 /** 抽屉当前宽度（CSS px），手势用它把位移换算成进度 */
 export const getSiderWidth = () => (drawerWidth > 0 ? drawerWidth : 300)
 

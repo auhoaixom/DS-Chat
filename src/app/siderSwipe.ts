@@ -7,7 +7,6 @@ import { useSearchPanel } from '../components/search/searchPanelState.js'
 import { useSettingsDialog } from '../components/settings/settingsDialogState.js'
 import {
   dragSider,
-  getSiderDrawer,
   getSiderWidth,
   settleSider,
   useMobileSider,
@@ -46,7 +45,7 @@ const scrollsHorizontally = (target: Element) => {
 }
 
 /**
- * 移动端侧边栏的拖动：收起时在左侧右滑拉出，展开时在抽屉上左滑推回，
+ * 移动端侧边栏的拖动：收起时在左侧右滑拉出，展开时在屏幕**任意位置**左滑推回，
  * 全程跟随手指，松手按「位移过半或甩得够快」决定停在开还是关。
  * 纵向滚动、斜着划、长按选字、输入框、可横向滚动的内容、其它浮层都不接管。
  */
@@ -87,11 +86,7 @@ export const useSiderSwipe = (enabled: boolean) => {
       const open = useMobileSider.getState().open
       closing = open
       if (open) {
-        // 反向：只有从抽屉上起手才管关闭，遮罩区域留给点击
-        const drawer = getSiderDrawer()
-        if (!drawer || !drawer.contains(target)) {
-          return
-        }
+        // 收起：屏幕任意位置起手都行，和展开对称（抽屉里、遮罩上都算）
         startProgress = 1
       } else {
         const touch = event.touches[0]
