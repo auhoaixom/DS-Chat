@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
@@ -24,6 +24,9 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  // 必须是稳定引用：每次渲染都新建闭包会让 SessionItem 的 memo 对上千行全部失效，
+  // 一次无意义的父级渲染就要重跑整个列表（实测 133ms 主线程长任务）
+  const requestDelete = useCallback((session: SessionSummary) => setDeleting(session), [])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -84,7 +87,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                   key={session.id}
                   session={session}
                   active={session.id === activeId}
-                  onDelete={() => setDeleting(session)}
+                  onDelete={requestDelete}
                 />
               ))}
             </div>

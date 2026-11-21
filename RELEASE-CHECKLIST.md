@@ -118,6 +118,14 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 导出的是**整棵消息树**（`parent_id` + `current_message_id`），不是当前选中路径；分支的全部版本都在包里。别为了"减小体积"改成只导出可见路径。
 - 往返测试覆盖：压缩记录、全部分支版本、逐条用量、系统信息快照、模型名、可续写标记，以及"官方包没有扩展也能导入"。
 
+**会话列表的重渲染成本（v0.9.15 起，别改回去）**：
+
+- `SessionItem` 虽然用 `memo` 包着，但**传给它的回调必须是稳定引用**：`Sider` 里用 `useCallback` 收成 `requestDelete`，`SessionItem` 调 `onDelete(session)`。以前是内联 `() => setDeleting(session)`，每次渲染都是新闭包，memo 对 1239 行**全部失效**——数据一个字没变也要全量重跑。
+- 量法：页内 rAF 探针 + `PerformanceObserver({ entryTypes: ['longtask'] })`，动作选「切回前台」（`focus` 会让 `Sider` 把 `now` 写新、重算分组），因为它不改变任何数据，纯粹看渲染成本。
+- 实测（Redmi 14C，1239 条会话）：纯重渲染 133/150 ms → **27/34/39 ms 且长任务为空**；置顶 164 ms → 0；取消置顶 121 ms → 0；点一行切会话 109+180 ms → 59 ms。
+- 成本分布：React 渲染约占三分之二，样式+布局+绘制约占三分之一（把抽屉 `display:none` 后同一动作从 133 ms 降到 89 ms 得出）。别指望用 CSS containment 解决。
+- 剩下的大头**不在列表**：切进长对话（`Rust重写Minecraft` 量级）是 590 ms + 183 ms 长任务，消息面板随消息条数膨胀。列表已经不是瓶颈了。
+
 **安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。
