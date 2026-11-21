@@ -101,8 +101,17 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 摘要与系统提示词在数据层已分开（`summaryTokens` / `systemTokens`），面板把它们当两笔不同的账；以前压缩后两者混在一行，同一行标签指两样东西。
 - 诊断信息**不用**这套写法：那里继续用 `formatTokens`（能显示 343、in 35 这种精确值）和 1.0M，排查时看的是准确数字。
 
-**安全审核（v0.9.7 起默认不声明）**：
+**写回会话的两条纪律（v0.9.11 起有测试钉住）**：
 
+- 重命名、置顶一律「整条读出 → 改一个字段 → 原样写回」，走 `db.ts` 的 `withTitle` / `withPinned`，**不要用摘要重建会话**：摘要（`toStoredSummary`）只有 id/标题/时间/置顶/文件 id，照它拼一个会话等于把 `messages` 和 `compaction` 洗掉。
+- 对应测试在 `test/dbSession.test.ts`：patch 之后 `compaction` 与 `messages` 必须还是同一个引用，摘要里不许出现这两个字段。
+
+**拒答收尾与用量合并（v0.9.11 起有单测）**：
+
+- `settleReply` 在 `stop_reason: 'refusal'` 时丢弃全部 thinking/text、只留工具块——这条路径真机很难复现（不再声明 safety_check），只能靠 `test/reply.test.ts`。
+- `message_delta` 只带 `output_tokens` 时会被整份丢弃，`message_start` 报的输入侧必须保留；四个数字齐全才整体替换。别把"估算偏高"再误判成"服务端只回了输出侧"。
+
+**安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。
 - 关它的收益：输出写完就断连（不等审核）、网页抓取不再先过审、审核 token 不再计入 `output_tokens`。
@@ -111,6 +120,8 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 
 **第 5 项的前提容易踩空**：「继续生成」不是常驻按钮，只有回复被**手动停止**、或撞到输出上限（`stopReason === 'max_tokens'`）时才出现。正常答完的回复不给续写——这是设计，不是 bug。所以必须先停一次。
+
+实战量级（v0.9.10 回归）：400 字的请求 5 秒内就写完了，抓不住停止时机；要用 **3000 字量级**的请求，第 6 秒左右点停止才稳。停止后文本会停在半个句子上，点「继续生成」应从这里原样接续、不重复已写内容。
 
 **第 7 项的平台限制（别当成 bug 去"修"）**：安卓只允许应用把**每条屏幕边缘最多 200dp** 从系统返回手势里排除掉，且实测（Android 16 / MIUI V816）这一段被系统锚定在**屏底**。所以：
 

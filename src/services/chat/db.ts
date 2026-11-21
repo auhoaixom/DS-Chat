@@ -33,7 +33,11 @@ interface ChatDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ChatDB>> | null = null
 
-const storedSummary = (session: Session): StoredSessionSummary => ({
+/**
+ * 列表元数据：只带标题、时间、置顶与引用到的文件 id。
+ * **不含 messages，也不含 compaction** —— 列表靠它渲染，打开会话时才读完整记录。
+ */
+export const toStoredSummary = (session: Session): StoredSessionSummary => ({
   ...toSessionSummary(session),
   fileIds: [
     ...new Set(
@@ -43,6 +47,25 @@ const storedSummary = (session: Session): StoredSessionSummary => ({
     ),
   ],
 })
+
+const storedSummary = toStoredSummary
+
+/**
+ * 重命名 / 置顶都要**整条读出、只改一个字段、原样写回**。
+ * 单独抽出来是为了让"别用摘要重建会话"这条约束落到代码里：
+ * 摘要是列表元数据，缺 messages 与 compaction，照它重建就等于把会话洗空。
+ */
+export const withTitle = (session: Session, title: string): Session => ({ ...session, title })
+
+export const withPinned = (session: Session, pinned: boolean): Session => {
+  const next = { ...session }
+  if (pinned) {
+    next.pinned = true
+  } else {
+    delete next.pinned
+  }
+  return next
+}
 
 const abortTransaction = (tx: { abort(): void }) => {
   try {
@@ -110,9 +133,9 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
         const sessions = tx.objectStore('sessions')
         const session = await sessions.get(id)
         if (session) {
-          session.title = title
-          await sessions.put(session)
-          await tx.objectStore('sessionSummaries').put(storedSummary(session))
+          const renamed = withTitle(session, title)
+          await sessions.put(renamed)
+          await tx.objectStore('sessionSummaries').put(storedSummary(renamed))
         }
       } catch (error) {
         abortTransaction(tx)
@@ -132,13 +155,9 @@ export const setSessionPinned = async (id: string, pinned: boolean): Promise<voi
         const sessions = tx.objectStore('sessions')
         const session = await sessions.get(id)
         if (session) {
-          if (pinned) {
-            session.pinned = true
-          } else {
-            delete session.pinned
-          }
-          await sessions.put(session)
-          await tx.objectStore('sessionSummaries').put(storedSummary(session))
+          const next = withPinned(session, pinned)
+          await sessions.put(next)
+          await tx.objectStore('sessionSummaries').put(storedSummary(next))
         }
       } catch (error) {
         abortTransaction(tx)
