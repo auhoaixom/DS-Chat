@@ -7,6 +7,7 @@ import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { CompactionCard, CompactedOriginals } from './CompactionCard.js'
+import { OLDER_CHUNK, LOAD_OLDER_THRESHOLD, clampWindowStart, initialWindowStart } from './messageWindow.js'
 import { ScrollToBottomContext } from './scrollContext.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
@@ -30,20 +31,6 @@ import styles from './MessageList.module.css'
 /** 距底部小于该值时视为在底部，流式内容增长时跟随 */
 const STICKY_THRESHOLD = 40
 const EMPTY_VERSIONS: MessageVersions = { ids: [], index: -1 }
-/**
- * 首屏最多挂多少条消息，以及往上滚到顶时一次补多少条。
- *
- * 打开一条长对话时所有消息会一次性建成 DOM 并解析 markdown：实测 258 条消息是
- * 1.7 秒的主线程长任务（CPU profile 里是创建一万多个节点 + 解析，不是布局，
- * 所以 v0.9.16 的 content-visibility 只能省 12%）。
- *
- * 挂 20 条约 200ms，补一批 10 条约几十毫秒且发生在用户主动往上滚的时候。
- * 调整这两个数之前，先用页内 rAF 探针量「打开耗时」和「补一帧有没有跳」。
- */
-const INITIAL_MESSAGES = 20
-const OLDER_CHUNK = 5
-/** 滚到离顶部这么近就补下一批（提前一点，别等贴到边才开始） */
-const LOAD_OLDER_THRESHOLD = 400
 
 export const MessageList = ({
   session,
@@ -81,15 +68,14 @@ export const MessageList = ({
    */
   const [windowState, setWindowState] = useState(() => ({
     sessionId: session.id,
-    start: Math.max(0, messages.length - INITIAL_MESSAGES),
+    start: initialWindowStart(messages.length),
   }))
-  // 上限是「至少留够一屏」而不是「最后一条」：压缩或切到条数更少的分支后可见消息
-  // 会变少，按最后一条钳会把窗口缩到只剩一条
-  const start = Math.min(
+  // 起点收进合法范围；上界为什么是「留够一屏」而不是「最后一条」，见 messageWindow.ts
+  const start = clampWindowStart(
     windowState.sessionId === session.id
       ? windowState.start
-      : Math.max(0, messages.length - INITIAL_MESSAGES),
-    Math.max(0, messages.length - INITIAL_MESSAGES),
+      : initialWindowStart(messages.length),
+    messages.length,
   )
   const shown = start > 0 ? messages.slice(start) : messages
   /** 补载前记下的锚点元素与它当时的视口位置 */
@@ -141,9 +127,8 @@ export const MessageList = ({
       sessionId: session.id,
       start: Math.max(
         0,
-        (state.sessionId === session.id
-          ? state.start
-          : Math.max(0, messages.length - INITIAL_MESSAGES)) - OLDER_CHUNK,
+        (state.sessionId === session.id ? state.start : initialWindowStart(messages.length)) -
+          OLDER_CHUNK,
       ),
     }))
   }, [session.id, messages.length])
