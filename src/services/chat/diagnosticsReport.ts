@@ -56,9 +56,12 @@ const compositionLines = (
   if (!usage) {
     return lines
   }
-  // 压缩后系统提示词里装的是摘要，标签得跟着变，否则又成了两个「系统提示词」
+  // 压缩后系统提示词里装的是摘要，所以摘要单独列一笔，提示词只算它自己
   const composition = [
-    `${t(usage.compacted ? 'diagnosticsSummaryTokens' : 'contextSystem')} ${formatTokens(usage.systemTokens)}`,
+    `${t('contextSystem')} ${formatTokens(usage.systemTokens)}`,
+    ...(usage.compacted
+      ? [`${t('diagnosticsSummaryTokens')} ${formatTokens(usage.summaryTokens)}`]
+      : []),
     `${t(usage.compacted ? 'diagnosticsTailMessages' : 'contextMessages')} ${formatTokens(usage.messageTokens)}`,
     `${t('contextOverhead')} ${formatTokens(usage.overheadTokens)}`,
     `${t('diagnosticsTotal')} ${formatTokens(usage.used)}`,

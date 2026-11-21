@@ -4,6 +4,7 @@ import {
   estimateMessageTokens,
   estimateTokens,
   formatTokens,
+  formatTokensK,
   getContextWindow,
   getPromptTokens,
 } from '../src/services/chat/tokens.js'
@@ -85,6 +86,21 @@ test('token 数的紧凑显示', () => {
   assert.equal(formatTokens(1_500), '1.5K')
   assert.equal(formatTokens(12_000), '12K')
   assert.equal(formatTokens(1_048_576), '1.0M')
+})
+
+test('面板的 K 单位：不足 1K 一格统称 <1K，窗口写 1024K', () => {
+  // K 按 1024 计，和窗口声明同一把尺子
+  assert.equal(formatTokensK(0), '<1K')
+  assert.equal(formatTokensK(46), '<1K')
+  assert.equal(formatTokensK(1_023), '<1K')
+  assert.equal(formatTokensK(1_024), '1.0K')
+  assert.equal(formatTokensK(1_434), '1.4K')
+  assert.equal(formatTokensK(9_216), '9.0K')
+  assert.equal(formatTokensK(10_240), '10K')
+  assert.equal(formatTokensK(16_384), '16K')
+  assert.equal(formatTokensK(1_048_576), '1024K')
+  // 负数（理论上不该出现）也按 <1K 兜住，别把 -1 摆到界面上
+  assert.equal(formatTokensK(-5), '<1K')
 })
 
 test('窗口以模型声明为准，认不出的模型退回 1Mi', () => {

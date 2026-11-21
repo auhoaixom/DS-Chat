@@ -114,12 +114,31 @@
 }
 
 .figures {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-top: 2px;
   color: var(--dsw-alias-label-primary);
   font-size: 18px;
   line-height: 26px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* 窗口写小一号：它是分母，不该和已用抢注意力 */
+.window {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* 实测 / 估算：拆分明细的来源，标在数字同一行末尾 */
+.anchor {
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
 }
 
 .bar {
@@ -139,17 +158,17 @@
   border-radius: 1px;
 }
 
-.segmentMessages {
-  background-color: var(--dsw-alias-label-tertiary);
+/* 三段与三行同序：固定开销 → 摘要 → 对话内容，颜色由暗到亮 */
+.segmentFixed {
+  background-color: var(--dsw-alias-label-dimmed);
 }
 
-.segmentSystem {
+.segmentSummary {
   background-color: var(--dsw-alias-border-l3);
 }
 
-/* 请求本身的固定开销既不是对话也不是提示词，用最暗的一段区分出来 */
-.segmentOverhead {
-  background-color: var(--dsw-alias-label-dimmed);
+.segmentMessages {
+  background-color: var(--dsw-alias-label-tertiary);
 }
 
 .rows {
@@ -177,9 +196,10 @@
   }
 }
 
+/* 三项配色的顺序与比例条一致：固定开销最暗、摘要次之、对话内容最亮 */
+.swatchFixed::before,
+.swatchSummary::before,
 .swatchMessages::before,
-.swatchSystem::before,
-.swatchOverhead::before,
 .swatchCache::before {
   content: '';
   position: absolute;
@@ -190,16 +210,16 @@
   border-radius: 2px;
 }
 
-.swatchMessages::before {
-  background-color: var(--dsw-alias-label-tertiary);
+.swatchFixed::before {
+  background-color: var(--dsw-alias-label-dimmed);
 }
 
-.swatchSystem::before {
+.swatchSummary::before {
   background-color: var(--dsw-alias-border-l3);
 }
 
-.swatchOverhead::before {
-  background-color: var(--dsw-alias-label-dimmed);
+.swatchMessages::before {
+  background-color: var(--dsw-alias-label-tertiary);
 }
 
 /* 缓存命中不是占用的一部分，用品牌色区分，也不参与上面那条比例条 */

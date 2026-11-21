@@ -92,6 +92,19 @@ export const formatTokens = (tokens: number): string => {
 }
 
 /**
+ * 只给用量面板用的粗显示：一律以 K 为单位，不给具体 token 数。
+ * K 按 1024 计，和窗口声明的 1024K 同一把尺子；不足 1K 一格统称 <1K。
+ * 诊断信息不用这个函数——那里要看精确值才能排查。
+ */
+export const formatTokensK = (tokens: number): string => {
+  if (!(tokens >= 1024)) {
+    return '<1K'
+  }
+  const value = tokens / 1024
+  return value < 10 ? `${value.toFixed(1)}K` : `${Math.round(value)}K`
+}
+
+/**
  * 上下文窗口：一律用模型自己声明的容量。
  * 模型容量来自服务端 /models 的声明，改别名时这张表要跟着改；
  * 认不出的模型退回 1Mi，而不是退回某个用户选过的数字。

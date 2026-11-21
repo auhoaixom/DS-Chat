@@ -5,7 +5,7 @@ import { useTranslate } from '../../i18n/index.js'
 import { getCacheStats, getContextUsage } from '../../services/chat/compaction.js'
 import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
 import { cancelCompaction, compactSession, undoCompaction, useChatStore } from '../../services/chat/store.js'
-import { formatTokens } from '../../services/chat/tokens.js'
+import { formatTokensK } from '../../services/chat/tokens.js'
 import type { Session } from '../../services/chat/types.js'
 import { useAnchoredPosition, useDismiss } from '../base/anchored.js'
 import { Button } from '../base/Button.js'
@@ -110,36 +110,43 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                   <span className={styles.headPercent}>{percentLabel}</span>
                 </div>
                 <div className={styles.figures}>
-                  {formatTokens(usage.used)} / {formatTokens(usage.window)}
+                  <span>
+                    ≈ {formatTokensK(usage.used)}{' '}
+                    <span className={styles.window}>/ {formatTokensK(usage.window)}</span>
+                  </span>
+                  {/* 拆分明细是估算摊分的结果，标出来免得被当成账单 */}
+                  <span className={styles.anchor}>
+                    {t(usage.measured ? 'contextAnchorMeasured' : 'contextAnchorEstimate')}
+                  </span>
                 </div>
                 <div className={styles.bar}>
                   <span
+                    className={clsx(styles.segment, styles.segmentFixed)}
+                    style={{ flexGrow: Math.max(0, usage.systemTokens + usage.overheadTokens) }}
+                  />
+                  <span
+                    className={clsx(styles.segment, styles.segmentSummary)}
+                    style={{ flexGrow: Math.max(0, usage.summaryTokens) }}
+                  />
+                  <span
                     className={clsx(styles.segment, styles.segmentMessages)}
-                    style={{
-                      flexGrow: Math.max(0, usage.messageTokens),
-                    }}
-                  />
-                  <span
-                    className={clsx(styles.segment, styles.segmentSystem)}
-                    style={{ flexGrow: Math.max(0, usage.systemTokens) }}
-                  />
-                  <span
-                    className={clsx(styles.segment, styles.segmentOverhead)}
-                    style={{ flexGrow: Math.max(0, usage.overheadTokens) }}
+                    style={{ flexGrow: Math.max(0, usage.messageTokens) }}
                   />
                 </div>
                 <dl className={styles.rows}>
                   <div className={styles.row}>
+                    <dt className={styles.swatchFixed}>{t('contextFixedCost')}</dt>
+                    <dd>
+                      ≈ {formatTokensK(usage.systemTokens + usage.overheadTokens)}
+                    </dd>
+                  </div>
+                  <div className={styles.row}>
+                    <dt className={styles.swatchSummary}>{t('contextSummary')}</dt>
+                    <dd>≈ {formatTokensK(usage.summaryTokens)}</dd>
+                  </div>
+                  <div className={styles.row}>
                     <dt className={styles.swatchMessages}>{t('contextMessages')}</dt>
-                    <dd>{formatTokens(usage.messageTokens)}</dd>
-                  </div>
-                  <div className={styles.row}>
-                    <dt className={styles.swatchSystem}>{t('contextSystem')}</dt>
-                    <dd>{formatTokens(usage.systemTokens)}</dd>
-                  </div>
-                  <div className={styles.row}>
-                    <dt className={styles.swatchOverhead}>{t('contextOverhead')}</dt>
-                    <dd>{formatTokens(usage.overheadTokens)}</dd>
+                    <dd>≈ {formatTokensK(usage.messageTokens)}</dd>
                   </div>
                   {cache ? (
                     <div

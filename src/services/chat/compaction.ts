@@ -323,9 +323,12 @@ export type ContextUsage = {
   percent: number
   /** 是否锚定了服务端真实用量；false 表示整体按字数估算 */
   measured: boolean
-  /** 明细三项，按同一系数归一后相加正好等于 used（不含请求开销重复计数） */
+  /** 明细四项，按同一系数归一后相加正好等于 used（不含请求开销重复计数） */
   messageTokens: number
+  /** 系统提示词本体，不含压缩摘要 */
   systemTokens: number
+  /** 压缩摘要及其包装；没压缩时为 0 */
+  summaryTokens: number
   /** 请求本身的固定开销（协议外壳、工具声明），单列出来免得被当成对话内容 */
   overheadTokens: number
   /** 当前是否处于压缩状态 */
@@ -366,9 +369,11 @@ const measureContext = (
   }
   const { history, summary } = applyCompaction(visible, session.compaction)
   const system = summary ? withCompactionSummary(systemBase, summary) : systemBase
-  const rawSystem = estimateTokens(system)
+  // 提示词本体与摘要分开计：面板上「固定开销」和「摘要」是两笔不同的账
+  const rawPrompt = estimateTokens(systemBase)
+  const rawSummary = Math.max(0, estimateTokens(system) - rawPrompt)
   const rawMessages = estimateRequestTokens([...history, ...extra])
-  const rawTotal = rawSystem + rawMessages
+  const rawTotal = rawPrompt + rawSummary + rawMessages
   let anchorUsage: number | undefined
   let anchorEstimate: number | undefined
   let anchorCreatedAt = 0
@@ -413,16 +418,21 @@ const measureContext = (
   // 明细按比例归到真实用量上：否则估算出来的分解会比总数还大，看着像 bug
   const scale = rawTotal > 0 ? used / rawTotal : 1
   const window = resolveWindow(session)
-  const systemTokens = Math.round(rawSystem * scale)
+  const systemTokens = Math.round(rawPrompt * scale)
+  const summaryTokens = Math.round(rawSummary * scale)
   const overheadTokens = Math.round(REQUEST_OVERHEAD * scale)
   return {
     used: Math.round(used),
     window,
     percent: Math.min(100, Math.round((used / window) * 100)),
     measured,
-    // 余数归给对话消息，保证三项相加正好等于 used，不会因为各自四舍五入差几个 token
-    messageTokens: Math.max(0, Math.round(used) - systemTokens - overheadTokens),
+    // 余数归给对话消息，保证四项相加正好等于 used，不会因为各自四舍五入差几个 token
+    messageTokens: Math.max(
+      0,
+      Math.round(used) - systemTokens - summaryTokens - overheadTokens
+    ),
     systemTokens,
+    summaryTokens,
     overheadTokens,
     compacted: summary !== null,
     anchor,

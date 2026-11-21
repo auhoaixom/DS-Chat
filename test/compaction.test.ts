@@ -221,17 +221,41 @@ test('有实测锚点时，占用按服务端回报的真实用量算', () => {
   assert.ok(usage.used > 9_000)
 })
 
-test('明细三项相加正好等于总用量，请求开销不被算进对话消息', () => {
+test('明细四项相加正好等于总用量，请求开销不被算进对话消息', () => {
   const messages = [userMessage(`问：${'甲'.repeat(2_000)}`), answered(`答：${'乙'.repeat(2_000)}`, 100, 800)]
   const usage = getContextUsage(sessionOf(messages))
   assert.ok(usage)
   assert.equal(
-    usage.messageTokens + usage.systemTokens + usage.overheadTokens,
+    usage.messageTokens + usage.systemTokens + usage.summaryTokens + usage.overheadTokens,
     usage.used
   )
   // 请求开销与对话消息分开算：800 的固定开销不该混进"对话消息"里
   assert.ok(usage.overheadTokens > 0)
   assert.ok(usage.messageTokens > usage.overheadTokens)
+  // 没压缩就没有摘要这一笔
+  assert.equal(usage.summaryTokens, 0)
+})
+
+test('摘要单独成一项，不再混进系统提示词', () => {
+  const first = userMessage(`问：${'甲'.repeat(2_000)}`)
+  const answer = answered(`答：${'乙'.repeat(2_000)}`, 100, 800)
+  const later = answered('答二', 400, 2_000)
+  const usage = getContextUsage(
+    sessionOf(
+      [first, answer, userMessage('追问'), later],
+      compactionRecord({ coveredIds: [first.id, answer.id], createdAt: 300, summary: '被压掉的旧内容' })
+    ),
+    SYSTEM_PROMPT
+  )
+  assert.ok(usage)
+  assert.equal(usage.compacted, true)
+  // 摘要那笔来自摘要正文，系统提示词只算它自己那句
+  assert.ok(usage.summaryTokens > 0)
+  assert.ok(usage.systemTokens < usage.summaryTokens)
+  assert.equal(
+    usage.messageTokens + usage.systemTokens + usage.summaryTokens + usage.overheadTokens,
+    usage.used
+  )
 })
 
 test('服务端用量小到不合常理时丢弃锚点，退回纯估算', () => {
