@@ -10,7 +10,7 @@
     "build": "cross-env NODE_ENV=production rspack build -c rspack.config.ts",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src test rspack.config.ts",
-    "test": "tsc -p tsconfig.test.json && node --import ./test/setup.mjs --test \".test/test/*.test.js\"",
+    "test": "node -e \"require('node:fs').rmSync('.test',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --import ./test/setup.mjs --test \".test/test/*.test.js\"",
     "format": "oxfmt --write .",
     "android:sync": "pnpm build && cap sync android",
     "android:debug": "cd android && gradlew.bat assembleDebug"
@@ -52,6 +52,7 @@
     "@swc/helpers": "0.5.23",
     "@types/node": "~20.9.2",
     "cross-env": "10.1.0",
+    "fake-indexeddb": "^6.2.8",
     "oxfmt": "0.48.0",
     "oxlint": "1.63.0",
     "typescript": "7.0.2"

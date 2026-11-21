@@ -143,6 +143,24 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 不卸载已经补进来的消息（不做真虚拟化）：滚到最顶之后所有消息都是挂着的，但那笔开销被摊成了几十次 5 条。
 - 调整 `INITIAL_MESSAGES` / `OLDER_CHUNK` / 阈值之前，先量两个数：打开耗时、补载后锚点有没有漂移。
 
+**会话状态机的场景测试（v0.9.22 起）**：
+
+`store.ts` 是唯一没有测试覆盖的核心逻辑：会话读写、内存缓存淘汰、流式与落盘、导入换库。现在有四个场景测试守着：
+
+| 文件 | 守什么 |
+|---|---|
+| `test/store-load.test.ts` | 读取期间改名，旧读取回来不能把标题盖回去（`sameSummary` 合并） |
+| `test/store-switch.test.ts` | 连点两条对话：两条都进缓存，`activeId` 停在最后点的那条 |
+| `test/store-epoch.test.ts` | 导入期间迟到的读取结果被 `historyEpoch` 挡住，不写进新数据 |
+| `test/store-cache.test.ts` | 缓存淘汰（上限 5）绝不踢当前打开的会话 |
+
+写这类测试的三条硬规矩：
+
+- **数据必须在 `initChat()` 之前造好**：`initChat` 是一次性的，会话清单只读一遍，之后再往库里塞的会话不在清单里，`ensureSessionLoaded` 会直接返回。
+- **一个用例一个文件**：`sessionAccess` / `historyEpoch` / `dbPromise` 都是模块级单例，同文件里跑两个用例会互相污染（踩过：第二个用例因为清单没刷新而假失败）。Node 每个测试文件跑在独立进程里，天然干净。
+- **不要 mock `db.ts`**：写回纪律、事务、游标都在里面，mock 掉等于把最该测的部分测没了。用 `test/setup.mjs` 里的 `fake-indexeddb` 让真实代码跑起来。
+- 判定“测试有没有牙齿”：把被守的那行代码故意改坏，确认对应测试变红，再还原。
+
 **安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。
