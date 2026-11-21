@@ -27,12 +27,16 @@ export type DiagnosticsReport = {
   detail: DiagnosticsDetail[]
 }
 
-/** 消息正文与字符构成，用来解释估算口径 */
-const estimateBasis = (
+/**
+ * 上下文这一段拆成几行，每行只说一件事：
+ * 字数 → 当前请求的构成 → 不压缩会是多少 → 锚点从哪来。
+ * 以前把这些挤在一行，同一个「系统提示词」既出现 14 又出现 1.2K，读起来像 bug。
+ */
+const compositionLines = (
   session: Session,
   t: typeof translate,
   usage: ReturnType<typeof getContextUsage>
-): string => {
+): string[] => {
   const visible = getVisibleMessages(session)
   const text = visible.map((message) =>
     message.role === 'user'
@@ -46,19 +50,59 @@ const estimateBasis = (
       cjk += 1
     }
   }
-  const parts = [
-    `${t('diagnosticsChars')} ${joined.length} (CJK ${cjk} / ASCII ${joined.length - cjk})`,
-    `${t('diagnosticsEstimate')} ${estimateRequestTokens(visible)}`,
-    `${t('diagnosticsSystemEstimate')} ${estimateTokens(SYSTEM_PROMPT)}`,
+  const lines = [
+    `${t('diagnosticsChars')}: ${joined.length} (CJK ${cjk} / ASCII ${joined.length - cjk})`,
   ]
-  // 实测与估算的拆分放在同一行，方便直接对照两者差多少
-  if (usage) {
-    parts.push(
-      `${t('contextMessages')} ${formatTokens(usage.messageTokens)}` +
-        ` / ${t('contextSystem')} ${formatTokens(usage.systemTokens)}`
+  if (!usage) {
+    return lines
+  }
+  // 压缩后系统提示词里装的是摘要，标签得跟着变，否则又成了两个「系统提示词」
+  const composition = [
+    `${t(usage.compacted ? 'diagnosticsSummaryTokens' : 'contextSystem')} ${formatTokens(usage.systemTokens)}`,
+    `${t(usage.compacted ? 'diagnosticsTailMessages' : 'contextMessages')} ${formatTokens(usage.messageTokens)}`,
+    `${t('contextOverhead')} ${formatTokens(usage.overheadTokens)}`,
+    `${t('diagnosticsTotal')} ${formatTokens(usage.used)}`,
+  ]
+  lines.push(`${t('diagnosticsComposition')}: ${composition.join(' · ')}`)
+
+  // 没压缩时全量就等于当前，再列一遍只会让人以为有两个不同的数
+  if (usage.compacted) {
+    const fullMessages = estimateRequestTokens(visible)
+    const fullSystem = estimateTokens(SYSTEM_PROMPT)
+    const fullTotal = fullMessages + fullSystem
+    const ratio = usage.used > 0 ? (fullTotal / usage.used).toFixed(1) : '1.0'
+    lines.push(
+      `${t('diagnosticsUncompacted')}: ${t('diagnosticsFullHistory')} ${formatTokens(fullMessages)}` +
+        ` · ${t('contextSystem')} ${formatTokens(fullSystem)}` +
+        ` · ${t('diagnosticsTotal')} ${formatTokens(fullTotal)}` +
+        ` · ${t('diagnosticsTimesCurrent', { ratio })}`
     )
   }
-  return `${t('diagnosticsEstimateBasis')}: ${parts.join(' · ')}`
+
+  const anchorUsed = usage.anchorUsed ?? 0
+  const anchorEstimate = usage.anchorEstimate ?? 0
+  if (usage.anchor === 'measured') {
+    const diff =
+      anchorEstimate > 0 ? Math.round(((anchorUsed - anchorEstimate) / anchorEstimate) * 100) : 0
+    lines.push(
+      `${t('diagnosticsAnchor')}: ${t('diagnosticsAnchorMeasured', {
+        used: anchorUsed,
+        estimate: anchorEstimate,
+        diff: `${diff > 0 ? '+' : ''}${diff}%`,
+      })}`
+    )
+  } else if (usage.anchor === 'dropped') {
+    lines.push(
+      `${t('diagnosticsAnchor')}: ${
+        usage.anchorDropReason === 'usage'
+          ? t('diagnosticsAnchorDroppedUsage', { used: anchorUsed, estimate: anchorEstimate })
+          : t('diagnosticsAnchorDroppedCompaction')
+      }`
+    )
+  } else {
+    lines.push(`${t('diagnosticsAnchor')}: ${t('diagnosticsAnchorNone')}`)
+  }
+  return lines
 }
 
 /** 请求明细：时间、模型、状态各占一行，用量单独一行（窄屏一行放不下） */
@@ -167,7 +211,7 @@ export const buildDiagnosticsReport = (
   )
   brief.push(failureBrief(failures, t))
 
-  const detail: DiagnosticsDetail[] = [{ lines: [estimateBasis(session, t, usage)] }]
+  const detail: DiagnosticsDetail[] = [{ lines: compositionLines(session, t, usage) }]
   if (compaction) {
     const parts = [
       `${t('diagnosticsReplay')} ${t(compaction.viaReplay ? 'diagnosticsYes' : 'diagnosticsNo')}`,

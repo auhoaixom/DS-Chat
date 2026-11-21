@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   applyCompaction,
+  estimateRequestTokens,
   getContextUsage,
   getCoveredCount,
   getSessionModel,
@@ -10,6 +11,7 @@ import {
   planCompaction,
 } from '../src/services/chat/compaction.js'
 import { ApiError } from '../src/services/api/client.js'
+import { SYSTEM_PROMPT } from '../src/services/chat/prompt.js'
 import { useSettings } from '../src/services/settings.js'
 import type { Session } from '../src/services/chat/types.js'
 import { assistantMessage, at, compactionRecord, conversation, userMessage } from './helpers.js'
@@ -215,7 +217,69 @@ test('有实测锚点时，占用按服务端回报的真实用量算', () => {
   const usage = getContextUsage(sessionOf(messages))
   assert.ok(usage)
   assert.equal(usage.measured, true)
+  assert.equal(usage.anchor, 'measured')
   assert.ok(usage.used > 9_000)
+})
+
+test('明细三项相加正好等于总用量，请求开销不被算进对话消息', () => {
+  const messages = [userMessage(`问：${'甲'.repeat(2_000)}`), answered(`答：${'乙'.repeat(2_000)}`, 100, 800)]
+  const usage = getContextUsage(sessionOf(messages))
+  assert.ok(usage)
+  assert.equal(
+    usage.messageTokens + usage.systemTokens + usage.overheadTokens,
+    usage.used
+  )
+  // 请求开销与对话消息分开算：800 的固定开销不该混进"对话消息"里
+  assert.ok(usage.overheadTokens > 0)
+  assert.ok(usage.messageTokens > usage.overheadTokens)
+})
+
+test('服务端用量小到不合常理时丢弃锚点，退回纯估算', () => {
+  // 只回了输出侧、提示侧全是 0 的用量：当成实测会把整段上下文压成几十 token
+  const zeroed = {
+    ...answered(`答：${'乙'.repeat(2_000)}`, 100, 1_200),
+    usage: {
+      input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 20,
+    },
+  }
+  const usage = getContextUsage(sessionOf([userMessage(`问：${'甲'.repeat(2_000)}`), zeroed]))
+  assert.ok(usage)
+  assert.equal(usage.measured, false)
+  assert.equal(usage.anchor, 'dropped')
+  assert.equal(usage.anchorDropReason, 'usage')
+  // 估算全量是几千 token，绝不是"只剩回答本身"
+  assert.ok(usage.used > 2_000)
+  assert.equal(usage.anchorUsed, 0)
+  assert.equal(usage.anchorEstimate, 1_200)
+})
+
+test('短请求的估算与实测同一个量级，固定开销不再虚高一个数量级', () => {
+  // 真机实测（82374919*61525321，17 个 ASCII 字符）：服务端整份提示侧只有 64 token
+  const estimated = estimateRequestTokens([userMessage('82374919*61525321', 'q1')])
+  assert.ok(estimated >= 64 && estimated < 120, `估算 ${estimated} 应与实测 64 同量级`)
+})
+
+test('估算口径改小后，旧锚点也不会把占用拉成 0', () => {
+  // 这条回答的 promptEstimate 是旧口径（800 开销）存下的 828，比现在的估算大得多
+  const stale = {
+    ...answered('答：2', 100, 828),
+    usage: {
+      input_tokens: 64,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 20,
+    },
+  }
+  const usage = getContextUsage(sessionOf([userMessage('82374919*61525321'), stale]), SYSTEM_PROMPT)
+  assert.ok(usage)
+  assert.equal(usage.measured, true)
+  // 净增减为负时停在实测值上，不夹成 0、也不冒出负增长
+  assert.equal(usage.used, 64)
+  // 系统提示词按比例摊分后是十来个 token，不会再被摊成 1
+  assert.ok(usage.systemTokens > 1, `系统提示词摊成了 ${usage.systemTokens}`)
 })
 
 test('压缩之后不再沿用更早的锚点，否则巨大负增量会把占用夹成 0', () => {
@@ -236,6 +300,8 @@ test('压缩之后不再沿用更早的锚点，否则巨大负增量会把占�
   assert.equal(before.measured, true)
   // 锚点比压缩记录更早，就退回纯估算
   assert.equal(after.measured, false)
+  assert.equal(after.anchor, 'dropped')
+  assert.equal(after.anchorDropReason, 'compaction')
   assert.ok(after.used > 0)
   assert.ok(after.used < before.used)
   assert.equal(after.compacted, true)

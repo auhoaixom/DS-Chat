@@ -147,6 +147,11 @@
   background-color: var(--dsw-alias-border-l3);
 }
 
+/* 请求本身的固定开销既不是对话也不是提示词，用最暗的一段区分出来 */
+.segmentOverhead {
+  background-color: var(--dsw-alias-label-dimmed);
+}
+
 .rows {
   margin: 4px 0 0;
 }
@@ -174,6 +179,7 @@
 
 .swatchMessages::before,
 .swatchSystem::before,
+.swatchOverhead::before,
 .swatchCache::before {
   content: '';
   position: absolute;
@@ -190,6 +196,10 @@
 
 .swatchSystem::before {
   background-color: var(--dsw-alias-border-l3);
+}
+
+.swatchOverhead::before {
+  background-color: var(--dsw-alias-label-dimmed);
 }
 
 /* 缓存命中不是占用的一部分，用品牌色区分，也不参与上面那条比例条 */

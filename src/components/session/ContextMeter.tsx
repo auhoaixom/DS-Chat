@@ -123,6 +123,10 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                     className={clsx(styles.segment, styles.segmentSystem)}
                     style={{ flexGrow: Math.max(0, usage.systemTokens) }}
                   />
+                  <span
+                    className={clsx(styles.segment, styles.segmentOverhead)}
+                    style={{ flexGrow: Math.max(0, usage.overheadTokens) }}
+                  />
                 </div>
                 <dl className={styles.rows}>
                   <div className={styles.row}>
@@ -132,6 +136,10 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                   <div className={styles.row}>
                     <dt className={styles.swatchSystem}>{t('contextSystem')}</dt>
                     <dd>{formatTokens(usage.systemTokens)}</dd>
+                  </div>
+                  <div className={styles.row}>
+                    <dt className={styles.swatchOverhead}>{t('contextOverhead')}</dt>
+                    <dd>{formatTokens(usage.overheadTokens)}</dd>
                   </div>
                   {cache ? (
                     <div

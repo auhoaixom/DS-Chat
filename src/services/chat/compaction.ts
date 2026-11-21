@@ -26,8 +26,16 @@ const MIN_RETAIN_MESSAGES = 2
 const MANUAL_RETAIN_MESSAGES = 4
 /** 至少有两轮才值得压缩 */
 const MIN_COVER_MESSAGES = 2
-/** 系统提示与工具声明的固定开销 */
-const REQUEST_OVERHEAD = 800
+/**
+ * 请求的固定开销：那句系统提示词、工具声明（read_url / web_search）、协议外壳。
+ *
+ * 以前取 800，把每一次短请求都估成十几倍大：一轮"82374919*61525321"的对话里
+ * 服务端实测 in = 64，我们估 828，于是上下文环、明细拆分、自动压缩阈值全被带偏
+ * （锚定后按比例摊回去，"系统提示词"只剩 1）。
+ * 实测（2026-11，Redmi 14C）：17 个 ASCII 字符的一条消息，服务端整份提示侧 64 token，
+ * 扣掉正文与消息包装约 14，固定开销在 50 上下。取 56 留一点余量。
+ */
+const REQUEST_OVERHEAD = 56
 /** 单次摘要请求的输入上限（字符）；超过就分段总结再合并 */
 const CHUNK_CHARS = 24_000
 /** 分段数量上限，超出的部分只取靠后的片段 */
@@ -297,6 +305,15 @@ const resolveWindow = (session: Session): number =>
 export const estimateRequestTokens = (messages: Message[], overhead = REQUEST_OVERHEAD) =>
   messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0) + overhead
 
+/**
+ * 锚点状态：measured 用了服务端实测；estimate 一直没等到用量；
+ * dropped 等到了但被判不可信（用例见 plausibleAnchor）
+ */
+export type AnchorState = 'measured' | 'estimate' | 'dropped'
+
+/** 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理 */
+export type AnchorDropReason = 'compaction' | 'usage'
+
 export type ContextUsage = {
   /** 下一次请求预计占用的提示侧 token */
   used: number
@@ -306,12 +323,33 @@ export type ContextUsage = {
   percent: number
   /** 是否锚定了服务端真实用量；false 表示整体按字数估算 */
   measured: boolean
-  /** 明细：对话消息与系统提示各占多少 */
+  /** 明细三项，按同一系数归一后相加正好等于 used（不含请求开销重复计数） */
   messageTokens: number
   systemTokens: number
+  /** 请求本身的固定开销（协议外壳、工具声明），单列出来免得被当成对话内容 */
+  overheadTokens: number
   /** 当前是否处于压缩状态 */
   compacted: boolean
+  anchor: AnchorState
+  /** 锚点被丢弃的原因；anchor 不是 dropped 时为 null */
+  anchorDropReason: AnchorDropReason | null
+  /** 诊断用：被判定的锚点实测值与当时的估算值，没有锚点时为 null */
+  anchorUsed: number | null
+  anchorEstimate: number | null
 }
+
+/**
+ * 锚点是否可信。唯一的硬条件是「提示侧用量得是个像样的数」：服务端有时只回输出侧的
+ * 计数，input + 缓存读 + 缓存写 全是 0。把它当成实测，整个上下文会被压成几十 token
+ * ——进度环一直不到 1%、自动压缩永远不触发，直到发送撞上服务端上限才暴露。
+ * 宁可退回纯估算：那只是偏大，不会漏压。
+ *
+ * 不拿「实测 / 估算」的比值当判据：估算本身就会偏大（短请求尤其明显），
+ * 比值小是常态，用它筛只会把好好的锚点一起丢掉。
+ */
+const MIN_ANCHOR_TOKENS = 32
+
+const plausibleAnchor = (usage: number): boolean => usage >= MIN_ANCHOR_TOKENS
 
 /**
  * 上下文占用：以最近一次服务端回报的真实用量为锚，加上对话表面的净增减，
@@ -349,26 +387,48 @@ const measureContext = (
    * 这个巨大负增量会把两把尺子的偏差直接放大到看得见（夹成 0/1.0M）。
    * 所以压缩之后退回纯估算，等下一次回复重新锚定。
    */
+  let dropReason: AnchorDropReason | null = null
   if (session.compaction && anchorCreatedAt < session.compaction.createdAt) {
+    dropReason = 'compaction'
+  } else if (anchorUsage !== undefined && !plausibleAnchor(anchorUsage)) {
+    dropReason = 'usage'
+  }
+  const anchorUsed = anchorUsage ?? null
+  const anchorEstimateValue = anchorEstimate ?? null
+  if (dropReason !== null) {
     anchorUsage = undefined
     anchorEstimate = undefined
   }
   let used = rawTotal
   if (anchorUsage !== undefined && anchorEstimate !== undefined) {
-    used = Math.max(0, anchorUsage + (rawTotal - anchorEstimate))
+    /**
+     * 净增减只认正数：锚点之后的对话只会变长，估算变短只可能是估算口径改过
+     * （比如固定开销从 800 调到 56）或消息被删。这时宁可停在实测值上，
+     * 也不能让差值把总量拉成 0——那会让进度环凭空归零。
+     */
+    used = anchorUsage + Math.max(0, rawTotal - anchorEstimate)
   }
   const measured = anchorUsage !== undefined && anchorEstimate !== undefined
+  const anchor: AnchorState = measured ? 'measured' : dropReason === null ? 'estimate' : 'dropped'
   // 明细按比例归到真实用量上：否则估算出来的分解会比总数还大，看着像 bug
   const scale = rawTotal > 0 ? used / rawTotal : 1
   const window = resolveWindow(session)
+  const systemTokens = Math.round(rawSystem * scale)
+  const overheadTokens = Math.round(REQUEST_OVERHEAD * scale)
   return {
     used: Math.round(used),
     window,
     percent: Math.min(100, Math.round((used / window) * 100)),
     measured,
-    messageTokens: Math.round(rawMessages * scale),
-    systemTokens: Math.round(rawSystem * scale),
+    // 余数归给对话消息，保证三项相加正好等于 used，不会因为各自四舍五入差几个 token
+    messageTokens: Math.max(0, Math.round(used) - systemTokens - overheadTokens),
+    systemTokens,
+    overheadTokens,
     compacted: summary !== null,
+    anchor,
+    anchorDropReason: dropReason,
+    anchorUsed,
+    anchorEstimate: anchorEstimateValue,
   }
 }
 

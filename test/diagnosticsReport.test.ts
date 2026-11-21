@@ -99,3 +99,41 @@ test('复制的全文是摘要在前、明细在后，与是否展开无关', ()
   assert.equal(head, report.brief.join('\n'))
   assert.equal(rest.join('\n\n'), composeDetail(report))
 })
+
+test('上下文拆成「构成 / 不压缩 / 锚点」三行，同一个量不会再出现两个值', () => {
+  const report = buildDiagnosticsReport(
+    session(
+      [userMessage('问题', 'm1'), { ...reply(), id: 'm2' }],
+      compactionRecord({ coveredIds: ['m1'], createdAt: 100, summary: '摘要正文' })
+    ),
+    t
+  )
+  const detail = composeDetail(report)
+  // 构成：压缩后系统提示词里装的是摘要，标签跟着变，不再叫「系统提示词」
+  assert.ok(detail.includes('diagnosticsComposition'), detail)
+  assert.ok(detail.includes('diagnosticsSummaryTokens'), detail)
+  assert.ok(detail.includes('diagnosticsTailMessages'), detail)
+  // 不压缩会是多少
+  assert.ok(detail.includes('diagnosticsUncompacted'), detail)
+  assert.ok(detail.includes('diagnosticsTimesCurrent('), detail)
+  // 压缩让锚点失效：必须写成「已丢弃」，不能空着或冒充实测
+  assert.ok(detail.includes('diagnosticsAnchorDroppedCompaction'), detail)
+  // 旧口径的两段文案已删，不会再有第二个「系统提示词」数字
+  assert.ok(!detail.includes('diagnosticsSystemEstimate'), detail)
+  assert.ok(!detail.includes('diagnosticsEstimate:'), detail)
+})
+
+test('服务端用量不合常理时，明细写明锚点被丢弃和那两个数', () => {
+  const zeroed: AssistantMessage = {
+    ...reply(),
+    usage: {
+      input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 10,
+    },
+  }
+  const report = buildDiagnosticsReport(session([userMessage('问题'), zeroed]), t)
+  const detail = composeDetail(report)
+  assert.ok(detail.includes('diagnosticsAnchorDroppedUsage(0|'), detail)
+})
