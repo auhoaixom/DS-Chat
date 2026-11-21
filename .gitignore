@@ -25,3 +25,6 @@ android/keystore/
 
 # 单元测试的编译产物
 .test/
+
+# 手工回归的临时截图（证据归档到 apk-archive/）
+.shots/

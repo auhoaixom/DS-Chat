@@ -4,11 +4,10 @@
   min-height: 0;
 }
 
+/* 摘要与明细共用的等宽文本块；摘要只七行，不再需要自己的滚动 */
 .report {
-  max-height: 60vh;
   margin: 0;
   padding: 12px 14px;
-  overflow: auto;
   border-radius: 12px;
   background-color: var(--dsw-alias-markdown-code-block);
   color: var(--dsw-alias-label-secondary);
@@ -19,4 +18,39 @@
   word-break: break-word;
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* 明细可能很长，单独给滚动区，摘要始终留在上面 */
+.scroll {
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 0 2px;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
 }

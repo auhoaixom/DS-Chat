@@ -1,168 +1,32 @@
+import clsx from 'clsx'
 import { useMemo, useState } from 'react'
-import { useTranslate, translate } from '../../i18n/index.js'
-import { getVisibleMessages } from '../../services/chat/branches.js'
-import { getCacheStats, getContextUsage, estimateRequestTokens } from '../../services/chat/compaction.js'
-import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
-import { estimateTokens, formatTokens } from '../../services/chat/tokens.js'
-import type { Session } from '../../services/chat/types.js'
+import { useTranslate } from '../../i18n/index.js'
+import {
+  buildDiagnosticsReport,
+  composeDetail,
+  composeReport,
+} from '../../services/chat/diagnosticsReport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { copyText } from '../../utils/clipboard.js'
 import { Button } from '../base/Button.js'
+import { IconChevronDownOutline14 } from '../base/icons.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import styles from './Diagnostics.module.css'
 
-/** 生成的报告里最多列多少条，避免长会话把弹窗撑爆 */
-const REQUEST_LIMIT = 12
-
-const clock = (time: number) =>
-  new Date(time).toLocaleTimeString(undefined, { hour12: false })
-
 /**
- * 把当前对话的可观测数据摊平成一段文本：最近若干轮的用量、压缩记录、失败记录。
- * 只读，不改任何状态；出问题时直接复制粘贴，不用再为读一个数字去改源码。
+ * 诊断信息弹窗：默认只给「每项一行结论」，完整记录折在下面的「详细」里。
+ * 只读当前对话的快照，不改任何状态；复制永远是结论 + 明细全文，与是否展开无关。
  */
-const buildReport = (session: Session): string => {
-  const t = (...args: Parameters<typeof translate>) => translate(...args)
-  const visible = getVisibleMessages(session)
-  const usage = getContextUsage(session, SYSTEM_PROMPT)
-  const cache = getCacheStats(session)
-  const replies = visible.filter((message) => message.role === 'assistant')
-  const lines: string[] = []
-
-  lines.push(t('diagnosticsTitle'))
-  lines.push(`${t('diagnosticsSession')}: ${session.title}`)
-  if (usage) {
-    const percent = usage.percent === 0 && usage.used > 0 ? '<1%' : `${usage.percent}%`
-    lines.push(
-      `${t('diagnosticsContext')}: ${formatTokens(usage.used)} / ${formatTokens(usage.window)} (${percent})` +
-        ` · ${t('contextMessages')} ${formatTokens(usage.messageTokens)}` +
-        ` · ${t('contextSystem')} ${formatTokens(usage.systemTokens)}`
-    )
-    lines.push(
-      `${t('diagnosticsMeasured')}: ${usage.measured ? t('diagnosticsYes') : t('diagnosticsNo')}`
-    )
-  }
-  if (cache) {
-    lines.push(
-      `${t('contextCacheHit')}: ${cache.percent}% (${cache.read} / ${cache.total}, ${cache.requests} ${t('diagnosticsRequests')})`
-    )
-  }
-  // 估算口径：把"估了多少"拆成字数与固定开销，方便和服务端的真实用量对照
-  {
-    const text = visible.map((message) =>
-      message.role === 'user'
-        ? message.content
-        : message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
-    )
-    const joined = text.join('')
-    let cjk = 0
-    for (const char of joined) {
-      if (/[\u2e80-\u9fff\uac00-\ud7af\u3000-\u303f\uff00-\uff60]/.test(char)) {
-        cjk += 1
-      }
-    }
-    lines.push(
-      `${t('diagnosticsEstimateBasis')}: ${t('diagnosticsChars')} ${joined.length}` +
-        ` (CJK ${cjk} / ASCII ${joined.length - cjk})` +
-        ` · ${t('diagnosticsEstimate')} ${estimateRequestTokens(visible)}` +
-        ` · ${t('diagnosticsSystemEstimate')} ${estimateTokens(SYSTEM_PROMPT)}`
-    )
-    // 附件按 1500/2000 计入估算，但只有带 serverId 的才会真正进入请求
-    const files = visible.flatMap((message) => (message.role === 'user' ? message.files : []))
-    const orphan = files.filter((file) => file.serverId === null)
-    // 抓取结果块的正文加密在 signature 里，估算只能按每处固定值计
-    const fetched = visible.reduce(
-      (sum, message) =>
-        message.role === 'user'
-          ? sum
-          : sum + message.blocks.filter((block) => block.type === 'web_fetch_tool_result').length,
-      0
-    )
-    lines.push(
-      `${t('diagnosticsFiles')}: ${files.length} (${t('diagnosticsFileOrphans')} ${orphan.length})` +
-        ` · ${t('diagnosticsFetched')}: ${fetched}`
-    )
-  }
-
-  lines.push('')
-  lines.push(`${t('diagnosticsRecentRequests')} (${t('diagnosticsLastN', { count: REQUEST_LIMIT })})`)
-  if (replies.length === 0) {
-    lines.push(`- ${t('diagnosticsNone')}`)
-  }
-  for (const reply of replies.slice(-REQUEST_LIMIT)) {
-    // 每条拆成「时间 + 模型 + 状态」与「用量」两行：窄屏上一行放不下，交给浏览器换行会断得很难读
-    const head = [`- ${clock(reply.createdAt)}`, reply.servedModel ?? reply.model ?? '-', reply.status]
-    // 多个回答版本时标出，否则时间相邻看不出区别
-    if (reply.selectedChildId !== undefined) {
-      head.push('*')
-    }
-    lines.push(head.join('  '))
-    const numbers: string[] = []
-    if (reply.usage) {
-      // prompt = in + hit + write，不再重复列出
-      numbers.push(
-        `in ${reply.usage.input_tokens}`,
-        `hit ${reply.usage.cache_read_input_tokens}`,
-        `write ${reply.usage.cache_creation_input_tokens}`,
-        `out ${reply.usage.output_tokens}`
-      )
-    } else {
-      numbers.push(t('diagnosticsNoUsage'))
-    }
-    if (reply.promptEstimate !== undefined) {
-      numbers.push(`est ${reply.promptEstimate}`)
-    }
-    lines.push(`  ${numbers.join(' ')}`)
-  }
-
-  lines.push('')
-  lines.push(t('diagnosticsCompaction'))
-  const compaction = session.compaction
-  if (compaction) {
-    const details = [
-      `${clock(compaction.createdAt)}`,
-      compaction.mode,
-      `${formatTokens(compaction.beforeTokens)} → ${formatTokens(compaction.afterTokens)}`,
-      `${t('diagnosticsReplay')}: ${compaction.viaReplay ? t('diagnosticsYes') : t('diagnosticsNo')}`,
-      `${t('diagnosticsCovered')}: ${compaction.coveredIds.length}`,
-    ]
-    if (compaction.summaryUsage) {
-      details.push(
-        `in ${compaction.summaryUsage.input} hit ${compaction.summaryUsage.cacheRead} write ${compaction.summaryUsage.cacheWrite}`
-      )
-    }
-    lines.push(`- ${details.join('  ')}`)
-  } else {
-    lines.push(`- ${t('diagnosticsNone')}`)
-  }
-
-  lines.push('')
-  lines.push(t('diagnosticsFailures'))
-  const failures = replies.filter((reply) => reply.error)
-  if (failures.length === 0) {
-    lines.push(`- ${t('diagnosticsNone')}`)
-  }
-  for (const reply of failures) {
-    const error = reply.error
-    if (!error) {
-      continue
-    }
-    lines.push(
-      `- ${clock(reply.createdAt)}  ${error.kind}${error.status === undefined ? '' : ` ${error.status}`}  ${error.message}`
-    )
-  }
-
-  return lines.join('\n')
-}
-
 export const Diagnostics = ({ onClose }: { onClose: () => void }) => {
   const t = useTranslate()
   const session = useChatStore((state) =>
     state.activeId === null ? undefined : state.sessionCache[state.activeId]
   )
   const [copied, setCopied] = useState(false)
-  const report = useMemo(() => (session ? buildReport(session) : ''), [session])
+  const [detailOpen, setDetailOpen] = useState(false)
+  const report = useMemo(() => (session ? buildDiagnosticsReport(session, t) : null), [session, t])
+  const full = report ? composeReport(report) : ''
 
   return (
     <Modal
@@ -178,9 +42,9 @@ export const Diagnostics = ({ onClose }: { onClose: () => void }) => {
           <Button
             variant="primary"
             size="m"
-            disabled={!report}
+            disabled={!full}
             onClick={async () => {
-              if (!(await copyText(report))) {
+              if (!(await copyText(full))) {
                 showToast({ key: 'copyFailed' })
                 return
               }
@@ -193,7 +57,27 @@ export const Diagnostics = ({ onClose }: { onClose: () => void }) => {
         </>
       }
     >
-      {report ? <pre className={styles.report}>{report}</pre> : <p>{t('diagnosticsNoSession')}</p>}
+      {report ? (
+        <>
+          <pre className={styles.report}>{report.brief.join('\n')}</pre>
+          <button
+            type="button"
+            className={styles.toggle}
+            aria-expanded={detailOpen}
+            onClick={() => setDetailOpen(!detailOpen)}
+          >
+            <span>{t(detailOpen ? 'diagnosticsDetailHide' : 'diagnosticsDetailShow')}</span>
+            <span className={clsx(styles.chevron, detailOpen && styles.chevronOpen)}>
+              <IconChevronDownOutline14 />
+            </span>
+          </button>
+          {detailOpen ? (
+            <pre className={clsx(styles.report, styles.scroll)}>{composeDetail(report)}</pre>
+          ) : null}
+        </>
+      ) : (
+        <p>{t('diagnosticsNoSession')}</p>
+      )}
     </Modal>
   )
 }
