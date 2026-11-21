@@ -15,9 +15,14 @@ import {
 /** 收起时从左侧起手区的宽度上限（CSS px），随着视口收窄 */
 const START_LIMIT = 160
 const START_RATIO = 0.4
-/** 松手时位移过半就换状态；不到一半但甩得够快也换 */
-const COMMIT_PROGRESS = 0.5
-const FLING_VELOCITY = 0.5
+/**
+ * 松手判定：从起手那一侧移动抽屉宽度的三成就算数（300dp 抽屉约 90dp ≈ 1.4cm），
+ * 两个方向共用同一个距离；或者甩得够快也换。官方 App 的手感是 1.5cm 左右。
+ */
+const COMMIT_TRAVEL = 0.27
+const FLING_VELOCITY = 0.35
+/** 位移小于这个值一律回弹，免得指尖抖一下就切换 */
+const MIN_TRAVEL = 32
 /** 判方向的阈值，以及横向要明显压过纵向的倍数 */
 const SLOP = 12
 const HORIZONTAL_RATIO = 1.4
@@ -166,13 +171,17 @@ export const useSiderSwipe = (enabled: boolean) => {
       if (moved) {
         suppressUntil = performance.now() + 400
       }
-      const progress = progressAt(lastX)
+      const dx = lastX - startX
+      // 向右拖指向「展开」，向左拖指向「收起」；朝着当前状态的方向拖，保持不动
+      const target = dx > 0
+      const distanceOk = Math.abs(dx) >= getSiderWidth() * COMMIT_TRAVEL
+      const flingOk = Math.abs(velocity) >= FLING_VELOCITY && velocity > 0 === dx > 0
       const open =
-        velocity >= FLING_VELOCITY
-          ? true
-          : velocity <= -FLING_VELOCITY
-            ? false
-            : progress >= COMMIT_PROGRESS
+        Math.abs(dx) < MIN_TRAVEL || target === closing
+          ? closing
+          : distanceOk || flingOk
+            ? target
+            : closing
       settleSider(open)
     }
 
