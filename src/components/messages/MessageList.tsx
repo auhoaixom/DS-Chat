@@ -83,11 +83,13 @@ export const MessageList = ({
     sessionId: session.id,
     start: Math.max(0, messages.length - INITIAL_MESSAGES),
   }))
+  // 上限是「至少留够一屏」而不是「最后一条」：压缩或切到条数更少的分支后可见消息
+  // 会变少，按最后一条钳会把窗口缩到只剩一条
   const start = Math.min(
     windowState.sessionId === session.id
       ? windowState.start
       : Math.max(0, messages.length - INITIAL_MESSAGES),
-    Math.max(0, messages.length - 1),
+    Math.max(0, messages.length - INITIAL_MESSAGES),
   )
   const shown = start > 0 ? messages.slice(start) : messages
   /** 补载前记下的锚点元素与它当时的视口位置 */
