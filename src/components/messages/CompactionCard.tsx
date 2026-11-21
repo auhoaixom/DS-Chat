@@ -71,6 +71,11 @@ export const CompactionCard = ({
     return null
   }
 
+  /**
+   * 只显示"省了多少"，不显示 before → after 两个绝对值。
+   * 原因：这两个字段在 v0.7.7 换过含义（旧：整个上下文压缩前后；新：被替换的原文 vs 摘要），
+   * 老记录被按新含义显示会出现一堆对不上的数。差值在两种含义下都是"减少了多少"，不会解释错。
+   */
   const saved = Math.max(0, compaction.beforeTokens - compaction.afterTokens)
   // 展开原文后卡片吸顶：翻到多深都能直接收起或撤销，不用再滚回顶部
   const sticky = originalsOpen && !open
@@ -110,11 +115,6 @@ export const CompactionCard = ({
       <div className={styles.footer}>
         <span className={styles.footnote}>
           {t(compaction.mode === 'auto' ? 'compactionModeAuto' : 'compactionModeManual')}
-          {' · '}
-          {t('compactionTokenFlow', {
-            before: formatTokens(compaction.beforeTokens),
-            after: formatTokens(compaction.afterTokens),
-          })}
         </span>
         {coveredCount > 0 ? (
           <button

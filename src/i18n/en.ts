@@ -266,7 +266,6 @@ export const en = {
   compactionCardSaved: 'saves about {tokens}',
   compactionModeAuto: 'Automatic before sending',
   compactionModeManual: 'Manual',
-  compactionTokenFlow: '{before} → {after}',
   compactionUndo: 'Undo compaction',
   compactionShowOriginals: 'View originals',
   compactionHideOriginals: 'Hide originals',

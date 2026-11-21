@@ -257,7 +257,6 @@ export const zh = {
   compactionCardSaved: '省去约 {tokens}',
   compactionModeAuto: '发送前自动压缩',
   compactionModeManual: '手动压缩',
-  compactionTokenFlow: '{before} → {after}',
   compactionUndo: '撤销压缩',
   compactionShowOriginals: '查看原文',
   compactionHideOriginals: '收起原文',
