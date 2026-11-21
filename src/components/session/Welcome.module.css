@@ -26,6 +26,17 @@
   font-weight: 600;
   text-align: center;
   color: var(--dsw-alias-label-primary);
+  /* 问候语是背景文案，长按不该弹出选字菜单 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 免责声明同理，也是背景文案 */
+.caveat {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 @media (max-width: 439px) {
@@ -63,6 +74,5 @@
     line-height: 16px;
     text-align: center;
     color: var(--dsw-alias-label-tertiary);
-    user-select: none;
   }
 }
