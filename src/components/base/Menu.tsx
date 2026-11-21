@@ -12,15 +12,30 @@ export type MenuOption = {
   onSelect: () => void
 }
 
-/** 点击触发，向下展开；点外部或 Esc 关闭 */
+/** 点击触发，向下展开；点外部或 Esc 关闭。传 open 也可由外部驱动（长按弹菜单） */
 export const Menu = ({
   options,
   children,
+  anchorClassName,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   options: MenuOption[]
   children: (props: { open: boolean; toggle: () => void }) => ReactNode
+  /** 触发元素外层锚点的 class，用来让锚点撑满整行（长按整行弹菜单时用） */
+  anchorClassName?: string
+  /** 受控模式的开合状态；不传则内部自己管 */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) => {
-  const [open, setOpen] = useState(false)
+  const [innerOpen, setInnerOpen] = useState(false)
+  const open = controlledOpen ?? innerOpen
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) {
+      setInnerOpen(next)
+    }
+    onOpenChange?.(next)
+  }
   const close = () => setOpen(false)
   // 左侧对齐并再左移 5px，让菜单文字与触发元素图标对齐
   const { anchorRef, floatingRef, position } = useAnchoredPosition<HTMLSpanElement, HTMLDivElement>(
@@ -31,8 +46,8 @@ export const Menu = ({
 
   return (
     <>
-      <span ref={anchorRef} className={styles.anchor}>
-        {children({ open, toggle: () => setOpen((value) => !value) })}
+      <span ref={anchorRef} className={clsx(styles.anchor, anchorClassName)}>
+        {children({ open, toggle: () => setOpen(!open) })}
       </span>
       {open
         ? createPortal(

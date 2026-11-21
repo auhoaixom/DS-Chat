@@ -3,6 +3,7 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  width: 100%;
   height: 40px;
   padding: 9px 6px 9px 10px;
   border-radius: 12px;
@@ -10,6 +11,10 @@
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+  /* 长按整行弹菜单，别让系统先弹出选字菜单 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 
   &.active {
     background-color: var(--dsw-specific-sidebar-nav-item-active-accent);
@@ -20,14 +25,13 @@
     &:not(.active):hover {
       background-color: var(--dsw-specific-sidebar-nav-item-hover);
     }
-
-    &:hover,
-    &.active {
-      .action {
-        display: flex;
-      }
-    }
   }
+}
+
+/* Menu 的锚点默认是 inline-flex，这里让整行撑满 */
+.menuAnchor {
+  display: flex;
+  width: 100%;
 }
 
 .title {
@@ -37,12 +41,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   line-height: 18px;
-}
-
-.action {
-  display: none;
-  flex-shrink: 0;
-  margin-left: 4px;
 }
 
 .renameInput {
