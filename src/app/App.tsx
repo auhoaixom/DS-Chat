@@ -27,7 +27,7 @@ import { showToast } from '../components/base/toastState.js'
 import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider, openMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
@@ -71,8 +71,8 @@ export const App = () => {
   }
 
   usePreventPageScroll(isMobile)
-  // 移动端除了顶栏按钮，也能在左侧右滑打开侧边栏
-  useSiderSwipe(isMobile, openMobileSider)
+  // 移动端除了顶栏按钮，也能在左侧右滑拉出侧边栏（展开时在抽屉上左滑推回）
+  useSiderSwipe(isMobile)
 
   useEffect(() => {
     document.documentElement.lang = locale

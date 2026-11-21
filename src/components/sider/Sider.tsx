@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
@@ -11,7 +11,7 @@ import { IconButton } from '../base/IconButton.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
-import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
+import { bindSiderNodes, closeMobileSider, measureSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
 import styles from './Sider.module.css'
 
@@ -141,15 +141,28 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 }
 
 /** 移动端抽屉：浮在页面上方，点空白区域关闭。 */
+/**
+ * 移动端抽屉：常驻挂载，位置由手势和收敛动画直接写元素样式；
+ * 收起时 visibility: hidden，既不接点击也不进 Tab 顺序。点空白区域关闭。
+ */
 export const MobileSider = () => {
-  const open = useMobileSider((state) => state.open)
-  if (!open) {
-    return null
-  }
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const maskRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    bindSiderNodes(drawerRef.current, maskRef.current)
+    const onResize = () => measureSider()
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      bindSiderNodes(null, null)
+    }
+  }, [])
+
   return (
     <>
-      <div className={styles.drawerMask} onClick={closeMobileSider} />
-      <div className={styles.drawer}>
+      <div ref={maskRef} className={styles.drawerMask} onClick={closeMobileSider} />
+      <div ref={drawerRef} className={styles.drawer}>
         <Sider mobile />
       </div>
     </>
