@@ -82,6 +82,8 @@ export const MessageList = ({
   const olderAnchorRef = useRef<{ el: Element; top: number } | null>(null)
   /** 只读回看被覆盖的原文；与压缩状态无关，展开不影响请求 */
   const [originalsOpen, setOriginalsOpen] = useState(false)
+  /** 展开原文那一刻的滚动位置与所属会话：收起时要回到这一屏（见下面的 useLayoutEffect） */
+  const originalsOriginRef = useRef({ open: false, top: 0, sessionId: session.id })
   useEffect(() => {
     setOriginalsOpen(false)
   }, [session.id])
@@ -118,7 +120,16 @@ export const MessageList = ({
     if (!el || !column || olderAnchorRef.current) {
       return
     }
-    const anchor = column.children[0]
+    /**
+     * 锚点必须取**第一条消息**，不能取 `column.children[0]`。
+     *
+     * 有压缩卡片时 children[0] 是卡片：它钉在列表最顶上（展开原文时还是 sticky），
+     * 补一批旧消息它一动不动，算出来的补偿量恒为 0 —— 视口就会跟着往下跳，
+     * 用户看到的是"我明明没动，画面却换了"。卡片恒为 1 个（有 compaction 就渲染），
+     * 原文块在它下面，所以前面要跳过这么多个非消息子节点。
+     */
+    const lead = (session.compaction ? 1 : 0) + (originalsOpen ? 1 : 0)
+    const anchor = column.children[lead]
     if (!anchor) {
       return
     }
@@ -131,7 +142,7 @@ export const MessageList = ({
           OLDER_CHUNK,
       ),
     }))
-  }, [session.id, messages.length])
+  }, [originalsOpen, session.compaction, session.id, messages.length])
 
   // 补载之后的补偿必须在绘制前做完，所以放 useLayoutEffect
   useLayoutEffect(() => {
@@ -208,6 +219,49 @@ export const MessageList = ({
       height: el.scrollHeight,
     }
   }, [covered, isMobile, messages.length, session.id])
+
+  /**
+   * 收起原文时回到展开那一刻的那一屏。
+   *
+   * 原文块是插在卡片和消息之间的一大段内容：展开时它把下面的消息顶下去，正是要看的东西；
+   * 收起时它整段被摘掉，而 `scrollTop` 不会跟着变小 —— 于是视口往下"漂"了正好那么多，
+   * 眼前换成了对话后面的一段。用户的预期很直白：我点开时看到哪，收起时就该看到哪。
+   *
+   * 展开时记下 `scrollTop`，收起后还原。必须放在 useLayoutEffect 里（DOM 已经更新、
+   * 还没绘制），否则会先闪一帧错误的位置。夹到合法范围，防止这期间内容变短后滚过头。
+   *
+   * 切会话时不算：那个场景有它自己的滚动规则（见上面两个 effect），这里插一脚会打架。
+   */
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const origin = originalsOriginRef.current
+    const changed = origin.open !== originalsOpen
+    origin.open = originalsOpen
+    if (!el) {
+      return
+    }
+    // 换对话不算：那个场景有自己的滚动规则（见上面两个 effect），这里插一脚会打架。
+    // 但要把记录迁到新会话上，否则新会话里展开时记不下位置。
+    if (origin.sessionId !== session.id) {
+      origin.sessionId = session.id
+      origin.top = el.scrollTop
+      return
+    }
+    if (!changed) {
+      return
+    }
+    if (originalsOpen) {
+      origin.top = el.scrollTop
+      return
+    }
+    el.scrollTop = Math.min(origin.top, Math.max(0, el.scrollHeight - el.clientHeight))
+    scrollTopRef.current = el.scrollTop
+    const metrics = cutMetricsRef.current
+    if (metrics) {
+      metrics.top = el.scrollTop
+      metrics.height = el.scrollHeight
+    }
+  }, [originalsOpen, session.id])
 
   const selectVersion = useCallback(
     (messageId: string, anchorTop: number) => {
