@@ -202,7 +202,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
   - `contextmenu` **只开不关**（`openFromPress()`），它是同一次手势的第二份通知，不是"用户又要关"。
   - `click` 的吞并**按手势认、不按时间认**（`pressMenu.ts` 的账本：`pressStart` / `opened` / `takeClick`）。v1.0.0 用的是「弹出后 400ms 内的 click 才吞」，手指在菜单弹出后还按着超过 400ms，松手那一下就把它关了。
 - `pressStart()` 必须放在 `startPress` 的 early return **之前**：菜单已经开着时再点这一行不会再开菜单，但那一下点击是真的点击（用来收起菜单），不能被上一次长按的标记吞掉。放到后面就变成「点两下才关」。
-- 桌面复现/回归（不需要手机）：`probe/99-longpress.mjs <holdMs>` 按住 → 松手 → 看菜单还在不在；`probe/99c-regress.mjs` 跑 contextmenu 补发、点行收起、点外收起、菜单项可点四项。前提是 `pnpm dev` 起着 + Edge 带 `--remote-debugging-port=9333`。
+- 桌面复现/回归（不需要手机）：`tools/probe/99-longpress.mjs <holdMs>` 按住 → 松手 → 看菜单还在不在；`tools/probe/99c-regress.mjs` 跑 contextmenu 补发、点行收起、点外收起、菜单项可点四项。前提是 `pnpm dev` 起着 + Edge 带 `--remote-debugging-port=9333`（见 `tools/probe/README.md`）。
 - 这个 bug 只在按住时长上暴露，短按测不出来：**验的时候必须按住 ≥1 秒再松手**。
 
 **收起源码窗口 / 顶部补载的滚动位置（v1.0.2 起）**：
@@ -211,7 +211,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 所以展开时记下 `scrollTop`，收起后在 `useLayoutEffect` 里还原（DOM 已更新、还没绘制），同时同步 `scrollTopRef` 与 `cutMetricsRef`。夹到合法范围，防止这期间内容变短后滚过头。切会话不还原（那个场景有自己的滚动规则），只把记录迁到新会话。
 - `loadOlder` 的锚点必须是**第一条消息**，不能是 `column.children[0]`：有压缩卡片时 `children[0]` 是卡片，它钉在最上面（展开原文时还是 sticky），补一批旧消息它一动不动，补偿量恒为 0，视口跟着往下跳。前面要跳过的非消息子节点数为 `(有 compaction ? 1 : 0) + (原文展开 ? 1 : 0)`。
 - **桌面布局测不出来**：浏览器自带的滚动锚定会兜住（把还原逻辑整个停掉，桌面上收起后位置照样对）。手机布局的滚动层是另一个元素（`.scroll`），必须切移动仿真或真机验。
-- 回归脚本：`probe/99h-mobile.mjs` —— 先在桌面尺寸下打开会话，再切移动仿真（400×860），展开 → 下滑 400px → 收起，输出**视口顶部那一条提问**做判定；顺带打一行「补载前后视口顶部」验证上面第二条。
+- 回归脚本：`tools/probe/99h-mobile.mjs` —— 先在桌面尺寸下打开会话，再切移动仿真（400×860），展开 → 下滑 400px → 收起，输出**视口顶部那一条提问**做判定；顺带打一行「补载前后视口顶部」验证上面第二条。
 
 **安全审核（v0.9.7 起默认不声明）**：
 
