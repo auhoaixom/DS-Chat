@@ -1,6 +1,6 @@
 import { useTranslate } from '../../i18n/index.js'
 import clsx from 'clsx'
-import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconBrowseOutline16,
   IconBrowseWarningOutline16,
@@ -32,6 +32,7 @@ import { Tooltip } from '../base/Tooltip.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
+import { nextOffset } from './previewScroll.js'
 import styles from './ReplyArea.module.css'
 import './thinking.markdown.css'
 
@@ -65,19 +66,14 @@ export const ReplyArea = memo(function ReplyArea({
   hasResponse: boolean
 }) {
   useTranslate()
-  // 思考中展开；正文开始输出、或整轮结束时自动收起（历史消息进页面时也是收起的）
-  const [open, setOpen] = useState(streaming && !hasResponse)
-  const wasStreamingRef = useRef(streaming)
-  const hadResponseRef = useRef(hasResponse)
-  useEffect(() => {
-    const answerStarted = hasResponse && !hadResponseRef.current
-    const finished = !streaming && wasStreamingRef.current
-    wasStreamingRef.current = streaming
-    hadResponseRef.current = hasResponse
-    if (answerStarted || finished) {
-      setOpen(false)
-    }
-  }, [streaming, hasResponse])
+  /**
+   * 只记「用户点开过全文」。它不会被自动改，三条规则因此自洽：
+   * - 思考结束时仍是展开态 → 保持展开（这正是这个功能要的）
+   * - 思考结束时仍是小窗态 → 小窗消失、落回标题行（`titleActive` 转 false）
+   * - 历史消息进页面 → 初值 false，天然收起
+   * 也只是组件内状态：切走会话就重置。
+   */
+  const [expanded, setExpanded] = useState(false)
   const titleActive = streaming && !hasResponse
   useTicker(titleActive, 1000)
   if (view.steps.length === 0 && !(message.thinking && streaming)) {
@@ -87,34 +83,95 @@ export const ReplyArea = memo(function ReplyArea({
   const thinking = message.thinking ?? view.steps.some((step) => step.type === 'thinking')
   const title = thinking ? getAreaTitle(view, streaming, Date.now(), hasResponse) : null
   const stopped = !streaming && !hasResponse
+  /** 思考进行中 + 用户没点开 → 显示滚动小窗（不是把全文铺开） */
+  const previewing = titleActive && title !== null && !expanded
+  const steps = view.steps.map((step, index) => (
+    <StepItem
+      key={stepKey(step, index)}
+      step={step}
+      message={message}
+      sources={view.sources}
+      streaming={streaming}
+      isLast={index === view.steps.length - 1}
+    />
+  ))
   return (
     <div className={styles.area}>
       {title ? (
-        <div className={styles.title} onClick={() => setOpen((value) => !value)}>
+        <div className={styles.title} onClick={() => setExpanded((value) => !value)}>
           <span className={clsx(styles.titleIcon, stopped && styles.stoppedIcon)}>
             <IconThinkOutline16 />
           </span>
           <span className={clsx(styles.titleText, titleActive && styles.shimmer)}>{title}</span>
-          {open ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
+          {expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
         </div>
       ) : null}
-      {open || !title ? (
-        <div className={styles.steps}>
-          {view.steps.map((step, index) => (
-            <StepItem
-              key={stepKey(step, index)}
-              step={step}
-              message={message}
-              sources={view.sources}
-              streaming={streaming}
-              isLast={index === view.steps.length - 1}
-            />
-          ))}
-        </div>
-      ) : null}
+      {expanded || !title ? <div>{steps}</div> : previewing ? <PreviewWindow>{steps}</PreviewWindow> : null}
     </div>
   )
 })
+
+/**
+ * 思考小窗：固定 5 行高，内容连续向上跟随，上下两端渐隐。
+ *
+ * 它**不是滚动容器**：不接手势、没有滚动条，手指在上面滑滚的是整页。
+ * 位移由 previewScroll 逐帧算，写进 transform（不碰 scrollTop，避免每帧触发布局）。
+ * 慢半拍是刻意的 —— 画面持续上滑，而不是攒够一行跳一下。
+ */
+const PreviewWindow = ({ children }: { children: ReactNode }) => {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const offsetRef = useRef(0)
+  const frameRef = useRef(0)
+
+  // 没有依赖数组：每次渲染都来一趟，确保内容增长时有一帧在排着队
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const inner = innerRef.current
+    if (!box || !inner) {
+      return
+    }
+    const target = () => Math.max(0, inner.scrollHeight - box.clientHeight)
+    // 刚进小窗（或被展开再收回）：直接贴底，不播一段追赶动画
+    if (offsetRef.current === 0) {
+      offsetRef.current = target()
+      inner.style.transform = `translate3d(0, ${-offsetRef.current}px, 0)`
+    }
+    if (frameRef.current !== 0) {
+      return
+    }
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const tick = () => {
+      frameRef.current = 0
+      const to = target()
+      const next = nextOffset({
+        current: offsetRef.current,
+        target: to,
+        windowHeight: box.clientHeight,
+        reducedMotion: reduced,
+      })
+      if (next !== offsetRef.current) {
+        offsetRef.current = next
+        inner.style.transform = `translate3d(0, ${-next}px, 0)`
+      }
+      // 追平就停，不要挂着一条 60fps 的循环
+      if (next !== to) {
+        frameRef.current = requestAnimationFrame(tick)
+      }
+    }
+    frameRef.current = requestAnimationFrame(tick)
+  })
+
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), [])
+
+  return (
+    <div ref={boxRef} className={styles.preview}>
+      <div ref={innerRef} className={styles.previewInner}>
+        {children}
+      </div>
+    </div>
+  )
+}
 
 const stepKey = (step: Step, index: number) =>
   step.type === 'thinking' || step.type === 'text' || step.type === 'search'

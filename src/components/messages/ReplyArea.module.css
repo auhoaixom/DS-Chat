@@ -2,6 +2,37 @@
   margin-bottom: 10px;
 }
 
+/*
+ * 思考小窗：固定 5 行高（行高来自 theme.css 的 --dsw-font-markdown-small: 14px/24px），
+ * 内容由 transform 逐帧上移，上下各 12px 渐隐。
+ *
+ * 它不是滚动容器（没有 overflow-y: auto）：用户不能在里面滑，手指滑的是整页。
+ * 上下边缘会切在字中间，这是"慢半拍跟随"的正常表现，别改成按行吸附。
+ */
+.preview {
+  max-height: calc(5 * 24px);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+/* transform 走合成器；声明出来免得每帧重新层化 */
+.previewInner {
+  will-change: transform;
+}
+
 .title {
   display: flex;
   align-items: center;
