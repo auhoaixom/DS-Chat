@@ -145,12 +145,41 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const canSend = !importingHistory && !streaming && draftReady
 
   /**
+   * 不让按钮抢走输入框的焦点。
+   *
+   * `pointerdown` 的默认行为就是把焦点移到被按的元素上；焦点一离开输入框，
+   * 安卓 WebView 立刻收起软键盘 —— 用户点一下「深度思考」，还得再点回输入框。
+   * 拦掉默认行为即可：焦点不动、键盘不动，`click` 之后照常触发，开关本身不受影响。
+   */
+  const keepFocus = (event: { preventDefault: () => void }) => {
+    event.preventDefault()
+  }
+
+  /**
    * 「＋」展开附件面板（拍照 / 相册 / 文件），面板占住键盘的位置。
+   * 再点一次收起面板，并把焦点还给输入框 —— 键盘跟着回来，光标停在原来的位置。
    * 不做防重入：相机被系统返回键关闭时 Capacitor 的回调可能不返回，
    * 死锁的标记会永久挡住这个入口；面板本身已经挡住重复点击。
    */
   const openAttach = () => {
     if (importingHistory || !ensureApiKey()) {
+      return
+    }
+    if (panelOpen) {
+      closeAttachPanel()
+      /**
+       * 收起面板要把焦点还给输入框，键盘才会回来。
+       *
+       * 必须在**这一次点击里**同步聚焦：安卓只在这种情况下弹软键盘；
+       * 放到 effect 或定时器里再聚焦，焦点回来了、键盘不弹（实测）。
+       * 后面那次 rAF 是兜底 —— 面板卸载有几率把焦点带回 body。
+       */
+      textareaRef.current?.focus({ preventScroll: true })
+      requestAnimationFrame(() => {
+        if (document.activeElement !== textareaRef.current) {
+          textareaRef.current?.focus({ preventScroll: true })
+        }
+      })
       return
     }
     textareaRef.current?.blur()
@@ -373,6 +402,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               className={clsx(styles.toggle, thinking && styles.selected)}
               aria-label={t('thinkingSwitch')}
               aria-pressed={thinking}
+              // 不让按钮抢走输入框的焦点：焦点一丢，安卓就把软键盘收起来，
+              // 用户点一下开关还得再点回输入框才能接着打字。
+              // click 在 pointerdown 被 preventDefault 之后照常触发，开关本身不受影响。
+              onPointerDown={keepFocus}
               onClick={() => setThinking(!thinking)}
             >
               <IconThinkOutline14 />
@@ -385,6 +418,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               className={clsx(styles.toggle, search && styles.selected)}
               aria-label={t('search')}
               aria-pressed={search}
+              onPointerDown={keepFocus}
               onClick={() => setSearch(!search)}
             >
               <IconGlobeLanguageOutline14 />

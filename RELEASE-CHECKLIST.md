@@ -226,6 +226,13 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 为什么 `holdAt` 只关跟随、补偿放在 `ReplyArea` 里：**展开是 ReplyArea 自己的 state，`MessageList` 不会因此重渲染**，它的 layout effect 根本跑不到。别把补偿挪回列表里。
 - 回归：`node tools/probe/99i-thinking.mjs --hold` —— 断言展开后标题行位移 ≤6px、且之后页面不再跟随（实测都是 0）。
 
+**输入栏的焦点（v1.1.2 起）**：
+
+- 「深度思考」「智能搜索」两个开关上挂了 `onPointerDown={keepFocus}`（`preventDefault`）：按钮不再抢走输入框的焦点，软键盘不动。点开关不用低头再点一次输入框。
+- 「＋」相反 —— 它**要**失焦（面板占住键盘的位置），收起时把焦点还给输入框，键盘才回来。
+- 关键细节：**回收焦点必须在点击里同步做**。放到 effect / 定时器里，焦点回来了但安卓不弹键盘（实测）。
+- 键盘本身在浏览器里看不到，所以探针断言的是成因：`tools/probe/99j-composer-focus.mjs` 检查点击后 `document.activeElement` 是不是还是 textarea、面板开合与两次点击的焦点归属。
+
 **安全审核（v0.9.7 起默认不声明）**：
 
 - `prompt.ts` 的 `SAFETY_CHECK` 现在是 `undefined`，请求体里**不出现** `safety_check` 字段，等价于官方文档的 `level: 'low'`。三个注入点（聊天、分段摘要、合并摘要）都走 `safetyCheckField()`，改一个常量就全开。
