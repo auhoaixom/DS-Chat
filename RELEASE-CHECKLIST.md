@@ -232,6 +232,8 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 「＋」相反 —— 它**要**失焦（面板占住键盘的位置），收起时把焦点还给输入框，键盘才回来。
 - 关键细节：**回收焦点必须在点击里同步做**。放到 effect / 定时器里，焦点回来了但安卓不弹键盘（实测）。
 - 键盘本身在浏览器里看不到，所以探针断言的是成因：`tools/probe/99j-composer-focus.mjs` 检查点击后 `document.activeElement` 是不是还是 textarea、面板开合与两次点击的焦点归属。
+- **键盘被收起时焦点也要放掉（v1.1.3 起）**：键盘上那个「收起」键只藏 IME、不动焦点，WebView 也不发事件 —— 于是留下"没有键盘但仍在吃输入"的状态，和点别处收起的表现不一致。判据只能靠 `visualViewport` 高度回弹（`keyboardViewport.ts` 的 `keyboardDismissed`，阈值 100px），命中且 `activeElement` 是输入框就 `blur()`。
+- 真机验法（不需要 CDP）：聚焦输入框 → `adb shell input keyevent 4`（只收键盘不动焦点，和那个键等效）→ `adb shell input text abc`。**修之前 abc 会进输入框，修之后不会** —— 两张截图就是判据。
 
 **安全审核（v0.9.7 起默认不声明）**：
 

@@ -28,6 +28,7 @@ import { openInAppCamera } from '../camera/inAppCameraState.js'
 import { useFilePreview } from '../files/filePreviewState.js'
 import { AttachPanel, type AttachSource } from './AttachPanel.js'
 import { closeAttachPanel, toggleAttachPanel, useAttachPanelOpen } from './attachPanelState.js'
+import { keyboardDismissed } from './keyboardViewport.js'
 import { loadRecentPhoto, type RecentPhotoItem } from '../../services/recentPhotos.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -185,6 +186,31 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     textareaRef.current?.blur()
     toggleAttachPanel()
   }
+
+  /**
+   * 软键盘被收起时，把焦点也一并放掉。
+   *
+   * 用键盘上那个「收起」键，IME 只是藏起来，`textarea` 仍然聚焦 —— 于是一个没有键盘、
+   * 却还在吃输入的状态留在那儿（点别处收起时焦点是走的，两种方式表现不一致）。
+   * WebView 不会为这件事发事件，只能盯 `visualViewport` 的高度回弹。
+   */
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) {
+      return
+    }
+    let height = viewport.height
+    const onResize = () => {
+      const next = viewport.height
+      const dismissed = keyboardDismissed(height, next)
+      height = next
+      if (dismissed && document.activeElement === textareaRef.current) {
+        textareaRef.current?.blur()
+      }
+    }
+    viewport.addEventListener('resize', onResize)
+    return () => viewport.removeEventListener('resize', onResize)
+  }, [])
 
   /** 面板里的三个入口：先收起面板，再走各自的取图 / 取文件流程 */
   const pickAttachment = (source: AttachSource) => {
