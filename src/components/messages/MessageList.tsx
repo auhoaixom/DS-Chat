@@ -8,7 +8,7 @@ import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { CompactionCard, CompactedOriginals } from './CompactionCard.js'
 import { OLDER_CHUNK, LOAD_OLDER_THRESHOLD, clampWindowStart, initialWindowStart } from './messageWindow.js'
-import { ScrollToBottomContext } from './scrollContext.js'
+import { ChatScrollContext } from './scrollContext.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
 
@@ -105,6 +105,18 @@ export const MessageList = ({
       scrollTopRef.current = el.scrollTop
     }
   }, [])
+
+  /**
+   * 关掉贴底跟随，交给调用方在渲染后自己把元素位置补回来。
+   *
+   * 本来想在这里连补偿一起做，但**列表不会因为子树的状态变化而重渲染**
+   * （思考窗口的展开是 ReplyArea 自己的 state），layout effect 跑不到。
+   * 所以这里只负责最容易出错的那一半：`stickyRef`。
+   */
+  const holdAt = useCallback(() => {
+    stickyRef.current = false
+  }, [])
+  const scrollApi = useMemo(() => ({ scrollToBottom, holdAt }), [scrollToBottom, holdAt])
 
   /**
    * 往前补一批更早的消息。
@@ -315,7 +327,7 @@ export const MessageList = ({
   const lastIndex = messages.length - 1
   const uploadRetryId = getUploadRetryId(messages, streaming)
   return (
-    <ScrollToBottomContext.Provider value={scrollToBottom}>
+    <ChatScrollContext.Provider value={scrollApi}>
       <div ref={isMobile ? undefined : scrollRef} className={styles.container}>
         <div ref={isMobile ? scrollRef : undefined} className={styles.scroll}>
           <div ref={contentRef} className={styles.column}>
@@ -359,6 +371,6 @@ export const MessageList = ({
         </div>
         {footer}
       </div>
-    </ScrollToBottomContext.Provider>
+    </ChatScrollContext.Provider>
   )
 }

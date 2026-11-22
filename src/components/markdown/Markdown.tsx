@@ -3,7 +3,7 @@ import { useTranslate } from '../../i18n/index.js'
 import { ErrorBoundary } from '../../app/ErrorBoundary.js'
 import type { Source } from '../../services/chat/view.js'
 import { toMdAst } from '../../services/markdown/parse.js'
-import { useScrollToBottom } from '../messages/scrollContext.js'
+import { useChatScroll } from '../messages/scrollContext.js'
 import { MarkdownAstRenderer } from './MarkdownAstRenderer.js'
 import { useThrottleMarkdownRender } from './useThrottleMarkdownRender.js'
 import styles from './Markdown.module.css'
@@ -30,7 +30,7 @@ export const Markdown = memo(function Markdown({
   sources?: Source[]
 }) {
   const t = useTranslate()
-  const scrollToBottom = useScrollToBottom()
+  const scrollToBottom = useChatScroll().scrollToBottom
   const throttledMarkdown = useThrottleMarkdownRender(content, loading)
   const ast = useMemo(
     () => (throttledMarkdown ? toMdAst(throttledMarkdown, { sources, disableLink }) : null),

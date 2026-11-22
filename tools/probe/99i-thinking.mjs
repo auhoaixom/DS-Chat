@@ -10,6 +10,12 @@
 //   默认  ：不点，结束后应只剩标题行
 const host = process.env.CDP_HOST || '127.0.0.1:9333'
 const wantExpand = process.argv.includes('--expand')
+/**
+ * --hold：在思考中途点开标题，检查"视口别再被拽到底部"。
+ * 展开会让下方内容一下子长高，如果列表还在贴底跟随，用户点完会直接跳到最新一行 ——
+ * 正确的表现是标题行留在原地，页面不再跟随。
+ */
+const wantHold = process.argv.includes('--hold')
 const THINK_CHARS = 600
 const CHAR_MS = 40
 
@@ -206,11 +212,14 @@ await evaluate(`(() => {
       const m = /matrix\\(([^)]+)\\)/.exec(getComputedStyle(inner).transform)
       y = m ? Number(m[1].split(',')[5]) : 0
     }
+    const titleEl = document.querySelector('[class*="titleText"]')
+    const titleRow = titleEl ? titleEl.parentElement : null
     window.__samples.push({
       t: Math.round(performance.now()),
       h: box ? Math.round(box.getBoundingClientRect().height) : -1,
       y,
       pageTop: scroller ? Math.round(scroller.scrollTop) : -1,
+      titleTop: titleRow ? Math.round(titleRow.getBoundingClientRect().top) : -1,
       mask: box ? getComputedStyle(box).maskImage.slice(0, 24) : '',
       done: !!(window.__think && window.__think.done),
     })
@@ -220,10 +229,11 @@ await evaluate(`(() => {
 
 // 等到思考流结束（约 600 × 40ms = 24s，含渲染开销）
 let expandedAt = 0
+let heldAt = 0
 const deadline = Date.now() + 40000
 while (Date.now() < deadline) {
   if (await evaluate(`window.__think && window.__think.done === true`)) break
-  if (wantExpand && expandedAt === 0 && (await evaluate(`window.__samples.length`)) >= 60) {
+  if ((wantExpand || wantHold) && expandedAt === 0 && (await evaluate(`window.__samples.length`)) >= 60) {
     // 展开：点标题行（标题行的实际结构是 图标 + 文本 + 箭头，用文本节点反找父级最稳）
     const title = await evaluate(`(() => {
       const text = document.querySelector('[class*="titleText"]')
@@ -233,8 +243,10 @@ while (Date.now() < deadline) {
       return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }
     })()`)
     if (title) {
+      const before = await evaluate(`window.__samples.length`)
       await click(title.x, title.y)
       expandedAt = await evaluate(`window.__samples.length`)
+      heldAt = before
     }
   }
   await sleep(250)
@@ -293,7 +305,7 @@ const scrollTotal =
 const tail = ys.slice(-3)
 const settled = tail.length === 3 && Math.abs(tail[2] - tail[0]) < 0.01
 const report = {
-  mode: wantExpand ? 'expand' : 'default',
+  mode: wantHold ? 'hold' : wantExpand ? 'expand' : 'default',
   previewSamples: previewSamples.length,
   heights,
   maxHeight: Math.max(...heights),
@@ -307,6 +319,23 @@ const report = {
   maskSample: previewSamples.at(-1)?.mask ?? '',
   final,
 }
+
+/**
+ * --hold：点击展开之后，标题行必须留在原地、页面不许再跟随。
+ * 取点击前一个采样与点击后两个采样比。
+ */
+if (wantHold && heldAt > 0) {
+  const before = samples[heldAt - 1]
+  const after = samples.slice(heldAt + 1, heldAt + 4).filter((s) => s.titleTop >= 0)
+  const titleDrift = before && after.length > 0 ? Math.abs(after[0].titleTop - before.titleTop) : -1
+  const postClick = samples.filter((s, i) => i > heldAt + 1 && !s.done && s.pageTop >= 0)
+  const postScroll =
+    postClick.length > 1
+      ? Math.max(...postClick.map((s) => s.pageTop)) - Math.min(...postClick.map((s) => s.pageTop))
+      : 0
+  report.titleDrift = titleDrift
+  report.postClickScroll = postScroll
+}
 console.log(JSON.stringify(report))
 
 const fail = []
@@ -315,7 +344,7 @@ if (!heights.every((h) => h <= 120)) fail.push(`出现了超过 120 的高度：
 if (!monotonic) fail.push('位移出现了回退（应该一路向上）')
 if (!settled) fail.push('输出停止后位移没有收敛')
 if (!report.maskSample) fail.push('没有 mask-image')
-if (!wantExpand) {
+if (!wantExpand && !wantHold) {
   // 只有一直待在小窗态跑完全程，窗口才会被内容顶到 5 行上限
   if (report.maxHeight !== 120) fail.push(`窗口最大高度应为 120，实际 ${report.maxHeight}`)
   if (maxStep > 40) fail.push(`相邻采样步长过大（${maxStep}px），像是按行跳变`)
@@ -328,6 +357,14 @@ if (wantExpand) {
   // 展开态结束时思考全文仍在页面上：步骤区高度必然超过 120
   if (final.stepsHeight <= 120) fail.push(`展开态结束后步骤区应高于 120，实际 ${final.stepsHeight}`)
   if (expandedAt === 0) fail.push('没能在流中点到标题行（展开动作没发生）')
+} else if (wantHold) {
+  if (expandedAt === 0) fail.push('没能在流中点到标题行（展开动作没发生）')
+  if (!(report.titleDrift >= 0 && report.titleDrift <= 6)) {
+    fail.push(`展开后标题行被挪走了 ${report.titleDrift}px（应留在原地）`)
+  }
+  if (report.postClickScroll > 2) {
+    fail.push(`展开后页面仍在跟随滚动：${report.postClickScroll}px`)
+  }
 } else {
   if (final.preview) fail.push('结束后小窗应收起')
   if (!final.title || !final.title.startsWith('已思考')) fail.push(`结束后标题行不对：${final.title}`)

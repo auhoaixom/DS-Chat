@@ -11,6 +11,7 @@ import { formatTokens } from '../../services/chat/tokens.js'
 import type { Compaction, Message } from '../../services/chat/types.js'
 import { IconChevronDownOutline14, IconCompressOutline14 } from '../base/icons.js'
 import { Markdown } from '../markdown/Markdown.js'
+import { findScrollParent } from './scrollParent.js'
 import styles from './CompactionCard.module.css'
 
 /** 原文列表首屏挂多少条（从头开始读，所以挂开头） */
@@ -19,17 +20,6 @@ const INITIAL_ORIGINALS = 20
 const ORIGINALS_CHUNK = 5
 /** 原文块下沿离视口底部这么近就补一批 */
 const ORIGINALS_LOAD_THRESHOLD = 900
-
-/** 找最近的可滚动祖先：原文块挂在消息滚动层里，补载靠它的滚动事件 */
-const findScrollParent = (node: HTMLElement | null): HTMLElement | null => {
-  for (let el = node?.parentElement ?? null; el; el = el.parentElement) {
-    const overflow = getComputedStyle(el).overflowY
-    if (overflow === 'auto' || overflow === 'scroll') {
-      return el
-    }
-  }
-  return null
-}
 
 /**
  * 消息列表顶部的压缩卡片：正在压缩时显示进度；压缩后给出摘要、原文与撤销。

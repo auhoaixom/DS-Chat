@@ -33,6 +33,8 @@ import { Markdown } from '../markdown/Markdown.js'
 import { SiteThumbnails } from '../search/SiteLogo.js'
 import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js'
 import { nextOffset } from './previewScroll.js'
+import { useChatScroll } from './scrollContext.js'
+import { findScrollParent } from './scrollParent.js'
 import styles from './ReplyArea.module.css'
 import './thinking.markdown.css'
 
@@ -85,6 +87,44 @@ export const ReplyArea = memo(function ReplyArea({
   const stopped = !streaming && !hasResponse
   /** 思考进行中 + 用户没点开 → 显示滚动小窗（不是把全文铺开） */
   const previewing = titleActive && title !== null && !expanded
+  const scroll = useChatScroll()
+  const titleRef = useRef<HTMLDivElement>(null)
+  /** 展开/收起前那一行标题在视口里的位置；渲染后要把它挪回原处 */
+  const holdRef = useRef<{ el: HTMLElement; top: number } | null>(null)
+
+  /**
+   * 就地展开/收起：把标题行钉在原地。
+   *
+   * 不这样做的话，展开会让下方内容一下长高很多，而列表还开着贴底跟随 ——
+   * 视口直接被拽到最底部，用户点的是"展开看看"，看到的却是"跳到最新一行"。
+   * 所以先关掉跟随（`holdAt`），渲染后再按位置差把滚动补回来。
+   */
+  const toggleExpanded = () => {
+    const row = titleRef.current
+    if (row) {
+      holdRef.current = { el: row, top: row.getBoundingClientRect().top }
+      scroll.holdAt(row)
+    }
+    setExpanded((value) => !value)
+  }
+
+  // 没有依赖数组：展开/收起之后必然重渲染，这一次就是补偿的时机
+  useLayoutEffect(() => {
+    const hold = holdRef.current
+    if (!hold) {
+      return
+    }
+    holdRef.current = null
+    const parent = findScrollParent(hold.el)
+    if (!parent) {
+      return
+    }
+    const delta = hold.el.getBoundingClientRect().top - hold.top
+    if (delta !== 0) {
+      parent.scrollTop += delta
+    }
+  })
+
   const steps = view.steps.map((step, index) => (
     <StepItem
       key={stepKey(step, index)}
@@ -98,7 +138,7 @@ export const ReplyArea = memo(function ReplyArea({
   return (
     <div className={styles.area}>
       {title ? (
-        <div className={styles.title} onClick={() => setExpanded((value) => !value)}>
+        <div ref={titleRef} className={styles.title} onClick={toggleExpanded}>
           <span className={clsx(styles.titleIcon, stopped && styles.stoppedIcon)}>
             <IconThinkOutline16 />
           </span>

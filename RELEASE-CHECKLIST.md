@@ -222,6 +222,9 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 - 页面跟随的边界：窗口从 0 长到 120px 的那一下列表确实变高了，贴底跟随即刻生效（实测位移 91px）；**长满之后思考继续输出，页面一动不动**（实测 0px）。这两条由 `tools/probe/99i-thinking.mjs` 采样断言。
 - 落后超过 3 个窗口高时直接跳过去（`PREVIEW_SNAP_RATIO`），避免一次进来一大段内容时拉一条长动画；`prefers-reduced-motion` 时不做动画。
 - 回归：`node tools/probe/99i-thinking.mjs`（默认：结束应收起）与 `--expand`（结束应保持展开）。两者都用假 SSE 灌 600 字思考，逐 50ms 采样。
+- **点开/收起时必须把标题行钉住（v1.1.1 修）**：展开会让下方内容一下长高很多，而列表通常还开着贴底跟随，结果视口被直接拽到最底部 —— 用户点的是"展开看看"，看到的却是"跳到最新一行"。做法：`toggleExpanded` 先 `scroll.holdAt(row)`（关掉 `stickyRef`），再在 `useLayoutEffect` 里按标题行的位置差把滚动补回来。
+- 为什么 `holdAt` 只关跟随、补偿放在 `ReplyArea` 里：**展开是 ReplyArea 自己的 state，`MessageList` 不会因此重渲染**，它的 layout effect 根本跑不到。别把补偿挪回列表里。
+- 回归：`node tools/probe/99i-thinking.mjs --hold` —— 断言展开后标题行位移 ≤6px、且之后页面不再跟随（实测都是 0）。
 
 **安全审核（v0.9.7 起默认不声明）**：
 
