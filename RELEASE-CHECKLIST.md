@@ -338,6 +338,10 @@ adb shell dumpsys package com.dschat.app | Select-String 'versionName|versionCod
 
 ## 已知限制（别当成 bug 反复修）
 
+- 「定位」按钮只在中文区出现；海外仍是只选国家一级（没有海外城市数据）。
+- 台湾不自动选市（避免猜错）；港澳的"市"是补的同名行政项，不再细分到区。
+- 定位精度门槛固定 5 公里（`src/services/locate.ts` 的 `MAX_ACCURACY_M`），不成设置项。
+
 - 原生键盘修复的第二半 —— `windowSoftInputMode="adjustResize"` 与 `SystemBars.insetsHandling` —— **没有采纳**：它只在 vivo / OriginOS 上被验证过必要，手上没有那台机器，盲改会在能测的机器上引入新的安全区问题。等有 vivo 设备再评估。
 - 当前键盘判据（`src/components/chatInput/keyboardViewport.ts`）假设键盘是**覆盖**而不是重排。真要开 `adjustResize`，这套判据必须一起重做。
 
