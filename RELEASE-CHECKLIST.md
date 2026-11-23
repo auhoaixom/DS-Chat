@@ -336,6 +336,11 @@ adb shell dumpsys package com.dschat.app | Select-String 'versionName|versionCod
 
 归档完成后，在 `RELEASES.md` 的表格**顶部**追加本版一行：版本、日期、`versionCode`、APK 状态、一句话变更。台账只有发版时顺手写才活得下去，补写一次就会积成八十行。
 
+## 已知限制（别当成 bug 反复修）
+
+- 原生键盘修复的第二半 —— `windowSoftInputMode="adjustResize"` 与 `SystemBars.insetsHandling` —— **没有采纳**：它只在 vivo / OriginOS 上被验证过必要，手上没有那台机器，盲改会在能测的机器上引入新的安全区问题。等有 vivo 设备再评估。
+- 当前键盘判据（`src/components/chatInput/keyboardViewport.ts`）假设键盘是**覆盖**而不是重排。真要开 `adjustResize`，这套判据必须一起重做。
+
 ---
 
 ## 7. 提交与标签

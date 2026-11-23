@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.2.0 | 2026-11-23 | 83 | 有 | feat: fix the vivo focus loop, add four languages, and make Enter a newline |
 | v1.1.3 | 2026-11-23 | 82 | 有 | fix: drop focus when the keyboard is dismissed |
 | v1.1.2 | 2026-11-23 | 81 | 有 | fix: keep the keyboard when toggling thinking or search |
 | v1.1.1 | 2026-11-23 | 80 | 有 | fix: keep the viewport still when the thinking block expands |
