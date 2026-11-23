@@ -334,6 +334,8 @@ Get-FileHash android\app\build\outputs\apk\release\app-release.apk -Algorithm SH
 adb shell dumpsys package com.dschat.app | Select-String 'versionName|versionCode'
 ```
 
+归档完成后，在 `RELEASES.md` 的表格**顶部**追加本版一行：版本、日期、`versionCode`、APK 状态、一句话变更。台账只有发版时顺手写才活得下去，补写一次就会积成八十行。
+
 ---
 
 ## 7. 提交与标签
