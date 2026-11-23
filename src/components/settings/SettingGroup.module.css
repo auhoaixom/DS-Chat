@@ -1,0 +1,76 @@
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+  text-align: start;
+}
+
+.head:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.head:focus-visible {
+  outline: 2px solid var(--dsw-alias-button-primary-fill);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.title {
+  min-width: 0;
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 0.3s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* 高度用 0fr → 1fr 过渡，内部再裁切：内容多高都能自适应，不用量像素 */
+.body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.bodyOpen {
+  grid-template-rows: 1fr;
+}
+
+.inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.bodyOpen .inner {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .body,
+  .inner {
+    transition: none;
+  }
+}

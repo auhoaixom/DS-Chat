@@ -14,6 +14,7 @@
 }
 
 .navigation {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -23,7 +24,28 @@
   padding-top: 4px;
 }
 
+/* 选中态的暗色滑块：位置和尺寸由测量得出，切换时整体平移 */
+.navSlider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 12px;
+  background-color: var(--dsw-alias-interactive-bg-hover);
+  pointer-events: none;
+  transition:
+    transform 0.3s var(--ds-ease-in-out),
+    width 0.3s var(--ds-ease-in-out),
+    height 0.3s var(--ds-ease-in-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navSlider {
+    transition: none;
+  }
+}
+
 .navItem {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -49,8 +71,7 @@
     flex-shrink: 0;
   }
 
-  &:hover,
-  &.navItemActive {
+  &:hover {
     background-color: var(--dsw-alias-interactive-bg-hover);
   }
 
@@ -68,6 +89,21 @@
   margin-right: -24px;
   padding: 0 24px;
   overflow-y: auto;
+  /* 切页时整块淡入并轻微上移；key 变化才重新触发 */
+  animation: content-in 0.24s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
+}
+
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .cell {
@@ -125,6 +161,22 @@
   gap: 16px;
   min-width: 0;
   max-width: 100%;
+}
+
+/* 语言行：右边先是一枚淡色 "Language" 提示，再是下拉 */
+.localeAction {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.localeHint {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--dsw-alias-label-caption);
+  opacity: 0.45;
 }
 
 .locationSelectors > button {

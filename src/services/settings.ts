@@ -1,7 +1,17 @@
 import { create } from 'zustand'
 import { normalizeLocation, type UserLocation } from './location.js'
 
-export type Locale = 'zh-CN' | 'en-US'
+export type Locale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP' | 'ru-RU' | 'fr-FR'
+
+/** 界面语言列表，顺序即设置里的顺序；名字用各语言自己的写法，不随界面语言翻译 */
+export const LOCALES: { value: Locale; label: string; lang: string }[] = [
+  { value: 'zh-CN', label: '简体中文', lang: 'zh-CN' },
+  { value: 'zh-TW', label: '繁體中文', lang: 'zh-TW' },
+  { value: 'en-US', label: 'English', lang: 'en' },
+  { value: 'ja-JP', label: '日本語', lang: 'ja' },
+  { value: 'ru-RU', label: 'Русский', lang: 'ru' },
+  { value: 'fr-FR', label: 'Français', lang: 'fr' },
+]
 
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
@@ -17,6 +27,8 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
+  /** 手机回车键的行为：true = 换行（默认），false = 直接发送 */
+  enterNewline: boolean
 }
 
 /**
@@ -41,6 +53,7 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  enterNewline: 'chat-demo:enter-newline',
 } as const
 
 const read = (key: string) => {
@@ -69,8 +82,9 @@ export const isChineseBrowser = (): boolean =>
 
 const initialLocale = (): Locale => {
   const saved = read(KEYS.locale)
-  if (saved === 'zh-CN' || saved === 'en-US') {
-    return saved
+  const known = LOCALES.find((item) => item.value === saved)
+  if (known) {
+    return known.value
   }
   return isChineseBrowser() ? 'zh-CN' : 'en-US'
 }
@@ -106,6 +120,8 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
+  // 没有存过就按换行：手机上回车直接发送太容易误触
+  enterNewline: read(KEYS.enterNewline) !== 'false',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -149,4 +165,9 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setEnterNewline = (enterNewline: boolean) => {
+  write(KEYS.enterNewline, String(enterNewline))
+  useSettings.setState({ enterNewline })
 }

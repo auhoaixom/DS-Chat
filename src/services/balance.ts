@@ -15,9 +15,17 @@ export type BalanceInfo = {
   toppedUp: string
 }
 
+/**
+ * 账户是否可用。
+ *
+ * 接口对 `is_available` 有三种可能：真、假、压根没给。三者含义不同，不能压成一个布尔：
+ * 缺字段说明这个接口版本没这个信息（按不可用处理更保守），值非法（字符串、数字）
+ * 说明接口在变，界面要如实说"不知道"，而不是替它猜。
+ */
+export type BalanceAvailability = 'available' | 'unavailable' | 'missing' | 'invalid'
+
 export type BalanceSnapshot = {
-  /** 账户是否可用（余额不足或欠费时为 false） */
-  available: boolean
+  availability: BalanceAvailability
   /** 各币种余额，接口可能返回多个 */
   infos: BalanceInfo[]
 }
@@ -45,7 +53,7 @@ const readString = (value: unknown): string =>
   typeof value === 'string' ? value : typeof value === 'number' ? String(value) : ''
 
 /** 解析 { is_available, balance_infos: [{ currency, total_balance, granted_balance, topped_up_balance }] } */
-const parseSnapshot = (body: unknown): BalanceSnapshot | null => {
+export const parseBalanceSnapshot = (body: unknown): BalanceSnapshot | null => {
   if (typeof body !== 'object' || body === null) {
     return null
   }
@@ -71,7 +79,16 @@ const parseSnapshot = (body: unknown): BalanceSnapshot | null => {
   if (infos.length === 0) {
     return null
   }
-  return { available: record.is_available !== false, infos }
+  const rawAvailable = record.is_available
+  const availability: BalanceAvailability =
+    typeof rawAvailable === 'boolean'
+      ? rawAvailable
+        ? 'available'
+        : 'unavailable'
+      : rawAvailable === undefined
+        ? 'missing'
+        : 'invalid'
+  return { availability, infos }
 }
 
 export const fetchBalance = async (apiKey: string, signal?: AbortSignal): Promise<BalanceResult> => {
@@ -94,7 +111,7 @@ export const fetchBalance = async (apiKey: string, signal?: AbortSignal): Promis
         lastMessage = '响应不是 JSON'
         continue
       }
-      const snapshot = parseSnapshot(body)
+      const snapshot = parseBalanceSnapshot(body)
       if (!snapshot) {
         lastMessage = '响应结构不符合预期'
         continue

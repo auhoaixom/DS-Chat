@@ -2,6 +2,7 @@ declare const styles: {
   readonly "dialog": string;
   readonly "dialogMain": string;
   readonly "navigation": string;
+  readonly "navSlider": string;
   readonly "navItem": string;
   readonly "navItemActive": string;
   readonly "content": string;
@@ -12,6 +13,8 @@ declare const styles: {
   readonly "uploadButton": string;
   readonly "locationCell": string;
   readonly "locationSelectors": string;
+  readonly "localeAction": string;
+  readonly "localeHint": string;
   readonly "provinceSelect": string;
   readonly "citySelect": string;
   readonly "regionSelect": string;

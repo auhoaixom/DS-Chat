@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   IconDarkOutline16,
   IconDataOutline16,
@@ -16,13 +16,15 @@ import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
   isChineseBrowser,
+  LOCALES,
+  setEnterNewline,
   setLocale,
   setLocation,
   setThemePreference,
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
-import { fetchBalance, formatBalance } from '../../services/balance.js'
+import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
@@ -31,6 +33,7 @@ import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
 import { Diagnostics } from './Diagnostics.js'
 import { ModelField } from './ModelField.js'
+import { SettingGroup } from './SettingGroup.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -64,6 +67,32 @@ const SettingsContent = () => {
   const replacingHistory = useChatStore((state) => state.importingHistory)
   const historyBusy = historyImport.busy || historyDelete.busy || replacingHistory
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  /** 导航高亮块：按选中项实测的位置和尺寸铺一层，避免"整条导航一起变暗" */
+  const navRef = useRef<HTMLDivElement>(null)
+  const [navSlider, setNavSlider] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (!nav) {
+      return
+    }
+    const measure = () => {
+      const active = nav.querySelector<HTMLElement>('[aria-selected="true"]')
+      if (!active) {
+        return
+      }
+      setNavSlider({
+        left: active.offsetLeft,
+        top: active.offsetTop,
+        width: active.offsetWidth,
+        height: active.offsetHeight,
+      })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [section])
+
   return (
     <>
       <Modal
@@ -77,14 +106,25 @@ const SettingsContent = () => {
           }
         }}
       >
-        <div role="tablist" className={styles.navigation}>
+        <div role="tablist" className={styles.navigation} ref={navRef}>
+          {navSlider ? (
+            <span
+              className={styles.navSlider}
+              style={{
+                width: navSlider.width,
+                height: navSlider.height,
+                transform: `translate(${navSlider.left}px, ${navSlider.top}px)`,
+              }}
+              aria-hidden
+            />
+          ) : null}
           {sections.map((item) => (
             <button
               key={item.value}
               type="button"
               role="tab"
               aria-selected={section === item.value}
-              className={clsx(styles.navItem, section === item.value && styles.navItemActive)}
+              className={styles.navItem}
               onClick={() => setSection(item.value)}
             >
               {item.icon}
@@ -92,12 +132,17 @@ const SettingsContent = () => {
             </button>
           ))}
         </div>
-        <div role="tabpanel" className={styles.content}>
+        <div role="tabpanel" className={styles.content} key={section}>
           {section === 'general' ? (
             <>
               <ThemeSetting />
               <LocaleSetting />
-              <LocationSetting />
+              <SettingGroup title={t('settingsPersonalizeKeys')}>
+                <EnterKeySetting />
+              </SettingGroup>
+              <SettingGroup title={t('settingsLocation')}>
+                <LocationSetting plain />
+              </SettingGroup>
             </>
           ) : (
             <>
@@ -221,7 +266,7 @@ const useHistoryDelete = () => {
   }
 }
 
-const LocationSetting = () => {
+const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
   const t = useTranslate()
   const locale = useSettings((state) => state.locale)
   const location = useSettings((state) => state.location)
@@ -232,7 +277,7 @@ const LocationSetting = () => {
 
   return (
     <SettingCell
-      label={t('settingsLocation')}
+      label={plain ? undefined : t('settingsLocation')}
       status={null}
       className={styles.locationCell}
       action={
@@ -293,19 +338,60 @@ const LocaleSetting = () => {
       label={t('settingsLocalePreference')}
       status={null}
       action={
+        <div className={styles.localeAction}>
+          {/* 固定的英文提示：看不懂当前界面语言的人，靠这个词找到语言设置 */}
+          <span className={styles.localeHint} aria-hidden>
+            Language
+          </span>
+          <Select
+            ariaLabel={t('settingsLocalePreference')}
+            value={locale}
+            options={LOCALES}
+            onChange={setLocale}
+          />
+        </div>
+      }
+    />
+  )
+}
+
+/** 手机回车键：默认换行，习惯直接发送的人可以切回来 */
+const EnterKeySetting = () => {
+  const t = useTranslate()
+  const enterNewline = useSettings((state) => state.enterNewline)
+  return (
+    <SettingCell
+      label={t('settingsMobileEnterKey')}
+      description={t(
+        enterNewline ? 'settingsMobileEnterDescNewline' : 'settingsMobileEnterDescSend'
+      )}
+      status={null}
+      action={
         <Select
-          ariaLabel={t('settingsLocalePreference')}
-          value={locale}
+          ariaLabel={t('settingsMobileEnterKey')}
+          value={enterNewline ? 'newline' : 'send'}
           options={[
-            { value: 'zh-CN', label: t('settingsLocaleZhCN'), lang: 'zh-CN' },
-            { value: 'en-US', label: t('settingsLocaleEnUS'), lang: 'en' },
+            { value: 'newline', label: t('settingsMobileEnterNewline') },
+            { value: 'send', label: t('settingsMobileEnterSend') },
           ]}
-          onChange={setLocale}
+          onChange={(value) => setEnterNewline(value === 'newline')}
         />
       }
     />
   )
 }
+
+/**
+ * 四种可用性状态各自的说法。
+ * `invalid` 是接口给了个说不清的值——界面上保留英文 Unknown，不替它猜。
+ */
+const balanceDetail = (
+  availability: BalanceAvailability,
+  t: (key: TranslationKey) => string
+): string =>
+  availability === 'invalid'
+    ? 'Unknown'
+    : t(availability === 'available' ? 'balanceAvailable' : 'balanceUnavailable')
 
 /** 账户余额：打开时查一次，右上角可按需刷新 */
 const BalanceSetting = () => {
@@ -329,6 +415,7 @@ const BalanceSetting = () => {
     controllerRef.current = controller
     setStatus('loading')
     setText(t('balanceLoading'))
+    setDetail(t('balanceChecking'))
     const result = await fetchBalance(apiKey, controller.signal)
     if (controller.signal.aborted) {
       return
@@ -338,7 +425,7 @@ const BalanceSetting = () => {
         result.snapshot.infos.find((item) => item.currency === 'CNY') ?? result.snapshot.infos[0]
       setStatus('done')
       setText(info ? formatBalance(info) : '—')
-      setDetail(result.snapshot.available ? t('balanceAvailable') : t('balanceUnavailable'))
+      setDetail(balanceDetail(result.snapshot.availability, t))
       setHint('')
     } else {
       setStatus('error')
@@ -511,7 +598,8 @@ const SettingCell = ({
   action,
   className,
 }: {
-  label: string
+  /** 折进分组时省略标签，标题由分组负责 */
+  label?: string
   description?: string
   status: Status
   action: ReactNode
@@ -521,7 +609,7 @@ const SettingCell = ({
   return (
     <div className={clsx(styles.cell, styles.row, className)}>
       <div className={styles.text}>
-        <div className={styles.label}>{label}</div>
+        {label ? <div className={styles.label}>{label}</div> : null}
         {status || description ? (
           <div className={clsx(styles.description, status?.error && styles.error)}>
             {status
