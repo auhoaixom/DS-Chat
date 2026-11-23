@@ -1,10 +1,36 @@
 import clsx from 'clsx'
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
+import { Button } from './Button.js'
 import { IconCloseOutline16 } from './icons.js'
 import { IconButton } from './IconButton.js'
 import styles from './Modal.module.css'
+
+/** 弹窗内部的自定义关闭按钮要走的入口；在弹窗外调用得到 null */
+const ModalCloseContext = createContext<(() => void) | null>(null)
+
+/**
+ * 弹窗内部的"关闭 / 取消"按钮用它，才能和 ✕、点遮罩一样播完淡出再卸载。
+ * 直接调父级的 onClose 会秒退，看起来像动画漏了一处。
+ */
+const useModalClose = (): (() => void) | null => useContext(ModalCloseContext)
+
+/** 弹窗里的关闭按钮：自动走淡出入口，其余样式与 Button 一致 */
+export const ModalCloseButton = (props: ComponentProps<typeof Button>) => {
+  const close = useModalClose()
+  return <Button {...props} onClick={close ?? props.onClick} />
+}
 
 /** 当前打开的弹窗，后打开的在末尾；叠放时 Esc 只关闭最上层 */
 const openModals: object[] = []
@@ -100,22 +126,24 @@ export const Modal = ({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className={styles.header}>
-          <div id={titleId} className={styles.title}>
-            {title}
+        <ModalCloseContext.Provider value={requestClose}>
+          <div className={styles.header}>
+            <div id={titleId} className={styles.title}>
+              {title}
+            </div>
+            {closable ? (
+              <IconButton
+                className={styles.close}
+                tone="primary"
+                icon={<IconCloseOutline16 />}
+                aria-label={t('close')}
+                onClick={requestClose}
+              />
+            ) : null}
           </div>
-          {closable ? (
-            <IconButton
-              className={styles.close}
-              tone="primary"
-              icon={<IconCloseOutline16 />}
-              aria-label={t('close')}
-              onClick={requestClose}
-            />
-          ) : null}
-        </div>
-        {children ? <div className={clsx(styles.main, mainClassName)}>{children}</div> : null}
-        {footer ? <div className={styles.footer}>{footer}</div> : null}
+          {children ? <div className={clsx(styles.main, mainClassName)}>{children}</div> : null}
+          {footer ? <div className={styles.footer}>{footer}</div> : null}
+        </ModalCloseContext.Provider>
       </div>
     </div>,
     document.body

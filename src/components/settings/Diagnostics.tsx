@@ -10,7 +10,7 @@ import { useChatStore } from '../../services/chat/store.js'
 import { copyText } from '../../utils/clipboard.js'
 import { Button } from '../base/Button.js'
 import { IconChevronDownOutline14 } from '../base/icons.js'
-import { Modal } from '../base/Modal.js'
+import { Modal, ModalCloseButton } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import styles from './Diagnostics.module.css'
 
@@ -36,9 +36,9 @@ export const Diagnostics = ({ onClose }: { onClose: () => void }) => {
       mainClassName={styles.main}
       footer={
         <>
-          <Button variant="outlined" size="m" onClick={onClose}>
+          <ModalCloseButton variant="outlined" size="m">
             {t('close')}
-          </Button>
+          </ModalCloseButton>
           <Button
             variant="primary"
             size="m"

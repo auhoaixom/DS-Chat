@@ -27,7 +27,7 @@ import {
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
-import { Modal } from '../base/Modal.js'
+import { Modal, ModalCloseButton } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
@@ -207,14 +207,9 @@ const DeleteAllConfirm = ({
       onClose={historyDelete.cancel}
       footer={
         <div className={styles.deleteActions} aria-busy={historyDelete.busy}>
-          <Button
-            variant="outlined"
-            autoFocus
-            disabled={historyDelete.busy}
-            onClick={historyDelete.cancel}
-          >
+          <ModalCloseButton variant="outlined" autoFocus disabled={historyDelete.busy}>
             {t('cancel')}
-          </Button>
+          </ModalCloseButton>
           <Button
             variant="danger"
             disabled={historyDelete.busy}
@@ -480,9 +475,9 @@ const BalanceSetting = () => {
       onClose={historyImport.cancel}
       footer={
         <>
-          <Button variant="outlined" size="m" autoFocus onClick={historyImport.cancel}>
+          <ModalCloseButton variant="outlined" size="m" autoFocus>
             {t('cancel')}
-          </Button>
+          </ModalCloseButton>
           <Button variant="dangerOutlined" size="m" onClick={() => void historyImport.confirm()}>
             {t('historyImportConfirm')}
           </Button>
