@@ -28,7 +28,8 @@ import { openInAppCamera } from '../camera/inAppCameraState.js'
 import { useFilePreview } from '../files/filePreviewState.js'
 import { AttachPanel, type AttachSource } from './AttachPanel.js'
 import { closeAttachPanel, toggleAttachPanel, useAttachPanelOpen } from './attachPanelState.js'
-import { keyboardDismissed } from './keyboardViewport.js'
+import { KEYBOARD_SETTLE_MS, keyboardVisible } from './keyboardViewport.js'
+import { enterAction } from './enterAction.js'
 import { loadRecentPhoto, type RecentPhotoItem } from '../../services/recentPhotos.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -58,6 +59,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const enterNewline = useSettings((state) => state.enterNewline)
   const panelOpen = useAttachPanelOpen()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -192,24 +194,52 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
    *
    * 用键盘上那个「收起」键，IME 只是藏起来，`textarea` 仍然聚焦 —— 于是一个没有键盘、
    * 却还在吃输入的状态留在那儿（点别处收起时焦点是走的，两种方式表现不一致）。
-   * WebView 不会为这件事发事件，只能盯 `visualViewport` 的高度回弹。
+   * WebView 不会为这件事发事件，只能盯可视视口。
+   *
+   * 判据见 `keyboardViewport.ts`：比的是**键盘高度**（历史最大视口高度减去当前视口），
+   * 不是"视口长高了多少"。早期版本用的正是增量，在 vivo / OriginOS 上被键盘弹起
+   * 过程的抖动骗到，blur → 键盘收起 → 焦点回来 → 再弹，输入法一闪就没。
    */
   useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) {
       return
     }
-    let height = viewport.height
-    const onResize = () => {
-      const next = viewport.height
-      const dismissed = keyboardDismissed(height, next)
-      height = next
-      if (dismissed && document.activeElement === textareaRef.current) {
+    const textarea = textareaRef.current
+    let focusedAt = 0
+    const onFocus = () => {
+      focusedAt = Date.now()
+    }
+    /** 基线：见过的最大视口高度，也就是"没有键盘时"的高度 */
+    let baseline = viewport.height
+    let visible = false
+    const onChange = () => {
+      baseline = Math.max(baseline, viewport.height)
+      const next = keyboardVisible(baseline, viewport.height)
+      const dismissed = visible && !next
+      visible = next
+      if (!dismissed || Date.now() - focusedAt < KEYBOARD_SETTLE_MS) {
+        return
+      }
+      if (document.activeElement === textareaRef.current) {
         textareaRef.current?.blur()
       }
     }
-    viewport.addEventListener('resize', onResize)
-    return () => viewport.removeEventListener('resize', onResize)
+    /** 转屏后横屏视口本来就矮，旧基线会一直判成"键盘在" */
+    const onOrientationChange = () => {
+      baseline = viewport.height
+      visible = false
+    }
+    textarea?.addEventListener('focus', onFocus)
+    viewport.addEventListener('resize', onChange)
+    window.addEventListener('resize', onChange)
+    window.addEventListener('orientationchange', onOrientationChange)
+    return () => {
+      textarea?.removeEventListener('focus', onFocus)
+      viewport.removeEventListener('resize', onChange)
+      window.removeEventListener('resize', onChange)
+      window.removeEventListener('orientationchange', onOrientationChange)
+    }
   }, [])
 
   /** 面板里的三个入口：先收起面板，再走各自的取图 / 取文件流程 */
@@ -402,10 +432,17 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             }
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            const action = enterAction({
+              key: event.key,
+              shiftKey: event.shiftKey,
+              composing: event.nativeEvent.isComposing,
+              enterNewline,
+            })
+            if (action === 'send') {
               event.preventDefault()
               send()
             }
+            // 'newline' 交给 textarea 自己插换行；null 是别的键，不管
           }}
           onPaste={(event) => {
             const files = Array.from(event.clipboardData.files)

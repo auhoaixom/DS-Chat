@@ -1,31 +1,51 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+
 import {
-  KEYBOARD_HIDE_THRESHOLD,
-  keyboardDismissed,
+  KEYBOARD_MIN_HEIGHT,
+  keyboardHeight,
+  keyboardVisible,
 } from '../src/components/chatInput/keyboardViewport.js'
 
-/**
- * 钉住"键盘被收起"的判据。
- *
- * 背景：键盘上的「收起」键只藏起 IME，不移动焦点，WebView 也不发事件。我们靠
- * visualViewport 高度变回来判断。阈值写错会带来两种真实故障：
- *   太小 → 工具栏轻微伸缩就被当成"收起"，正打字时输入框莫名失焦
- *   太大 → 小屏上键盘只涨了九十来像素，收起来了却检测不到，焦点留在输入框
- */
+/** 没有键盘时的视口高度，也就是基线 */
+const BASELINE = 1600
+/** 键盘高度为 h 时的可视视口高度 */
+const viewport = (keyboard: number) => BASELINE - keyboard
 
-test('视口明显长高 = 键盘被收起', () => {
-  assert.equal(keyboardDismissed(400, 720), true)
+test('没有键盘时高度差为 0，判为不可见', () => {
+  assert.equal(keyboardHeight(BASELINE, viewport(0)), 0)
+  assert.equal(keyboardVisible(BASELINE, viewport(0)), false)
 })
 
-test('刚好到阈值就算收起（边界不能漏）', () => {
-  assert.equal(keyboardDismissed(620, 620 + KEYBOARD_HIDE_THRESHOLD), true)
+test('刚到一个键盘的最小高度就算可见', () => {
+  assert.equal(keyboardVisible(BASELINE, viewport(KEYBOARD_MIN_HEIGHT)), true)
+  assert.equal(keyboardVisible(BASELINE, viewport(KEYBOARD_MIN_HEIGHT - 1)), false)
 })
 
-test('小于阈值的起伏不算收起', () => {
-  assert.equal(keyboardDismissed(620, 620 + KEYBOARD_HIDE_THRESHOLD - 1), false)
+test('视口比基线还高时不返回负数', () => {
+  assert.equal(keyboardHeight(600, 900), 0)
 })
 
-test('键盘弹出（视口变矮）不算收起', () => {
-  assert.equal(keyboardDismissed(720, 400), false)
+test('键盘弹起过程中的抖动不会被判成"收起"', () => {
+  // 一帧一帧模拟：视口从全高一路变矮，中间可能来回抖
+  const frames = [1600, 1580, 1300, 1320, 1100, 1080, 1040]
+  const seen = frames.map((height) => keyboardVisible(BASELINE, height))
+  // 一旦可见就再也不该变回不可见（真正的收起不在这段里）
+  const firstVisible = seen.indexOf(true)
+  assert.ok(firstVisible >= 0, '键盘最终应当被判为可见')
+  assert.ok(
+    seen.slice(firstVisible).every(Boolean),
+    `抖动的过程中出现了"不可见"：${seen.join(',')}`
+  )
+})
+
+test('真正收起：视口从有键盘回到全高，可见性由真变假', () => {
+  assert.equal(keyboardVisible(BASELINE, viewport(900)), true)
+  assert.equal(keyboardVisible(BASELINE, viewport(0)), false)
+})
+
+test('重排模式下也成立：基线不变，视口跟着键盘一起缩', () => {
+  // 重排时 vv.height 与布局同缩，基线仍是曾经的最大值
+  assert.equal(keyboardVisible(BASELINE, 700), true)
+  assert.equal(keyboardVisible(BASELINE, BASELINE), false)
 })
