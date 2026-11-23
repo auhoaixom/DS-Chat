@@ -306,11 +306,14 @@ export const getContextRounds = (history: Message[]): [UserMessage, AssistantMes
  * 与 toRequestMessages 共用同一套转换，因此「历史前缀」在两条路径下逐字一致——
  * 摘要请求正是靠这一点命中聊天的前缀缓存。
  */
-export const toHistoryParams = (history: Message[]): MessageParam[] =>
-  buildHistoryParams(history).messages
+export const toHistoryParams = (
+  history: Message[],
+  withServerFeatures = true
+): MessageParam[] => buildHistoryParams(history, withServerFeatures).messages
 
 const buildHistoryParams = (
-  history: Message[]
+  history: Message[],
+  withServerFeatures = true
 ): { messages: MessageParam[]; reminder?: string } => {
   const messages: MessageParam[] = []
   let previousReminder: string | undefined
@@ -326,7 +329,9 @@ const buildHistoryParams = (
     if (!user.content && toFileBlocks(user.files).length === 0) {
       continue
     }
-    appendReminder(reply.latestReminder)
+    if (withServerFeatures) {
+      appendReminder(reply.latestReminder)
+    }
     messages.push(toUserParam(user), toAssistantParam(reply))
   }
   return { messages, reminder: previousReminder }
@@ -341,11 +346,13 @@ export const toRequestMessages = (
   question: UserMessage,
   prefix?: AssistantMessage,
   thinking = prefix?.thinking ?? false,
-  latestReminder?: string
+  latestReminder?: string,
+  /** 当前模型是否支持服务端能力；不支持的模型不带 `latest_reminder` 角色消息 */
+  withServerFeatures = true
 ): MessageParam[] => {
-  const { messages, reminder } = buildHistoryParams(history)
+  const { messages, reminder } = buildHistoryParams(history, withServerFeatures)
   // 仅在当前分支首次出现或内容变化时插入快照
-  if (latestReminder && latestReminder !== reminder) {
+  if (withServerFeatures && latestReminder && latestReminder !== reminder) {
     messages.push({ role: 'latest_reminder', content: latestReminder })
   }
   messages.push(toUserParam(question))

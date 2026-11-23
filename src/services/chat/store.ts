@@ -18,6 +18,7 @@ import {
 import { upgradeSession } from './contentVersion.js'
 import * as db from './db.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
+import { supportsServerFeatures } from './capabilities.js'
 import { estimateTokens } from './tokens.js'
 import {
   clearAllDrafts,
@@ -1147,6 +1148,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           ? prepared.prefix.latestReminder
           : createLatestReminder(useSettings.getState())
         const system = summary ? withCompactionSummary(SYSTEM_PROMPT, summary) : SYSTEM_PROMPT
+        // 服务端工具、标题生成与 latest_reminder 只有 flash 系列支持，其它模型整条请求会被拒
+        const model = initial.model ?? useSettings.getState().model
+        const withServerFeatures = supportsServerFeatures(model)
         // 记下这次的提示侧估算：上下文占用用它和真实用量算"表面净增减"
         const promptEstimate =
           estimateRequestTokens([...prepared.history, prepared.question]) +
@@ -1159,18 +1163,21 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           prepared.question,
           prepared.prefix,
           initial.thinking ?? false,
-          latestReminder
+          latestReminder,
+          withServerFeatures
         )
         const events = streamMessage(
           useSettings.getState().apiKey ?? '',
           {
-            model: initial.model ?? useSettings.getState().model,
+            model,
             system,
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             ...safetyCheckField(),
-            tools: serverTools(initial.search ?? false),
-            ...(titleRequests.has(controller) ? { title: { enabled: true } } : {}),
+            tools: serverTools(model, initial.search ?? false),
+            ...(withServerFeatures && titleRequests.has(controller)
+              ? { title: { enabled: true } }
+              : {}),
           },
           controller.signal
         )

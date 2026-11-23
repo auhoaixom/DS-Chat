@@ -2,6 +2,7 @@ import { ApiError, streamMessage } from '../api/client.js'
 import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types.js'
 import { useSettings } from '../settings.js'
 import { getVisibleMessages } from './branches.js'
+import { supportsServerFeatures } from './capabilities.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
 import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
@@ -177,7 +178,7 @@ const requestSummary = async (
     if (!(error instanceof ApiError) || error.status !== 400) {
       throw error
     }
-    result = await collectSummary(apiKey, { ...body, tools: serverTools(false) }, signal, onText)
+    result = await collectSummary(apiKey, { ...body, tools: serverTools(model, false) }, signal, onText)
   }
   if (!result.text) {
     throw new ApiError('protocol', 'summary is empty')
@@ -203,9 +204,12 @@ const requestReplaySummary = async (
   const body: CreateMessageRequest = {
     model,
     system: SYSTEM_PROMPT,
-    messages: [...toHistoryParams(history), { role: 'user', content: REPLAY_INSTRUCTION }],
+    messages: [
+      ...toHistoryParams(history, supportsServerFeatures(model)),
+      { role: 'user', content: REPLAY_INSTRUCTION },
+    ],
     thinking: { type: 'disabled' },
-    tools: serverTools(search),
+    tools: serverTools(model, search),
     ...safetyCheckField(),
   }
   const result = await collectSummary(apiKey, body, signal, onText)
