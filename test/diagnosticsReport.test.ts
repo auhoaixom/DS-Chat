@@ -46,8 +46,8 @@ test('摘要每项一行结论，不把请求明细和失败原文塞进去', ()
     ),
     t
   )
-  // 会话 + 上下文 + 命中率 + 附件 + 压缩 + 失败 = 七行以内
-  assert.ok(report.brief.length <= 7, `摘要过长：${report.brief.length} 行`)
+  // 会话 + 密钥来源 + 上下文 + 命中率 + 附件 + 压缩 + 失败 = 八行以内
+  assert.ok(report.brief.length <= 8, `摘要过长：${report.brief.length} 行`)
   for (const line of report.brief) {
     assert.ok(!line.includes('\n'), `摘要行内不该换行：${line}`)
   }
@@ -55,6 +55,8 @@ test('摘要每项一行结论，不把请求明细和失败原文塞进去', ()
   // 逐条用量与失败原文只属于明细
   assert.ok(!brief.includes('in 8200'), '摘要把单条请求用量带出来了')
   assert.ok(!brief.includes('Rate limit reached'), '摘要把失败原文带出来了')
+  // 密钥来源要在摘要里，数据究竟是不是真加密就看这一行
+  assert.ok(brief.includes('settingsKeySource'), `密钥来源缺失：${brief}`)
   // 失败那一行必须给出条数与最近一条的原因，折叠着也不能有盲区
   assert.ok(brief.includes('diagnosticsFailureBrief(1|'), `失败结论缺失：${brief}`)
   assert.ok(brief.includes('diagnosticsFailures: '), `失败板块缺失：${brief}`)

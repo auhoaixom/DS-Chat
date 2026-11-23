@@ -311,4 +311,22 @@ export const frFR = {
   contextCompactHint: "Condense les anciens messages en un résumé ; les originaux restent sur cet appareil et sont consultables",
   contextCacheHit: "Cache atteint",
   contextCacheHitAria: "Cache atteint {percent}, sur {count} requêtes",
+
+  // Chiffrement des données locales
+  encryptionNoticeTitle: "Chiffrement des données locales",
+  encryptionNoticeBody:
+    "L'API Key, le contenu des conversations, les titres et les résumés de compaction enregistrés sur cet appareil vont être chiffrés.\nUne fois chiffrées, ces données ne s'ouvrent que sur ce téléphone : copier les données de l'application ailleurs ne révèle rien.\n\nAttention : à partir de cette version, réinstaller une version antérieure ne permettra plus de lire les données chiffrées.",
+  encryptionNoticeBackup: "Exporter une sauvegarde",
+  encryptionNoticeBackupHint:
+    "Exportez d'abord une sauvegarde : elle servira lors d'un changement de téléphone ou d'une réinstallation.",
+  encryptionNoticeBackupDone: "Sauvegarde créée.",
+  encryptionNoticeBackupFailed: "Échec de la sauvegarde. Le chiffrement peut continuer.",
+  encryptionNoticeProceed: "Lancer le chiffrement",
+  encryptionRunning: "Chiffrement des données locales. Ne fermez pas l'application…",
+  encryptionFailedTitle: "Chiffrement inachevé",
+  encryptionFailedBody:
+    "Certaines données n'ont pas pu être chiffrées. Vous pouvez réessayer ; la partie inachevée reste en clair et n'est pas perdue.",
+  settingsKeySource: "Source de la clé",
+  settingsKeySourceHardware: "Puce sécurisée (Android Keystore)",
+  settingsKeySourceSoftware: "Clé logicielle (aucun matériel sécurisé disponible)",
 } as const

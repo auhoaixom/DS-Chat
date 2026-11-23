@@ -1,4 +1,5 @@
 import { translate } from '../../i18n/index.js'
+import { keySourceKind } from '../crypto/keySource.js'
 import { estimateRequestTokens, getCacheStats, getContextUsage } from './compaction.js'
 import { getVisibleMessages } from './branches.js'
 import { SYSTEM_PROMPT } from './prompt.js'
@@ -174,6 +175,17 @@ export const buildDiagnosticsReport = (
   const compaction = session.compaction
 
   const brief: string[] = [t('diagnosticsTitle'), `${t('diagnosticsSession')}: ${session.title}`]
+  // 密钥来源放在最上面两行：数据到底是不是真加密，取决于这一行是不是安全芯片。
+  const keySource = keySourceKind()
+  brief.push(
+    `${t('settingsKeySource')}: ${
+      keySource === 'hardware'
+        ? t('settingsKeySourceHardware')
+        : keySource === 'software'
+          ? t('settingsKeySourceSoftware')
+          : '-'
+    }`
+  )
   if (usage) {
     const percent = usage.percent === 0 && usage.used > 0 ? '<1%' : `${usage.percent}%`
     brief.push(

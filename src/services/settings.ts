@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { isSealedText, openText, sealText } from './crypto/seal.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
 export type Locale = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP' | 'ru-RU' | 'fr-FR'
@@ -56,12 +57,22 @@ const KEYS = {
   enterNewline: 'chat-demo:enter-newline',
 } as const
 
-const read = (key: string) => {
+const rawRead = (key: string) => {
   try {
     return localStorage.getItem(key)
   } catch {
     return null
   }
+}
+
+const read = (key: string) => {
+  const value = rawRead(key)
+  // API Key 是加密落盘的。还没解锁时读出来的是密文，这时要当作「还没填」——
+  // 绝不能把密文原样塞进 Authorization 头发出去。
+  if (key === KEYS.apiKey && isSealedText(value)) {
+    return null
+  }
+  return value
 }
 
 const write = (key: string, value: string | null) => {
@@ -74,6 +85,11 @@ const write = (key: string, value: string | null) => {
   } catch {
     // 存储不可用时只在内存中生效
   }
+}
+
+const reportSettingsError = (action: string) => (error: unknown) => {
+  // eslint-disable-next-line no-console
+  console.error(`[settings] ${action} failed`, error)
 }
 
 /** 位置选择模式跟随浏览器语言，与应用内选择的界面语言无关。 */
@@ -140,9 +156,56 @@ export const setThemePreference = (themePreference: ThemePreference) => {
   useSettings.setState({ themePreference })
 }
 
+/**
+ * API Key 的落盘形态是密文，而解密是异步的——zustand 的初始值却必须同步拿到。
+ * 所以启动时先按「没有」渲染，由 boot 阶段调 unlockApiKey 把明文补进内存。
+ * 那段时间界面被加密遮罩挡住，用户不会看到空 Key 闪一下。
+ *
+ * 其余设置（模型名、语言、主题、位置、开关）**不加密**：它们不是敏感内容，
+ * 加密只会把整个设置模块变成异步，换不来任何东西。
+ */
+let unlocking: Promise<void> | null = null
+
+const persistApiKey = async (apiKey: string | null): Promise<void> => {
+  write(KEYS.apiKey, apiKey === null ? null : await sealText(apiKey, KEYS.apiKey))
+}
+
+const doUnlockApiKey = async (): Promise<void> => {
+  const raw = rawRead(KEYS.apiKey)
+  if (raw === null) {
+    return
+  }
+  try {
+    const plain = isSealedText(raw) ? await openText(raw, KEYS.apiKey) : raw
+    useSettings.setState({ apiKey: plain })
+    // 迁移前留下的明文值顺手加密写回：设置项里只有这一处需要迁移。
+    if (!isSealedText(raw) && raw !== '') {
+      await persistApiKey(raw)
+    }
+  } catch (error) {
+    // 解不开（密钥换了，或记录坏了）：密文保留不删，内存置空让用户重新填。
+    // 把密文当明文交给请求是更坏的结果。
+    useSettings.setState({ apiKey: null })
+    reportSettingsError('unlock api key')(error)
+  }
+}
+
+/** 由 boot 调用一次；失败时清掉缓存，允许重试 */
+export const unlockApiKey = (): Promise<void> =>
+  (unlocking ??= doUnlockApiKey().catch((error: unknown) => {
+    unlocking = null
+    throw error
+  }))
+
+/** 只在测试里用：重置解锁状态 */
+export const resetApiKeyUnlockForTest = () => {
+  unlocking = null
+}
+
 export const setApiKey = (apiKey: string | null) => {
-  write(KEYS.apiKey, apiKey)
   useSettings.setState({ apiKey })
+  // 内存里立刻是明文，磁盘上异步加密；这里不等它，界面不该为一个写盘抖动一下。
+  void persistApiKey(apiKey).catch(reportSettingsError('save api key'))
 }
 
 /** 模型名由用户在设置里填、由 /models 校验后才调用这里 */

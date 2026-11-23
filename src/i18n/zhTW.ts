@@ -310,4 +310,20 @@ export const zhTW = {
   contextCompactHint: "把較早的對話濃縮成一段摘要，原文儲存在本機，隨時可查看",
   contextCacheHit: "快取命中",
   contextCacheHitAria: "快取命中 {percent}，基於 {count} 次請求",
+
+  // 本機資料加密
+  encryptionNoticeTitle: "本機資料加密",
+  encryptionNoticeBody:
+    "即將把這台裝置上儲存的 API Key、對話內容、標題與壓縮摘要加密。\n加密後這些資料只能在這支手機上解開，把應用程式的資料檔拷到別處也讀不出內容。\n\n注意：從這一版起，裝回舊版本將無法讀取已加密的資料。",
+  encryptionNoticeBackup: "匯出備份",
+  encryptionNoticeBackupHint: "建議先匯出一次備份，換手機或重新安裝時用它還原。",
+  encryptionNoticeBackupDone: "備份已產生。",
+  encryptionNoticeBackupFailed: "備份失敗，仍可繼續加密。",
+  encryptionNoticeProceed: "開始加密",
+  encryptionRunning: "正在加密本機資料，請不要關閉應用程式…",
+  encryptionFailedTitle: "加密未完成",
+  encryptionFailedBody: "部分資料沒有加密成功，可以重試；未完成的部分仍是原本的明文，沒有遺失。",
+  settingsKeySource: "金鑰來源",
+  settingsKeySourceHardware: "系統安全晶片（Android Keystore）",
+  settingsKeySourceSoftware: "軟體金鑰（本機無可用安全硬體）",
 } as const

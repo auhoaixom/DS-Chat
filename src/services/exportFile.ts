@@ -40,20 +40,23 @@ const toBase64 = (blob: Blob) =>
 const CHUNK_SIZE = 3 * 1024 * 1024
 
 /**
- * 把 Blob 交给系统处理。
+ * 把 Blob 交给系统处理，返回**用户有没有真的把它交出去**。
  * 原生容器没有下载管理器接管 <a download>，也没有可用于 _blank 的窗口管理，
  * 因此写入应用缓存目录后交给系统分享面板：用户可以存到文件管理器，或选择其他应用打开。
  * 导出 ZIP 与打开 PDF / 文档共用这一条路径。
+ *
+ * 返回 `false` 只有一个含义：用户在分享面板上按了取消。调用方必须区分开——
+ * 「备份已生成」这种话在文件根本没被交出去的时候说，是会让人以为存好了的。
  */
 export const shareBlob = async (
   blob: Blob,
   name: string,
   /** 写缓存文件时按块回报进度（已写字节 / 总字节）；80MB 要分二十多块，不给反馈就是干等 */
   onProgress?: (written: number, total: number) => void,
-): Promise<void> => {
+): Promise<boolean> => {
   if (!Capacitor.isNativePlatform()) {
     downloadInBrowser(blob, name)
-    return
+    return true
   }
   for (let offset = 0; offset <= blob.size; offset += CHUNK_SIZE) {
     const data = await toBase64(blob.slice(offset, offset + CHUNK_SIZE))
@@ -68,12 +71,13 @@ export const shareBlob = async (
   const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache })
   try {
     await Share.share({ title: name, files: [uri] })
+    return true
   } catch (error) {
     // 用户关掉系统面板时，插件的 activityResult 里是
     // `if (RESULT_CANCELED) call.reject("Share canceled")` —— 它把「不想分享了」
     // 也当成异常抛出来。那是正常操作，不是失败，更不能在界面上报红字。
     if (/cancel/i.test(error instanceof Error ? error.message : String(error))) {
-      return
+      return false
     }
     throw error
   }

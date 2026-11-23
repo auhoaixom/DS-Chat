@@ -311,4 +311,22 @@ export const jaJP = {
   contextCompactHint: "古い会話を要約にまとめます。原文はこの端末に保存され、いつでも確認できます",
   contextCacheHit: "キャッシュヒット",
   contextCacheHitAria: "キャッシュヒット {percent}、{count} 回のリクエストに基づく",
+
+  // ローカルデータの暗号化
+  encryptionNoticeTitle: "ローカルデータの暗号化",
+  encryptionNoticeBody:
+    "この端末に保存されている API Key、会話内容、タイトル、圧縮要約を暗号化します。\n暗号化後はこのスマートフォンでしか開けなくなり、アプリのデータを他所へコピーしても中身は読めません。\n\n注意：このバージョン以降、古いバージョンに戻すと暗号化されたデータは読めなくなります。",
+  encryptionNoticeBackup: "バックアップを書き出す",
+  encryptionNoticeBackupHint:
+    "先にバックアップを書き出すことをおすすめします。機種変更や再インストール時の復元に使えます。",
+  encryptionNoticeBackupDone: "バックアップを作成しました。",
+  encryptionNoticeBackupFailed: "バックアップに失敗しました。暗号化は続行できます。",
+  encryptionNoticeProceed: "暗号化を開始",
+  encryptionRunning: "ローカルデータを暗号化しています。アプリを閉じないでください…",
+  encryptionFailedTitle: "暗号化が完了しませんでした",
+  encryptionFailedBody:
+    "一部のデータを暗号化できませんでした。再試行できます。未完了の部分は元の平文のままで、失われてはいません。",
+  settingsKeySource: "鍵の取得元",
+  settingsKeySourceHardware: "セキュリティチップ（Android Keystore）",
+  settingsKeySourceSoftware: "ソフトウェア鍵（利用可能なセキュリティハードウェアなし）",
 } as const

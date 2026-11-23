@@ -53,7 +53,8 @@ export const CrashScreen = ({
     setBusy(true)
     setFailure(null)
     const result = await exportToShare()
-    if (result) {
+    // 取消分享不是失败，静默回到原样即可
+    if (result && !('canceled' in result)) {
       setFailure('message' in result ? result.message : text(result.key))
     }
     setBusy(false)

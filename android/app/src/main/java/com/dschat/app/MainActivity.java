@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SystemBarPlugin.class);
         registerPlugin(ClipboardPlugin.class);
         registerPlugin(RecentPhotosPlugin.class);
+        registerPlugin(SecureKeyPlugin.class);
         super.onCreate(savedInstanceState);
         surviveRendererDeath();
     }

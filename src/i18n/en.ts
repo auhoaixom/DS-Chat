@@ -322,4 +322,22 @@ export const en = {
   contextCompactHint: 'Condenses earlier messages into a summary; the originals stay on this device',
   contextCacheHit: 'Cache hit',
   contextCacheHitAria: 'Cache hit {percent} across {count} requests',
+
+  // Local data encryption
+  encryptionNoticeTitle: 'Local data encryption',
+  encryptionNoticeBody:
+    'Your API Key, conversations, titles and compaction summaries stored on this device are about to be encrypted.\nOnce encrypted, they can only be opened on this phone — copying the app data elsewhere will not reveal any content.\n\nNote: from this version on, installing an older version will no longer read the encrypted data.',
+  encryptionNoticeBackup: 'Export backup',
+  encryptionNoticeBackupHint:
+    'Consider exporting a backup first; use it to restore after switching phones or reinstalling.',
+  encryptionNoticeBackupDone: 'Backup created.',
+  encryptionNoticeBackupFailed: 'Backup failed. You can still continue encrypting.',
+  encryptionNoticeProceed: 'Start encrypting',
+  encryptionRunning: 'Encrypting local data. Please keep the app open…',
+  encryptionFailedTitle: 'Encryption did not finish',
+  encryptionFailedBody:
+    'Some data could not be encrypted. You can retry; the unfinished part is still plain text and nothing was lost.',
+  settingsKeySource: 'Key source',
+  settingsKeySourceHardware: 'Secure element (Android Keystore)',
+  settingsKeySourceSoftware: 'Software key (no secure hardware available)',
 } satisfies Record<keyof typeof zh, string>

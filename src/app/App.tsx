@@ -11,6 +11,9 @@ import {
   selectSession,
   useChatStore,
 } from '../services/chat/store.js'
+import { boot } from '../services/boot.js'
+import { useEncMigration } from '../services/crypto/migration.js'
+import { EncryptionGate } from '../components/app/EncryptionGate.js'
 import { exportToShare } from '../services/chat/backup.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
 import { closeSearchPanel } from '../components/search/searchPanelState.js'
@@ -38,6 +41,7 @@ export const App = () => {
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
   const ready = useChatStore((state) => state.ready)
+  const booted = useEncMigration((state) => state.booted)
   const initError = useChatStore((state) => state.initError)
   const saveError = useChatStore((state) => Object.values(state.sessionSaveErrors).some(Boolean))
   const importingHistory = useChatStore((state) => state.importingHistory)
@@ -61,7 +65,8 @@ export const App = () => {
     setExporting(true)
     const failure = await exportToShare()
     setExporting(false)
-    if (failure) {
+    // 取消分享不是失败，不弹任何东西
+    if (failure && !('canceled' in failure)) {
       showToast(
         'key' in failure
           ? { key: failure.key, type: 'error' }
@@ -90,10 +95,17 @@ export const App = () => {
   useEffect(closeMobileSider, [activeId, isMobile])
 
   useEffect(() => {
-    void initChat()
-    // 首次打开先在设置里输入 API Key
-    ensureApiKey()
+    // 启动顺序在 boot 里：取数据密钥 → 加密存量（需要时先征求同意）→ 解锁 API Key → 读列表
+    void boot()
   }, [])
+
+  useEffect(() => {
+    // 首次打开先在设置里输入 API Key。
+    // 必须等启动流程走完——API Key 是加密落盘的，还没解锁时读到的是「没有」。
+    if (booted) {
+      ensureApiKey()
+    }
+  }, [booted])
 
   return (
     <>
@@ -168,6 +180,8 @@ export const App = () => {
       <InAppCamera />
       <ImageCropper />
       <Toast />
+      {/* 加密期间盖在最上层，挡住一切操作 */}
+      <EncryptionGate />
     </>
   )
 }

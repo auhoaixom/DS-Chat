@@ -101,8 +101,11 @@ export const clearHistory = (): Promise<void> =>
     await replaceHistory(async () => {})
   })
 
-/** 导出失败的原因：可预期的失败带文案 key，其余带原始信息 */
-export type ExportFailure = { key: TranslationKey } | { message: string }
+/**
+ * 导出失败的原因：可预期的失败带文案 key，其余带原始信息。
+ * `canceled` 单独一档：用户在分享面板上取消了，不算失败，但**也不能当成已备份**。
+ */
+export type ExportFailure = { key: TranslationKey } | { message: string } | { canceled: true }
 
 /**
  * 导出全部会话并交给系统分享面板。设置页、「保存失败」横幅和崩溃兜底页共用这一条路径，
@@ -111,10 +114,10 @@ export type ExportFailure = { key: TranslationKey } | { message: string }
 export const exportToShare = async (): Promise<ExportFailure | null> => {
   try {
     const { name, blob } = await exportHistory()
-    await shareBlob(blob, name, (written, total) => {
+    const shared = await shareBlob(blob, name, (written, total) => {
       setBackupProgress({ job: 'export', stage: 'writing', done: written, total, unit: 'bytes' })
     })
-    return null
+    return shared ? null : { canceled: true }
   } catch (error) {
     return error instanceof BackupError
       ? { key: error.key }

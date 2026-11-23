@@ -307,4 +307,20 @@ export const zh = {
   contextCompactHint: '把较早的对话浓缩成一段摘要，原文保存在本机，随时可查看',
   contextCacheHit: '缓存命中',
   contextCacheHitAria: '缓存命中 {percent}，基于 {count} 次请求',
+
+  // 本地数据加密
+  encryptionNoticeTitle: '本地数据加密',
+  encryptionNoticeBody:
+    '即将把本机保存的 API Key、对话内容、标题和压缩摘要加密。\n加密后这些数据只能在这台手机上解开，把这个应用的数据文件拷到别处也读不出内容。\n\n注意：从这一版起，装回旧版本将无法读取已加密的数据。',
+  encryptionNoticeBackup: '导出备份',
+  encryptionNoticeBackupHint: '建议先导出一次备份，换手机或重装时用它恢复。',
+  encryptionNoticeBackupDone: '备份已生成。',
+  encryptionNoticeBackupFailed: '备份失败，仍可继续加密。',
+  encryptionNoticeProceed: '开始加密',
+  encryptionRunning: '正在加密本地数据，请不要关闭应用…',
+  encryptionFailedTitle: '加密未完成',
+  encryptionFailedBody: '部分数据没有加密成功，可以重试；未完成的部分仍是原来的明文，没有丢失。',
+  settingsKeySource: '密钥来源',
+  settingsKeySourceHardware: '系统安全芯片（Android Keystore）',
+  settingsKeySourceSoftware: '软件密钥（本机无可用安全硬件）',
 } as const

@@ -850,7 +850,8 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
     setBusy(true)
     setStatus(null)
     const failure = await exportToShare()
-    if (failure) {
+    // 用户在分享面板上取消：既不是失败，也不能提示"已导出"
+    if (failure && !('canceled' in failure)) {
       setStatus(
         'key' in failure
           ? { key: 'historyExportFailed', reason: failure.key, error: true }
