@@ -157,6 +157,7 @@ export const ruRU = {
   settingsLocalePreference: "Язык",
   settingsLocation: "Местоположение",
   settingsLocationProvince: "Выберите провинцию/регион",
+  settingsLocationNone: "Без геолокации",
   settingsLocationCity: "Выберите город",
   settingsLocationRegion: "Выберите страну или регион",
   settingsLocationAutoHint: "Автоматически заполнить регион по геолокации телефона",

@@ -157,6 +157,7 @@ export const jaJP = {
   settingsLocalePreference: "言語",
   settingsLocation: "位置情報",
   settingsLocationProvince: "省・地域を選択",
+  settingsLocationNone: "位置情報なし",
   settingsLocationCity: "市を選択",
   settingsLocationRegion: "国または地域を選択",
   settingsLocationAutoHint: "端末の位置情報から地域を自動入力します",

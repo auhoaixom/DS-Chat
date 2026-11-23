@@ -157,6 +157,7 @@ export const zhTW = {
   settingsLocalePreference: "語言",
   settingsLocation: "位置資訊",
   settingsLocationProvince: "請選擇省份/地區",
+  settingsLocationNone: "不定位",
   settingsLocationCity: "請選擇市",
   settingsLocationRegion: "請選擇國家或地區",
   settingsLocationAutoHint: "用手機定位自動填入省份/地區",

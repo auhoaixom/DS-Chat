@@ -150,6 +150,7 @@ export const zh = {
   settingsLocalePreference: '语言',
   settingsLocation: '位置信息',
   settingsLocationProvince: '请选择省份/地区',
+  settingsLocationNone: '不定位',
   settingsLocationCity: '请选择市',
   settingsLocationRegion: '请选择国家或地区',
   settingsLocationAutoHint: '用手机定位自动填写省份/地区',

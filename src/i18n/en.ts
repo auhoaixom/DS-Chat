@@ -156,6 +156,7 @@ export const en = {
   settingsLocalePreference: 'Language',
   settingsLocation: 'Location',
   settingsLocationProvince: 'Select province/region',
+  settingsLocationNone: 'No location',
   settingsLocationCity: 'Select city',
   settingsLocationRegion: 'Select country or region',
   settingsLocationAutoHint: "Use your phone's location to fill the region automatically",

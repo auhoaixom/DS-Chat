@@ -285,9 +285,16 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
                 ariaLabel={t('settingsLocationProvince')}
                 className={styles.provinceSelect}
                 value={province?.code ?? ''}
-                placeholder={t('settingsLocationProvince')}
-                options={provinces.map((item) => ({ value: item.code, label: item.name }))}
+                options={[
+                  // 置顶的"不定位"：选中它等于整条位置清空，市级跟着回到"不定位"
+                  { value: '', label: t('settingsLocationNone') },
+                  ...provinces.map((item) => ({ value: item.code, label: item.name })),
+                ]}
                 onChange={(value) => {
+                  if (value === '') {
+                    setLocation(null)
+                    return
+                  }
                   if (value !== province?.code) {
                     setLocation({ region: 'CN', province: value })
                   }
@@ -298,14 +305,20 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
                 className={styles.citySelect}
                 value={province ? (location?.city ?? '') : ''}
                 disabled={!province?.cities.length}
-                placeholder={t('settingsLocationCity')}
-                options={
-                  province?.cities.map((item) => ({ value: item.code, label: item.name })) ?? []
-                }
+                options={[
+                  { value: '', label: t('settingsLocationNone') },
+                  ...(province?.cities.map((item) => ({ value: item.code, label: item.name })) ?? []),
+                ]}
                 onChange={(value) => {
-                  if (province) {
-                    setLocation({ region: 'CN', province: province.code, city: value })
+                  if (!province) {
+                    return
                   }
+                  // 只改市：选"不定位"就只清市，省保持不动
+                  setLocation({
+                    region: 'CN',
+                    province: province.code,
+                    ...(value === '' ? {} : { city: value }),
+                  })
                 }}
               />
             </>
@@ -314,11 +327,13 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
               ariaLabel={t('settingsLocationRegion')}
               className={styles.regionSelect}
               value={location?.region ?? ''}
-              placeholder={t('settingsLocationRegion')}
-              options={regionCodes
-                .map((code) => ({ value: code, label: getRegionName(code, locale) }))
-                .sort((a, b) => a.label.localeCompare(b.label, locale))}
-              onChange={(value) => setLocation({ region: value })}
+              options={[
+                { value: '', label: t('settingsLocationNone') },
+                ...regionCodes
+                  .map((code) => ({ value: code, label: getRegionName(code, locale) }))
+                  .sort((a, b) => a.label.localeCompare(b.label, locale)),
+              ]}
+              onChange={(value) => setLocation(value === '' ? null : { region: value })}
             />
           )}
         </div>

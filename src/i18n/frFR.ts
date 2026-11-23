@@ -157,6 +157,7 @@ export const frFR = {
   settingsLocalePreference: "Langue",
   settingsLocation: "Localisation",
   settingsLocationProvince: "Choisir une province/région",
+  settingsLocationNone: "Aucune position",
   settingsLocationCity: "Choisir une ville",
   settingsLocationRegion: "Choisir un pays ou une région",
   settingsLocationAutoHint: "Remplir automatiquement la région avec la position du téléphone",
