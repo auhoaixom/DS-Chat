@@ -2,13 +2,13 @@
 
 一个用自己 API Key 的安卓聊天客户端，前端直接连 DeepSeek API，没有自己的服务端。
 
-私有自用：不分发、不上架应用商店、不做多端同步。当前版本 `1.1.3`（`versionCode 82`）。
+私有自用：不分发、不上架应用商店、不做多端同步。当前版本 `1.4.0`（`versionCode 90`）。
 
 ## 这是什么
 
 - 一个 React 前端（React 18 + zustand + TypeScript strict + rspack/SWC）套在 Capacitor 8 的安卓壳里，装到自己手机上用。
 - WebView 的页面 origin 固定为 `https://localhost`。这个不能改：`file://` 的 null origin 会让 IndexedDB 直接失效，整个会话存储都保不住。
-- 没有账号体系、没有云端备份、没有后端。数据只在本机，API Key 也只在本机。
+- 没有账号体系、没有云端备份、没有后端。数据只在本机，API Key 也只在本机；落盘的那部分是密文，见「本地数据加密」。
 - 它不做的事：语音输入与朗读（早期版本有，已移除，相关代码不再存在）、多设备同步、应用内计费。
 
 ## 出包
@@ -28,7 +28,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 **版本号要改三处**：`package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 和 `versionCode`。漏改一个不会报错，只会打出一个装不上的包；现在 `pnpm test` 会拦住这种情况（要求 `versionCode` 不小于历史上任何一版，准备发新版时还必须严格大于上一版）。
 
-完整的发版流程（十项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。
+完整的发版流程（十一项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。
 
 ## 开发
 
@@ -54,10 +54,11 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 src/
   app/                 应用布局、主题与全局样式
   components/          聊天、设置、Markdown 等界面组件
-  i18n/                中英文文案
+  i18n/                六种界面语言的文案
   services/
     api/               API 请求、SSE 与协议类型
     chat/              会话、消息分支、本地存储、历史导入导出
+    crypto/            本地数据加密：密钥来源、AES-GCM 原语、一次性迁移
     markdown/          Markdown 解析、代码高亮与图表
   utils/               通用工具
 test/                  单元测试
@@ -73,13 +74,14 @@ tools/probe/           真机问题的 CDP 复现探针
 - 渲染：Markdown、代码高亮、KaTeX 公式、Mermaid 图表。
 - 上下文：超长会话自动压缩历史（摘要 + 只读原文），顶部上下文面板显示用量。
 - 数据：历史导入导出（ZIP）、设置里显示账户余额、导出前显示进度。
+- 加密：会话正文、标题、压缩摘要与 API Key 以硬件密钥加密落盘；图片字节不加密。细节见下文「本地数据加密」。
 - 外观：深色/浅色主题、六种界面语言（简体中文 / 繁體中文 / English / 日本語 / Русский / Français）、移动端布局；默认模型 `deepseek-flash`，模型名可在设置里改。
 - 位置：设置 → 通用 → 位置信息里可以下拉选省市，也可以点「定位」用手机坐标自动填到市（精度差于 5 公里时拒绝写入并提示）。
 - 输入：手机回车默认换行（设置 → 通用 → 个性化键位设置里可切成"直接发送"）；非 flash 模型自动降级为纯对话（不发服务端工具、不请求标题、不注入位置提醒）。
 
 ## 数据与存储
 
-- API Key 与设置存在 `localStorage`；会话、消息与附件原件存在 IndexedDB。
+- API Key 存在 `localStorage`，值是密文；其余设置（语言、主题、位置、开关）不加密。会话、消息与附件原件存在 IndexedDB。
 - 因为 origin 固定为 `https://localhost`，数据不会和其他站点串。
 - 历史导入导出是 ZIP：导出包含会话与本地可用的图片原件，**不包含** API Key、应用设置、非图片附件原件；导入会在校验通过后整体替换本地会话与附件。
 - 设置 → 数据管理 → 删除所有对话：清空全部本地会话、附件原件和未发送的草稿，停止正在生成的回复；API Key 与设置保留，已经上传到 API 服务的文件不受影响。

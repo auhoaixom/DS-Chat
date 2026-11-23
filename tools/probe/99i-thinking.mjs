@@ -133,7 +133,18 @@ await evaluate(`(async () => {
       tx.objectStore('sessionSummaries').put({
         id: session.id, title: session.title, createdAt: now, updatedAt: now, fileIds: [],
       })
-      tx.oncomplete = () => { db.close(); resolve() }
+      tx.oncomplete = () => {
+        // 1.4.0 起：库里只要有会话、又没写过加密标记，启动时会弹一个不可跳过的引导框
+        // （fixed + z-index 1100），把探针后面每一次点击都吃掉。探针种的是明文记录
+        // （读取路径兼容迁移前的形状），所以这里补一个「已完成」的标记，让 boot 直接往下走。
+        try {
+          db.transaction('meta', 'readwrite').objectStore('meta').put({
+            key: 'enc-state', value: { version: 1, sessionsEnc: true, filesEnc: false },
+          })
+        } catch (error) { /* 老库没有 meta 存储：这个浏览器配置还没跑过 1.4.0+ */ }
+        db.close()
+        resolve()
+      }
       tx.onerror = () => reject(tx.error)
     }
   })

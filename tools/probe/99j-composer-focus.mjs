@@ -74,7 +74,26 @@ await send('Page.enable')
 await send('Emulation.clearDeviceMetricsOverride')
 await send('Page.reload')
 await sleep(2800)
-await evaluate(`(() => { localStorage.setItem('chat-demo:api-key', 'probe-key'); return 'key' })()`)
+await evaluate(`(async () => {
+  localStorage.setItem('chat-demo:api-key', 'probe-key')
+  // 1.4.0 起：库里只要有会话、又没写过加密标记，启动会弹一个不可跳过的引导框挡住一切点击。
+  // 这个脚本自己不种会话，但临时配置目录是几个探针共用的，别的脚本种下的数据还在。
+  await new Promise((resolve) => {
+    const request = indexedDB.open('chat-demo')
+    request.onerror = () => resolve()
+    request.onsuccess = () => {
+      const db = request.result
+      try {
+        db.transaction('meta', 'readwrite').objectStore('meta').put({
+          key: 'enc-state', value: { version: 1, sessionsEnc: true, filesEnc: false },
+        })
+      } catch (error) { /* 老库没有 meta 存储 */ }
+      db.close()
+      resolve()
+    }
+  })
+  return 'key'
+})()`)
 await sleep(200)
 await send('Page.reload')
 await sleep(2600)
