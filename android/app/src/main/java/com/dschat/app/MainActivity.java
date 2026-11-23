@@ -3,10 +3,12 @@ package com.dschat.app;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 import java.util.Collections;
 
@@ -22,6 +24,30 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ClipboardPlugin.class);
         registerPlugin(RecentPhotosPlugin.class);
         super.onCreate(savedInstanceState);
+        surviveRendererDeath();
+    }
+
+    /**
+     * 渲染进程被系统回收时，别让整个应用跟着死。
+     *
+     * 安卓把 WebView 的渲染进程和宿主进程分开管理，内存吃紧时系统会直接回收渲染进程。
+     * 默认行为是把宿主 Activity 一起判死（用户看到的是"应用闪退"），其实页面只是需要重载一次。
+     * 接管这个回调、返回 true 表示"我处理了"，然后重新加载页面即可。
+     */
+    private void surviveRendererDeath() {
+        Bridge bridge = getBridge();
+        if (bridge == null) {
+            return;
+        }
+        bridge.addWebViewListener(
+            new WebViewListener() {
+                @Override
+                public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                    webView.post(webView::reload);
+                    return true;
+                }
+            }
+        );
     }
 
     @Override
