@@ -1,4 +1,5 @@
 import { cityNames, regionCodes, regionNameOverrides, provinceNames } from './locationData.js'
+import type { Locale } from './settings.js'
 
 export { regionCodes } from './locationData.js'
 
@@ -17,15 +18,23 @@ export type UserLocation = {
 }
 
 const regions = new Set(regionCodes)
-const regionNames = {
-  'zh-CN': new Intl.DisplayNames(['zh-CN'], { type: 'region' }),
-  'en-US': new Intl.DisplayNames(['en-US'], { type: 'region' }),
+/** 地区名各自的 Intl 实例；只有中英有手写覆盖，其余语言交给 Intl */
+const displayNames = new Map<string, Intl.DisplayNames>()
+
+const displayNamesFor = (locale: Locale): Intl.DisplayNames => {
+  const cached = displayNames.get(locale)
+  if (cached) {
+    return cached
+  }
+  const created = new Intl.DisplayNames([locale], { type: 'region' })
+  displayNames.set(locale, created)
+  return created
 }
 
-export const getRegionName = (code: string, locale: 'zh-CN' | 'en-US'): string =>
-  regions.has(code)
-    ? (regionNameOverrides[locale][code] ?? regionNames[locale].of(code) ?? code)
-    : ''
+const overrides = regionNameOverrides as Record<string, Record<string, string> | undefined>
+
+export const getRegionName = (code: string, locale: Locale): string =>
+  regions.has(code) ? (overrides[locale]?.[code] ?? displayNamesFor(locale).of(code) ?? code) : ''
 
 export const normalizeLocation = (value: unknown): UserLocation | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

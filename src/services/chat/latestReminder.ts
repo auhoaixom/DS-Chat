@@ -7,7 +7,7 @@ const locationName = (location: UserLocation | null, locale: Locale): string => 
   if (!location) {
     return ''
   }
-  if (location.region === 'CN' && locale === 'zh-CN') {
+  if (location.region === 'CN' && (locale === 'zh-CN' || locale === 'zh-TW')) {
     const province = provinces.find((item) => item.code === location.province)
     const city = province?.cities.find((item) => item.code === location.city)
     return city?.name ?? province?.name ?? getRegionName('CN', locale)

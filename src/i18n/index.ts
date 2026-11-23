@@ -1,6 +1,10 @@
 import { useSettings } from '../services/settings.js'
 import { en } from './en.js'
+import { frFR } from './frFR.js'
+import { jaJP } from './jaJP.js'
+import { ruRU } from './ruRU.js'
 import { zh } from './zh.js'
+import { zhTW } from './zhTW.js'
 
 export type TranslationKey = keyof typeof zh
 export type TranslationParams = Record<string, string | number>
@@ -24,7 +28,11 @@ const createTranslate =
 
 const translators = {
   'zh-CN': createTranslate(zh),
+  'zh-TW': createTranslate(zhTW),
   'en-US': createTranslate(en),
+  'ja-JP': createTranslate(jaJP),
+  'ru-RU': createTranslate(ruRU),
+  'fr-FR': createTranslate(frFR),
 }
 
 /** 组件订阅语言变化；普通函数在调用时读取当前语言。 */

@@ -47,6 +47,14 @@ test('非中文界面下位置只到国家一级', () => {
   assert.ok(en.split(',')[2].length > 0)
 })
 
+test('繁体界面与简体一样用省市名，不退化成国家名', () => {
+  const tw = createLatestReminder(
+    { locale: 'zh-TW', location: { region: 'CN', province: '110000', city: '110100' } },
+    at('2026-11-21T10:30:00')
+  )
+  assert.equal(tw.split(',')[2], '北京市')
+})
+
 test('语言项取自全局设置，与传入的 locale 无关', () => {
   /**
    * 这一项走的是全局翻译表（`translate`），不是参数里的 locale。
