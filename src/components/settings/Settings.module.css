@@ -71,8 +71,15 @@
     flex-shrink: 0;
   }
 
-  &:hover {
-    background-color: var(--dsw-alias-interactive-bg-hover);
+  /**
+   * 只在"真有鼠标"的设备上给悬停底色。
+   * 手机上点一下会让 :hover 粘在刚点的那一项上，于是出现两个块：
+   * 一个是跳过去的新位置，一个是慢慢滑的滑块 —— 看着像动画分了层。
+   */
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: var(--dsw-alias-interactive-bg-hover);
+    }
   }
 
   &:focus-visible {

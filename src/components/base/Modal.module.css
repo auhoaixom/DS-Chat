@@ -22,6 +22,35 @@
   }
 }
 
+/* 关闭：与打开对称，淡出并轻微下沉 */
+.overlayClosing {
+  animation: overlay-out 0.18s ease-in both;
+}
+
+.contentClosing {
+  animation: content-out 0.18s ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlayClosing,
+  .contentClosing {
+    animation: none;
+  }
+}
+
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes content-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
 @keyframes overlay-in {
   from {
     opacity: 0;
