@@ -1,5 +1,6 @@
 package com.dschat.app;
 
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -54,6 +55,38 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         excludeEdgeSwipe(EDGE_SWIPE_RETRIES);
+        // 从后台、小窗或分屏回来时，系统可能已经重新装饰过窗口
+        SystemBarPlugin.reapply(this);
+    }
+
+    /**
+     * 窗口模式或尺寸变化后，系统会把状态栏底色与图标明暗重置回主题默认值。
+     * 深色模式下那就是浅底浅字（时间直接看不见），这里按上次的设定重放一遍。
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        SystemBarPlugin.reapply(this);
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig);
+        SystemBarPlugin.reapply(this);
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        SystemBarPlugin.reapply(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            SystemBarPlugin.reapply(this);
+        }
     }
 
     /**
