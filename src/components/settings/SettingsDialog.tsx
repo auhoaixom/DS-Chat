@@ -14,6 +14,7 @@ import { useBackupProgress } from '../../services/backupProgress.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
+import { locate, MAX_ACCURACY_M } from '../../services/locate.js'
 import {
   isChineseBrowser,
   LOCALES,
@@ -271,12 +272,13 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
       : undefined
 
   return (
-    <SettingCell
-      label={plain ? undefined : t('settingsLocation')}
-      status={null}
-      className={styles.locationCell}
-      action={
-        <div className={styles.locationSelectors}>
+    <>
+      <SettingCell
+        label={plain ? undefined : t('settingsLocation')}
+        status={null}
+        className={styles.locationCell}
+        action={
+          <div className={styles.locationSelectors}>
           {isChineseBrowser() ? (
             <>
               <Select
@@ -320,6 +322,114 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
             />
           )}
         </div>
+      }
+    />
+    {isChineseBrowser() ? <LocateSetting /> : null}
+    </>
+  )
+}
+
+/** 定位结果的状态机；文案在渲染时统一翻译 */
+type LocateStatus =
+  | { kind: 'idle' }
+  | { kind: 'locating' }
+  | { kind: 'done'; place: string }
+  | { kind: 'denied' }
+  | { kind: 'failed' }
+  | { kind: 'unsupported' }
+  | { kind: 'imprecise'; km: number }
+
+const GEO_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 15000,
+  // 不吃缓存：上一次的坐标对"填当前位置"毫无意义
+  maximumAge: 0,
+}
+
+const readPosition = (): Promise<GeolocationPosition> =>
+  new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, GEO_OPTIONS)
+  })
+
+/**
+ * 用手机定位自动填省市。
+ *
+ * 只在中文区显示（海外那套只到国家一级，没有城市数据）。精度差时重试一次，
+ * 仍差就拒绝写入——坐标偏出五公里，再怎么匹配都是瞎猜。
+ */
+const LocateSetting = () => {
+  const t = useTranslate()
+  const [status, setStatus] = useState<LocateStatus>({ kind: 'idle' })
+
+  const locateNow = async () => {
+    if (!navigator.geolocation) {
+      setStatus({ kind: 'unsupported' })
+      return
+    }
+    setStatus({ kind: 'locating' })
+    try {
+      let position = await readPosition()
+      if (position.coords.accuracy > MAX_ACCURACY_M) {
+        position = await readPosition()
+      }
+      const result = locate({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      })
+      if (result.kind === 'imprecise') {
+        setStatus({ kind: 'imprecise', km: result.km })
+        return
+      }
+      if (result.kind === 'unmatched') {
+        setStatus({ kind: 'failed' })
+        return
+      }
+      const province = provinces.find((item) => item.code === result.province)
+      const city = province?.cities.find((item) => item.code === result.city)
+      setLocation({ region: 'CN', province: result.province, city: result.city ?? undefined })
+      setStatus({ kind: 'done', place: [province?.name, city?.name].filter(Boolean).join(' / ') })
+    } catch (error) {
+      // 1 = PERMISSION_DENIED；超时与不可用都归到"失败"
+      const code = (error as GeolocationPositionError | undefined)?.code
+      setStatus({ kind: code === 1 ? 'denied' : 'failed' })
+    }
+  }
+
+  const description = (() => {
+    switch (status.kind) {
+      case 'locating':
+        return t('settingsLocationImporting')
+      case 'done':
+        return t('settingsLocationImported', { place: status.place })
+      case 'denied':
+        return t('settingsLocationImportDenied')
+      case 'failed':
+        return t('settingsLocationImportFailed')
+      case 'unsupported':
+        return t('settingsLocationUnsupported')
+      case 'imprecise':
+        return t('settingsLocationLowAccuracy', { km: status.km })
+      default:
+        return undefined
+    }
+  })()
+
+  return (
+    <SettingCell
+      label={t('settingsLocationAutoHint')}
+      description={description}
+      status={null}
+      action={
+        <Button
+          variant="outlined"
+          size="m"
+          className={styles.cellButton}
+          disabled={status.kind === 'locating'}
+          onClick={() => void locateNow()}
+        >
+          {t('settingsLocationAutoAction')}
+        </Button>
       }
     />
   )
