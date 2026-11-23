@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.2.2 | 2026-11-23 | 85 | 有 | fix: fade the settings away, and stop the second nav highlight |
 | v1.2.1 | 2026-11-23 | 84 | 有 | fix: keep the status bar themed after the window is re-decorated |
 | v1.2.0 | 2026-11-23 | 83 | 有 | feat: fix the vivo focus loop, add four languages, and make Enter a newline |
 | v1.1.3 | 2026-11-23 | 82 | 有 | fix: drop focus when the keyboard is dismissed |
