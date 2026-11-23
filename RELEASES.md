@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.3.2 | 2026-11-23 | 89 | 有 | fix: drop the "imported" line once the picker no longer matches it |
 | v1.3.1 | 2026-11-23 | 88 | 有 | feat: pin a no-location choice in the province and city pickers |
 | v1.3.0 | 2026-11-23 | 87 | 有 | feat: fill the province and city from the phone's location |
 | v1.2.3 | 2026-11-23 | 86 | 有 | fix: fade out from the dialogs' own close buttons too |
