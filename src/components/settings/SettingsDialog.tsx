@@ -374,7 +374,24 @@ const readPosition = (): Promise<GeolocationPosition> =>
  */
 const LocateSetting = () => {
   const t = useTranslate()
+  const location = useSettings((state) => state.location)
   const [status, setStatus] = useState<LocateStatus>({ kind: 'idle' })
+  /** 上一次由「定位」写进去的省市；用来区分"是我们写的"还是"用户自己改的" */
+  const locatedKey = useRef<string | null>(null)
+  const currentKey = `${location?.province ?? ''}|${location?.city ?? ''}`
+
+  /**
+   * 用户自己在下拉里改了地点（含改回"不定位"）之后，那句「已导入：…」就该消失——
+   * 它描述的是上一次定位的结果，已经和眼前的选项对不上了。
+   * 只清掉成功态；失败/权限/精度那几条仍然说明最近一次尝试，留着更有用。
+   */
+  useEffect(() => {
+    if (status.kind !== 'done' || currentKey === locatedKey.current) {
+      return
+    }
+    locatedKey.current = null
+    setStatus({ kind: 'idle' })
+  }, [currentKey, status.kind])
 
   const locateNow = async () => {
     if (!navigator.geolocation) {
@@ -402,6 +419,7 @@ const LocateSetting = () => {
       }
       const province = provinces.find((item) => item.code === result.province)
       const city = province?.cities.find((item) => item.code === result.city)
+      locatedKey.current = `${result.province}|${result.city ?? ''}`
       setLocation({ region: 'CN', province: result.province, city: result.city ?? undefined })
       setStatus({ kind: 'done', place: [province?.name, city?.name].filter(Boolean).join(' / ') })
     } catch (error) {
