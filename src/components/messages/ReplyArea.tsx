@@ -78,35 +78,10 @@ export const ReplyArea = memo(function ReplyArea({
   const [expanded, setExpanded] = useState(false)
   const titleActive = streaming && !hasResponse
   useTicker(titleActive, 1000)
-  if (view.steps.length === 0 && !(message.thinking && streaming)) {
-    return null
-  }
-  // 未记录请求开关时，按是否有思考内容显示标题。
-  const thinking = message.thinking ?? view.steps.some((step) => step.type === 'thinking')
-  const title = thinking ? getAreaTitle(view, streaming, Date.now(), hasResponse) : null
-  const stopped = !streaming && !hasResponse
-  /** 思考进行中 + 用户没点开 → 显示滚动小窗（不是把全文铺开） */
-  const previewing = titleActive && title !== null && !expanded
   const scroll = useChatScroll()
   const titleRef = useRef<HTMLDivElement>(null)
   /** 展开/收起前那一行标题在视口里的位置；渲染后要把它挪回原处 */
   const holdRef = useRef<{ el: HTMLElement; top: number } | null>(null)
-
-  /**
-   * 就地展开/收起：把标题行钉在原地。
-   *
-   * 不这样做的话，展开会让下方内容一下长高很多，而列表还开着贴底跟随 ——
-   * 视口直接被拽到最底部，用户点的是"展开看看"，看到的却是"跳到最新一行"。
-   * 所以先关掉跟随（`holdAt`），渲染后再按位置差把滚动补回来。
-   */
-  const toggleExpanded = () => {
-    const row = titleRef.current
-    if (row) {
-      holdRef.current = { el: row, top: row.getBoundingClientRect().top }
-      scroll.holdAt(row)
-    }
-    setExpanded((value) => !value)
-  }
 
   // 没有依赖数组：展开/收起之后必然重渲染，这一次就是补偿的时机
   useLayoutEffect(() => {
@@ -124,6 +99,40 @@ export const ReplyArea = memo(function ReplyArea({
       parent.scrollTop += delta
     }
   })
+
+  /**
+   * 上面所有 hook 必须先跑完，再决定要不要早退。
+   *
+   * 早退是给「这条回复既没有思考也没有工具步骤」准备的，但它会跳过后面的
+   * `useContext` / `useRef` / `useLayoutEffect`。只要某次重渲染让条件由真变假
+   * （切换模型、历史消息补进来都会），hooks 数量前后不一致，React 抛 #300。
+   */
+  if (view.steps.length === 0 && !(message.thinking && streaming)) {
+    return null
+  }
+
+  /**
+   * 就地展开/收起：把标题行钉在原地。
+   *
+   * 不这样做的话，展开会让下方内容一下长高很多，而列表还开着贴底跟随 ——
+   * 视口直接被拽到最底部，用户点的是"展开看看"，看到的却是"跳到最新一行"。
+   * 所以先关掉跟随（`holdAt`），渲染后再按位置差把滚动补回来。
+   */
+  const toggleExpanded = () => {
+    const row = titleRef.current
+    if (row) {
+      holdRef.current = { el: row, top: row.getBoundingClientRect().top }
+      scroll.holdAt(row)
+    }
+    setExpanded((value) => !value)
+  }
+
+  // 未记录请求开关时，按是否有思考内容显示标题。
+  const thinking = message.thinking ?? view.steps.some((step) => step.type === 'thinking')
+  const title = thinking ? getAreaTitle(view, streaming, Date.now(), hasResponse) : null
+  const stopped = !streaming && !hasResponse
+  /** 思考进行中 + 用户没点开 → 显示滚动小窗（不是把全文铺开） */
+  const previewing = titleActive && title !== null && !expanded
 
   const steps = view.steps.map((step, index) => (
     <StepItem
