@@ -12,6 +12,7 @@ import {
   useChatStore,
 } from '../services/chat/store.js'
 import { boot } from '../services/boot.js'
+import { dismissSplash } from '../services/splash.js'
 import { useEncMigration } from '../services/crypto/migration.js'
 import { EncryptionGate } from '../components/app/EncryptionGate.js'
 import { exportToShare } from '../services/chat/backup.js'
@@ -42,6 +43,7 @@ export const App = () => {
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
   const ready = useChatStore((state) => state.ready)
   const booted = useEncMigration((state) => state.booted)
+  const migrationPhase = useEncMigration((state) => state.phase)
   const initError = useChatStore((state) => state.initError)
   const saveError = useChatStore((state) => Object.values(state.sessionSaveErrors).some(Boolean))
   const importingHistory = useChatStore((state) => state.importingHistory)
@@ -98,6 +100,19 @@ export const App = () => {
     // 启动顺序在 boot 里：取数据密钥 → 加密存量（需要时先征求同意）→ 解锁 API Key → 读列表
     void boot()
   }, [])
+
+  useEffect(() => {
+    // 启动画面什么时候撤：判据与下面那段渲染完全一致 —— 只要「有东西可以显示」就撤，
+    // 还在读会话列表就一直留着 logo。原生那边不计时，停多久取决于这里多久满足条件。
+    const hasSomethingToShow =
+      migrationPhase !== 'idle' ||
+      initError ||
+      sessionLoadError ||
+      (ready && (activeId === null || session !== undefined))
+    if (hasSomethingToShow) {
+      dismissSplash()
+    }
+  }, [migrationPhase, initError, sessionLoadError, ready, activeId, session])
 
   useEffect(() => {
     // 首次打开先在设置里输入 API Key。

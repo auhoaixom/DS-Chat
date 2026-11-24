@@ -6,7 +6,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +26,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import java.util.Collections;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "DSChatSplash";
     /** 从系统返回手势里让出来的左边缘宽度（dp），比网页手势的起手区窄，只贴物理边缘 */
     private static final int EDGE_SWIPE_WIDTH_DP = 24;
     /** 网页还没完成首次布局时重试几次，取到高度再上报排除区 */
@@ -35,11 +36,16 @@ public class MainActivity extends BridgeActivity {
     private static final int LIGHT_BG = 0xFFFFFFFF;
     /** 启动画面里字标宽度占屏幕宽度的比例（与 tools/icon/build-icons.py 的 0.46 一致） */
     private static final float SPLASH_LOGO_RATIO = 0.46f;
-    /** 启动画面最短停留时间（从 onCreate 算）：系统那一屏会先盖住它约 500~600ms，所以要留长一点 */
-    private static final long SPLASH_MIN_MS = 1000;
+    /**
+     * 看门狗：只在网页永远不回报「可以显示了」时兜底（JS 抛错、渲染进程挂了），
+     * 免得一直卡在 logo 上。正常路径不看时间，撤掉完全由网页的信号决定。
+     */
+    private static final long SPLASH_WATCHDOG_MS = 10_000;
+
+    /** 当前实例，供 SplashPlugin 转调 */
+    private static MainActivity current;
 
     private View splashOverlay;
-    private long splashShownAt;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -51,9 +57,28 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(RecentPhotosPlugin.class);
         registerPlugin(SecureKeyPlugin.class);
         registerPlugin(KeepAlivePlugin.class);
+        registerPlugin(SplashPlugin.class);
         super.onCreate(savedInstanceState);
+        current = this;
         showSplash(isDarkTheme());
         surviveRendererDeath();
+    }
+
+    @Override
+    public void onDestroy() {
+        if (current == this) {
+            current = null;
+        }
+        super.onDestroy();
+    }
+
+    /** 网页说「可以显示了」时由 SplashPlugin 调用；重复调用无害 */
+    static void dismissSplashNow() {
+        MainActivity activity = current;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(activity::hideSplash);
     }
 
     /**
@@ -113,7 +138,7 @@ public class MainActivity extends BridgeActivity {
             )
         );
         splashOverlay = overlay;
-        splashShownAt = SystemClock.uptimeMillis();
+        Log.i(TAG, "splash shown at " + System.currentTimeMillis());
         SystemBarPlugin.apply(getWindow(), dark ? DARK_BG : LIGHT_BG, dark);
         // 再补一次：Capacitor 启动时会用自己的默认值刷一遍状态栏（浅色），
         // 那一下会把我们上面设的颜色盖掉，于是启动画面顶部留下一条白边。
@@ -121,27 +146,27 @@ public class MainActivity extends BridgeActivity {
             () -> SystemBarPlugin.apply(getWindow(), dark ? DARK_BG : LIGHT_BG, dark),
             220
         );
+        // 看门狗：网页永远不回报时兜底，避免卡在 logo 上
+        overlay.postDelayed(this::hideSplash, SPLASH_WATCHDOG_MS);
     }
 
-    /** 撤掉启动画面；至少留 SPLASH_MIN_MS，避免页面来得快时字标一闪而过 */
+    /**
+     * 撤掉启动画面。由网页的信号触发（时机 = 会话列表读完 / 弹出加密对话框 / 出现错误页），
+     * 原生这边没有任何计时器；重复调用无害。
+     */
     private void hideSplash() {
         final View overlay = splashOverlay;
         if (overlay == null) {
             return;
         }
         splashOverlay = null;
-        long waited = SystemClock.uptimeMillis() - splashShownAt;
-        overlay.postDelayed(
-            () -> {
-                ViewGroup parent = (ViewGroup) overlay.getParent();
-                if (parent != null) {
-                    parent.removeView(overlay);
-                }
-                getWindow().getDecorView().setBackgroundColor(isDarkTheme() ? DARK_BG : LIGHT_BG);
-                WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-            },
-            Math.max(0, SPLASH_MIN_MS - waited)
-        );
+        Log.i(TAG, "splash dismissed at " + System.currentTimeMillis());
+        ViewGroup parent = (ViewGroup) overlay.getParent();
+        if (parent != null) {
+            parent.removeView(overlay);
+        }
+        getWindow().getDecorView().setBackgroundColor(isDarkTheme() ? DARK_BG : LIGHT_BG);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
     }
 
     /**
@@ -158,11 +183,6 @@ public class MainActivity extends BridgeActivity {
         }
         bridge.addWebViewListener(
             new WebViewListener() {
-                @Override
-                public void onPageLoaded(WebView webView) {
-                    hideSplash();
-                }
-
                 @Override
                 public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
                     webView.post(webView::reload);
