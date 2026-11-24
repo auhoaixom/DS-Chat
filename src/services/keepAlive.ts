@@ -19,7 +19,7 @@ type KeepAliveBridge = {
   progress(options: { title: string; body: string }): Promise<void>
   stop(): Promise<void>
   getVendor(): Promise<{ manufacturer: string }>
-  openAppSettings(): Promise<{ opened: boolean }>
+  openBackgroundSettings(options: { guide: string }): Promise<{ opened: boolean }>
 }
 
 /** 进度文案最多两秒更新一次；后台没有定时器可用，靠"数据到达"这个事件驱动 */
@@ -134,17 +134,18 @@ export const readVendorGuide = async (): Promise<VendorGuide> => {
 }
 
 /**
- * 打开本应用的「应用信息」页。
+ * 打开系统的「后台 / 自启动管理」页。
  *
- * 只跳这一个页面：所有安卓机都有，不会失效。厂商的后台开关藏在它下面，
- * 具体找哪一项由提示框里的文案说清楚——我们不去猜厂商的页面，也不假装知道状态。
+ * 各家的页面组件名随版本变，所以这里只传厂商类别，由原生侧按候选列表逐个试，
+ * 全都找不到再退回「应用信息」页（那一页一定有）。跳转永远是加分项：
+ * 弹窗里那段完整路径才是主力，跳不过去用户也能自己走完。
  */
-export const openAppSettings = async (): Promise<void> => {
+export const openBackgroundSettings = async (guide: VendorGuide): Promise<void> => {
   if (!native()) {
     return
   }
   try {
-    await getBridge().openAppSettings()
+    await getBridge().openBackgroundSettings({ guide })
   } catch {
     // 打不开系统页面而已，不用告诉用户
   }

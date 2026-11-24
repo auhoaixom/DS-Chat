@@ -143,11 +143,12 @@ export const zhTW = {
   settingsKeepAliveAction: "開啟應用程式設定",
   settingsKeepAliveOpen: "去設定",
   settingsKeepAliveGuideHuawei:
-    "在「應用程式資訊」裡找到「應用程式啟動管理」，關掉「自動管理」，再把「允許自啟動 / 允許關聯啟動 / 允許背景活動」三個開關全部打開。",
-  settingsKeepAliveGuideXiaomi: "在「應用程式資訊」裡找到「省電策略」，選擇「無限制」。",
-  settingsKeepAliveGuideOppo: "在「應用程式資訊」裡找到「耗電管理」（有些機型叫「電池」），允許背景活動。",
-  settingsKeepAliveGuideVivo: "在「應用程式資訊」裡找到「背景高耗電」，允許背景執行。",
-  settingsKeepAliveGuideOther: "在「應用程式資訊」裡找到與電池或背景相關的設定，把本應用程式設為不限制。",
+    "打開「設定 → 應用程式和服務 → 應用程式啟動管理」，找到「DS Chat」，關掉「自動管理」，再把「允許自啟動 / 允許關聯啟動 / 允許背景活動」三個開關全部打開。",
+  settingsKeepAliveGuideXiaomi:
+    "打開「設定 → 應用程式設定 → 應用程式管理 → DS Chat → 省電策略」，選擇「無限制」。",
+  settingsKeepAliveGuideOppo: "打開「設定 → 應用程式管理 → DS Chat → 耗電管理」，允許背景活動。",
+  settingsKeepAliveGuideVivo: "打開「設定 → 應用程式與權限 → 應用程式管理 → DS Chat → 電池」，允許背景高耗電。",
+  settingsKeepAliveGuideOther: "打開「設定 → 應用程式 → DS Chat → 電池」，把背景活動設為不限制。",
   replyInvalidApiKey: "API Key 無效或已被刪除，請更換後重試",
   replyInsufficientBalance: "帳戶餘額不足，請儲值後重試",
   replyRateLimited: "請求過於頻繁，請稍後再試",

@@ -26,7 +26,11 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
-import { openAppSettings, readVendorGuide, type VendorGuide } from '../../services/keepAlive.js'
+import {
+  openBackgroundSettings,
+  readVendorGuide,
+  type VendorGuide,
+} from '../../services/keepAlive.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
@@ -525,8 +529,9 @@ const KeepAliveSetting = () => {
                 variant="primary"
                 size="m"
                 onClick={() => {
+                  const target = guide
                   setGuide(null)
-                  void openAppSettings()
+                  void openBackgroundSettings(target)
                 }}
               >
                 {t('settingsKeepAliveOpen')}

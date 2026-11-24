@@ -141,14 +141,15 @@ export const en = {
   settingsKeepAliveAction: 'Open app settings',
   settingsKeepAliveOpen: 'Open',
   settingsKeepAliveGuideHuawei:
-    'In App info, open “App launch”, turn off automatic management, then enable all three switches: auto-launch, secondary launch and run in background.',
-  settingsKeepAliveGuideXiaomi: 'In App info, open “Battery saver” and choose “No restrictions”.',
+    'Open Settings → Apps and services → App launch, find DS Chat, turn off automatic management, then enable all three switches: auto-launch, secondary launch and run in background.',
+  settingsKeepAliveGuideXiaomi:
+    'Open Settings → Apps → Manage apps → DS Chat → Battery saver, then choose “No restrictions”.',
   settingsKeepAliveGuideOppo:
-    'In App info, open “Power usage” (called “Battery” on some models) and allow background activity.',
+    'Open Settings → Apps → DS Chat → Power usage and allow background activity.',
   settingsKeepAliveGuideVivo:
-    'In App info, open “High background power usage” and allow running in background.',
+    'Open Settings → Apps and permissions → App manager → DS Chat → Battery and allow high background power usage.',
   settingsKeepAliveGuideOther:
-    'In App info, look for battery or background settings and set this app to unrestricted.',
+    'Open Settings → Apps → DS Chat → Battery and set background activity to unrestricted.',
   replyInvalidApiKey:
     'The API Key is invalid or has been deleted. Please replace it and try again.',
   replyInsufficientBalance: 'Insufficient account balance. Please top up and try again.',

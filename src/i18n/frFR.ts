@@ -143,15 +143,15 @@ export const frFR = {
   settingsKeepAliveAction: "Ouvrir les réglages de l'application",
   settingsKeepAliveOpen: "Ouvrir",
   settingsKeepAliveGuideHuawei:
-    "Dans « Infos sur l'application », ouvrez « Gestion du démarrage », désactivez la gestion automatique, puis activez les trois options : démarrage auto, démarrage associé et activité en arrière-plan.",
+    "Ouvrez « Paramètres → Applications et services → Gestion du démarrage », trouvez DS Chat, désactivez la gestion automatique, puis activez les trois options : démarrage auto, démarrage associé et activité en arrière-plan.",
   settingsKeepAliveGuideXiaomi:
-    "Dans « Infos sur l'application », ouvrez « Économiseur de batterie » et choisissez « Aucune restriction ».",
+    "Ouvrez « Paramètres → Applications → Gérer les applications → DS Chat → Économiseur de batterie » et choisissez « Aucune restriction ».",
   settingsKeepAliveGuideOppo:
-    "Dans « Infos sur l'application », ouvrez « Consommation d'énergie » (parfois « Batterie ») et autorisez l'activité en arrière-plan.",
+    "Ouvrez « Paramètres → Gestion des applications → DS Chat → Consommation d'énergie » et autorisez l'activité en arrière-plan.",
   settingsKeepAliveGuideVivo:
-    "Dans « Infos sur l'application », ouvrez « Forte consommation en arrière-plan » et autorisez l'exécution en arrière-plan.",
+    "Ouvrez « Paramètres → Applications et autorisations → Gestionnaire d'applications → DS Chat → Batterie » et autorisez une forte consommation en arrière-plan.",
   settingsKeepAliveGuideOther:
-    "Dans « Infos sur l'application », cherchez les réglages de batterie ou d'arrière-plan et retirez les restrictions pour cette application.",
+    "Ouvrez « Paramètres → Applications → DS Chat → Batterie » et retirez les restrictions d'arrière-plan.",
   replyInvalidApiKey: "L'API Key est invalide ou a été supprimée. Remplacez-la et réessayez",
   replyInsufficientBalance: "Solde insuffisant. Rechargez le compte et réessayez",
   replyRateLimited: "Trop de requêtes. Réessayez plus tard",

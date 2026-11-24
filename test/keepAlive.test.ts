@@ -3,7 +3,7 @@ import { beforeEach, test } from 'node:test'
 import {
   acquireKeepAlive,
   keepAliveCountForTest,
-  openAppSettings,
+  openBackgroundSettings,
   readVendorGuide,
   releaseKeepAlive,
   reportKeepAliveProgress,
@@ -35,7 +35,7 @@ const makeBridge = () => {
         calls.stop += 1
       },
       getVendor: async () => ({ manufacturer: 'Xiaomi' }),
-      openAppSettings: async () => ({ opened: true }),
+      openBackgroundSettings: async () => ({ opened: true }),
     },
   }
 }
@@ -74,7 +74,7 @@ test('起服务失败也不能抛错，发消息不依赖保活', async () => {
       stopped += 1
     },
     getVendor: async () => ({ manufacturer: '' }),
-    openAppSettings: async () => ({ opened: true }),
+    openBackgroundSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
@@ -93,7 +93,7 @@ test('停止失败同样吞掉，不影响已经结束的回复', async () => {
       throw new Error('stop failed')
     },
     getVendor: async () => ({ manufacturer: '' }),
-    openAppSettings: async () => ({ opened: true }),
+    openBackgroundSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
@@ -174,7 +174,7 @@ test('读厂商名失败时按"认不出"处理，不抛错', async () => {
     getVendor: async () => {
       throw new Error('boom')
     },
-    openAppSettings: async () => ({ opened: true }),
+    openBackgroundSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
@@ -192,7 +192,7 @@ test('非原生平台不读厂商、也不跳系统页面', async () => {
       vendor += 1
       return { manufacturer: 'HUAWEI' }
     },
-    openAppSettings: async () => {
+    openBackgroundSettings: async () => {
       opened += 1
       return { opened: true }
     },
@@ -200,7 +200,7 @@ test('非原生平台不读厂商、也不跳系统页面', async () => {
   setKeepAliveNativeForTest(false)
 
   assert.equal(await readVendorGuide(), 'other', '浏览器里没有厂商这个概念')
-  await openAppSettings()
+  await openBackgroundSettings('other')
   assert.equal(vendor, 0)
   assert.equal(opened, 0)
 })

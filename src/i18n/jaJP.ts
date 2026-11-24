@@ -143,14 +143,15 @@ export const jaJP = {
   settingsKeepAliveAction: "アプリ設定を開く",
   settingsKeepAliveOpen: "設定へ",
   settingsKeepAliveGuideHuawei:
-    "「アプリ情報」で「アプリ起動管理」を開き、「自動管理」をオフにしてから「自動起動 / 関連起動 / バックグラウンド動作」の3つをすべてオンにしてください。",
-  settingsKeepAliveGuideXiaomi: "「アプリ情報」で「バッテリーセーバー」を開き、「制限なし」を選んでください。",
+    "「設定 → アプリとサービス → アプリ起動管理」を開き、「DS Chat」を見つけて「自動管理」をオフにし、「自動起動 / 関連起動 / バックグラウンド動作」の3つをすべてオンにしてください。",
+  settingsKeepAliveGuideXiaomi:
+    "「設定 → アプリ → アプリを管理 → DS Chat → バッテリーセーバー」を開き、「制限なし」を選んでください。",
   settingsKeepAliveGuideOppo:
-    "「アプリ情報」で「電力使用量」（機種によっては「バッテリー」）を開き、バックグラウンド動作を許可してください。",
+    "「設定 → アプリ管理 → DS Chat → 電力使用量」を開き、バックグラウンド動作を許可してください。",
   settingsKeepAliveGuideVivo:
-    "「アプリ情報」で「バックグラウンドでの高消費電力」を開き、バックグラウンド動作を許可してください。",
+    "「設定 → アプリと権限 → アプリ管理 → DS Chat → バッテリー」を開き、バックグラウンドでの高消費電力を許可してください。",
   settingsKeepAliveGuideOther:
-    "「アプリ情報」でバッテリーやバックグラウンドに関する設定を探し、このアプリを「制限なし」にしてください。",
+    "「設定 → アプリ → DS Chat → バッテリー」を開き、バックグラウンド動作を「制限なし」にしてください。",
   replyInvalidApiKey: "API Key が無効か削除されています。交換してから再試行してください",
   replyInsufficientBalance: "アカウント残高が不足しています。チャージしてから再試行してください",
   replyRateLimited: "リクエストが多すぎます。しばらくしてから再試行してください",

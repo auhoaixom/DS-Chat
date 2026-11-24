@@ -1,6 +1,7 @@
 package com.dschat.app;
 
 import android.app.NotificationManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -94,23 +95,73 @@ public class KeepAlivePlugin extends Plugin {
         call.resolve(result);
     }
 
-    /** 打开本应用的「应用信息」页；打不开也只是没跳转，不影响任何功能 */
+    /**
+     * 打开系统的"后台/自启动管理"页。
+     *
+     * 各家自建的页面组件名随版本变，所以按候选列表逐个试：先用 PackageManager 解析能不能
+     * 找到这个 Activity，找不到就下一个；startActivity 抛异常（华为部分 HarmonyOS 机型会
+     * 直接抛 ActivityNotFound）也只当作"这一个不行"，继续下一个。全部失败就退回
+     * 「应用信息」页——那一页所有安卓机都有。
+     *
+     * 调用方传进来的是网页侧判定的厂商类别（huawei / xiaomi / oppo / vivo / other），
+     * 原生侧不重复做厂商判断。
+     */
     @PluginMethod
-    public void openAppSettings(PluginCall call) {
+    public void openBackgroundSettings(PluginCall call) {
+        String guide = call.getString("guide", "other");
         boolean opened = false;
-        try {
-            Intent details =
-                    new Intent(
-                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    Uri.parse("package:" + getContext().getPackageName()))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(details);
-            opened = true;
-        } catch (Exception error) {
-            Log.w(TAG, "openAppSettings failed: " + error);
+        for (String[] candidate : candidatesFor(guide)) {
+            if (tryOpenComponent(candidate[0], candidate[1])) {
+                opened = true;
+                break;
+            }
+        }
+        if (!opened) {
+            opened = tryOpenComponent(null, null);
         }
         JSObject result = new JSObject();
         result.put("opened", opened);
         call.resolve(result);
+    }
+
+    /**
+     * 只有华为/荣耀给候选组件：它们的「应用启动管理」是一个全局列表页，从「应用信息」进不去。
+     *
+     * 其它厂商一律直接落到「应用信息」——实测小米的 `PowerDetailActivity`（电量详情）虽然能被
+     * 解析到，但缺了系统内部才会传的 extra，启动后立刻自己关掉，用户看到的是闪一下又回到原处，
+     * 比老实打开应用信息更糟。宁可少跳一步，也不要跳到一个会自己消失的页面。
+     */
+    private String[][] candidatesFor(String guide) {
+        if ("huawei".equals(guide)) {
+            return new String[][] {
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                {"com.hihonor.systemmanager", "com.hihonor.systemmanager.appcontrol.activity.StartupAppControlActivity"},
+                {"com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+            };
+        }
+        return new String[0][];
+    }
+
+    /** 组件为空时打开本应用的「应用信息」页；任何异常都只返回 false */
+    private boolean tryOpenComponent(String packageName, String className) {
+        try {
+            Intent intent = new Intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (packageName == null || className == null) {
+                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(Uri.parse("package:" + getContext().getPackageName()));
+            } else {
+                intent.setComponent(new ComponentName(packageName, className));
+                // 先解析再启动：不存在就安静地试下一个，不指望异常来兜底
+                if (getContext().getPackageManager().resolveActivity(intent, 0) == null) {
+                    return false;
+                }
+            }
+            getContext().startActivity(intent);
+            return true;
+        } catch (Exception error) {
+            Log.w(TAG, "open failed: " + packageName + "/" + className + " " + error);
+            return false;
+        }
     }
 }
