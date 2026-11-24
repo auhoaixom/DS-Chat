@@ -19,6 +19,13 @@ globalThis.__API_ORIGIN__ = 'https://api.example.test'
 globalThis.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 0)
 globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle)
 
+/**
+ * 流式循环还会看一眼 `document.visibilityState` 决定"按帧提交"还是"合并提交"
+ * （应用在后台时不用动画帧）。Node 里没有 document，缺了它一收到事件就抛 ReferenceError，
+ * 表现为"流开始了但一个字都写不进去"。
+ */
+globalThis.document = { visibilityState: 'visible' }
+
 const store = new Map()
 
 globalThis.localStorage = {

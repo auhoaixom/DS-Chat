@@ -33,6 +33,7 @@ import {
   applyEvent,
   canContinueReply,
   getContextRounds,
+  getReplyText,
   settleReply,
   toRequestMessages,
 } from './reply.js'
@@ -57,6 +58,32 @@ const OVERFLOW_RETRY_LIMIT = 2
 const FILE_RETRY_BASE_DELAY = 1000
 /** 应用在后台时，流式增量合并提交的最小间隔（毫秒） */
 const HIDDEN_FLUSH_INTERVAL = 250
+/**
+ * 连接层断掉后自动接着写的次数上限。
+ * 只有一次：再断就照常报错——反复自动重试等于拿用户的钱试运气。
+ */
+const AUTO_CONTINUE_LIMIT = 1
+/**
+ * 断网期间的"空转重试"：请求根本发不出去（拿不到任何事件），不花钱，可以多试几次。
+ * 换网的瞬间连接先断、网络几秒后才回来，不等就会把唯一的机会打空
+ * （真机实测：网络 8 秒后回来，第 1 秒就重试必然失败）。
+ * 不用 `navigator.onLine` 判断——WebView 在双卡机型上亮着它照样是 true。
+ */
+const AUTO_RETRY_LIMIT = 8
+const AUTO_RETRY_DELAY_MS = 1500
+const AUTO_RETRY_WINDOW_MS = 20_000
+
+/** 可被中止打断的等待：用户点停止时立刻返回 */
+const sleepUnlessAborted = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const finish = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const timer = setTimeout(finish, ms)
+    signal.addEventListener('abort', finish, { once: true })
+  })
 
 /** 允许自动补标题的请求；手动重命名后取消本轮标题写入，包含主动清空标题的情况。 */
 const titleRequests = new Set<AbortController>()
@@ -1106,6 +1133,13 @@ const waitForRetry = (attempt: number, signal: AbortSignal) =>
   })
 
 /**
+ * 连接层失败：**拿不到 HTTP 状态码**，说明这不是服务端对我们的结论。
+ * 断网、切网络时连接被掐、流读到一半断掉都落在这里；HTTP 4xx/5xx 是服务端给的答案，不自动重试。
+ */
+const isConnectionLoss = (error: unknown): boolean =>
+  !(error instanceof ApiError) || error.status === undefined
+
+/**
  * 已经写出来的字数（思考 + 正文）。
  * 只用于通知里的进度，两秒才上报一次，这点遍历开销可以忽略。
  */
@@ -1139,6 +1173,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
   /** 发送前是否已经做过一次压缩判断；超限重试单独记一次，避免反复压缩 */
   let compactionTried = false
   let overflowRetries = 0
+  /** 续写前缀：自动续写时换成"已经写出来的这段"，其余情况沿用调用方给的 */
+  let nextPrefix = request.prefix
+  /** 已经用掉的"真续写"次数（服务端真的开始生成过，是要花钱的） */
+  let autoContinues = 0
+  /** 断网空转的重试次数（请求没出去，不花钱） */
+  let autoAttempts = 0
+  /** 这一枪空转到什么时候就不再试了 */
+  let autoDeadline = 0
   const flush = () => {
     cancelAnimationFrame(frame)
     frame = 0
@@ -1164,6 +1206,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       /** 附件补齐前出错属于上传失败，请求还没有发出 */
       let preparing = true
       let receivedContent = false
+      /** 这一枪有没有真的接到过服务端的事件（用来分清"断网空转"和"生成到一半断了"） */
+      let gotReplyEvent = false
       try {
         // 发送前按阈值压缩一次；压缩失败不影响本轮请求，由超限重试兜底
         if (!compactionTried) {
@@ -1180,7 +1224,11 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           request.history,
           getSession(sessionId)?.compaction
         )
-        const prepared = await prepareFiles(sessionId, { ...request, history }, controller.signal)
+        const prepared = await prepareFiles(
+          sessionId,
+          { ...request, history, prefix: nextPrefix },
+          controller.signal
+        )
         preparing = false
         // 附件就绪后获取本轮信息；续写沿用原回答快照，重新生成的快照独立保存。
         const latestReminder = prepared.prefix
@@ -1222,6 +1270,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         )
         const blockIndexes = new Map<number, number>()
         for await (const event of events) {
+          gotReplyEvent = true
           receivedContent ||= event.type === 'content_block_start'
           if (
             event.type === 'message_delta' &&
@@ -1289,6 +1338,44 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         if (error instanceof ApiError && error.kind === 'interrupted' && reply.stopReason) {
           // 已收到 message_delta 的结束原因，只是缺了结尾的 message_stop
           reply = settleReply(reply, 'done', Date.now())
+        } else if (isConnectionLoss(error) && reply.prefix !== false) {
+          /*
+           * 连接层断了（切网络、信号掉了、后台被掐）：这不是服务端的结论，
+           * 已经写出来的内容不能白扔 —— 把这段当成前缀重新请求，让模型接着写。
+           * 一个字都没产出时把可能残留的思考块丢掉：那样等于重发，留着会重复显示。
+           *
+           * 分两种：真的收到过内容的断流要花一次预算；请求压根没发出去（断网）的
+           * 不花钱，在时间窗内可以反复试，等网络回来。
+           */
+          const started = gotReplyEvent
+          const now = Date.now()
+          autoDeadline ||= now + AUTO_RETRY_WINDOW_MS
+          const allowed = started
+            ? autoContinues < AUTO_CONTINUE_LIMIT
+            : autoAttempts < AUTO_RETRY_LIMIT && now < autoDeadline
+          if (allowed) {
+            if (started) {
+              autoContinues += 1
+            } else {
+              autoAttempts += 1
+              await sleepUnlessAborted(AUTO_RETRY_DELAY_MS, controller.signal)
+              if (controller.signal.aborted) {
+                reply = settleReply(reply, 'stopped', Date.now())
+                break
+              }
+            }
+            nextPrefix = { ...reply, blocks: getReplyText(reply) ? reply.blocks : [] }
+            reply = { ...nextPrefix, status: 'streaming', error: undefined, stopReason: undefined }
+            updateReply(sessionId, reply)
+            continue
+          }
+          reply = settleReply(reply, 'error', Date.now(), {
+            kind: error instanceof ApiError ? error.kind : 'protocol',
+            message: error instanceof Error ? error.message : String(error),
+            status: error instanceof ApiError ? error.status : undefined,
+            localMessage: error instanceof ApiError ? error.localMessage : undefined,
+          })
+          break
         } else if (error instanceof ApiError) {
           reply = settleReply(reply, 'error', Date.now(), {
             kind: error.kind,

@@ -4,7 +4,6 @@
  * 不用 mock 模块，也不给生产代码加开关 —— `request()` 用的就是全局 fetch，
  * 从这里下手最贴近真实链路（URL 拼接、请求头、SSE 解析、事件派发全都还是真的）。
  */
-
 const encoder = new TextEncoder()
 
 /** 拼一段 SSE 帧；data 走 JSON，和真实服务端一致 */
@@ -12,13 +11,19 @@ export const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${J
 
 export const startFakeStream = () => {
   const original = globalThis.fetch
-  let controller: ReadableStreamDefaultController<Uint8Array> | null = null
+  let controllers: ReadableStreamDefaultController<Uint8Array>[] = []
   let closed = false
 
   globalThis.fetch = async () => {
     const body = new ReadableStream<Uint8Array>({
       start(streamController) {
-        controller = streamController
+        // end() 之后又来的请求（比如连接层断开后的自动续写）立刻结束，
+        // 否则那个流会一直挂着，等它的测试全部超时
+        if (closed) {
+          streamController.close()
+          return
+        }
+        controllers.push(streamController)
       },
     })
     return new Response(body, {
@@ -27,10 +32,12 @@ export const startFakeStream = () => {
     })
   }
 
+  const latest = () => controllers[controllers.length - 1]
+
   return {
     /** 推一段文本增量（前面会自动补上 message_start，让回复真正开始） */
     begin(text: string) {
-      controller?.enqueue(
+      latest()?.enqueue(
         encoder.encode(
           sse('message_start', {
             type: 'message_start',
@@ -38,7 +45,7 @@ export const startFakeStream = () => {
           }),
         ),
       )
-      controller?.enqueue(
+      latest()?.enqueue(
         encoder.encode(
           sse('content_block_delta', {
             type: 'content_block_delta',
@@ -54,14 +61,17 @@ export const startFakeStream = () => {
         return
       }
       closed = true
-      try {
-        controller?.close()
-      } catch {
-        // 已经被 abort 取消了（reader.cancel 会关掉 controller），这里不用再管
+      for (const controller of controllers) {
+        try {
+          controller.close()
+        } catch {
+          // 已经被 abort 取消了（reader.cancel 会关掉 controller），这里不用再管
+        }
       }
     },
     restore() {
       this.end()
+      controllers = []
       globalThis.fetch = original
     },
   }
