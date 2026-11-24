@@ -4,6 +4,7 @@ import { ApiError, streamMessage } from '../api/client.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
+import { acquireKeepAlive, releaseKeepAlive, reportKeepAliveProgress } from '../keepAlive.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import {
   applyCompaction,
@@ -54,6 +55,8 @@ const FILE_RETRY_LIMIT = 2
 const OVERFLOW_RETRY_LIMIT = 2
 /** 退避基数，第 n 次重试等待 2^n 倍；连续失败达到上限就放弃，把原始报错展示出来 */
 const FILE_RETRY_BASE_DELAY = 1000
+/** 应用在后台时，流式增量合并提交的最小间隔（毫秒） */
+const HIDDEN_FLUSH_INTERVAL = 250
 
 /** 允许自动补标题的请求；手动重命名后取消本轮标题写入，包含主动清空标题的情况。 */
 const titleRequests = new Set<AbortController>()
@@ -255,6 +258,11 @@ export const bindChatPersistence = () => {
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
       save()
+      return
+    }
+    // 回到前台：把后台期间被合并掉的那一段补上，否则最后几个字符要等下一个事件才上屏
+    for (const [, flush] of streamFlushes) {
+      flush()
     }
   }
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -1098,6 +1106,22 @@ const waitForRetry = (attempt: number, signal: AbortSignal) =>
   })
 
 /**
+ * 已经写出来的字数（思考 + 正文）。
+ * 只用于通知里的进度，两秒才上报一次，这点遍历开销可以忽略。
+ */
+const replyChars = (reply: AssistantMessage): number => {
+  let total = 0
+  for (const block of reply.blocks) {
+    if (block.type === 'text') {
+      total += block.text.length
+    } else if (block.type === 'thinking') {
+      total += block.thinking.length
+    }
+  }
+  return total
+}
+
+/**
  * 请求并消费流：先补齐附件的 serverId，再发请求；流式增量按动画帧刷新内存，完成、失败或停止后落盘。
  * 补传失败时回复记为 upload 错误，可重试。
  * 服务端判定 file_id 失效时重新补传后重发，退避重试且次数有上限，超过则按原始报错收尾。
@@ -1108,6 +1132,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
     titleRequests.add(controller)
   }
   set((state) => ({ streaming: { ...state.streaming, [sessionId]: controller } }))
+  // 先在进程层面保活，再发请求：用户随时可能切走，服务必须在请求之前就位
+  await acquireKeepAlive()
   let reply = initial
   let frame = 0
   /** 发送前是否已经做过一次压缩判断；超限重试单独记一次，避免反复压缩 */
@@ -1119,6 +1145,19 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
     updateReply(sessionId, reply)
   }
   streamFlushes.set(sessionId, flush)
+  /**
+   * 后台期间不能每个事件都刷一次：隐藏页面虽然不画帧，但 setState 本身照跑，
+   * 每秒几十次纯属浪费电。250ms 合并一次；回到前台时 bindChatPersistence 会补最后一刀。
+   */
+  let lastHiddenFlush = 0
+  const flushHidden = () => {
+    const now = Date.now()
+    if (now - lastHiddenFlush < HIDDEN_FLUSH_INTERVAL) {
+      return
+    }
+    lastHiddenFlush = now
+    flush()
+  }
 
   try {
     for (let attempt = 0; ; attempt += 1) {
@@ -1197,8 +1236,9 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             titleRequests.delete(controller)
           }
           reply = applyEvent(reply, event, Date.now(), blockIndexes)
+          reportKeepAliveProgress(replyChars(reply))
           if (document.visibilityState === 'hidden') {
-            flush()
+            flushHidden()
           } else {
             frame ||= requestAnimationFrame(flush)
           }
@@ -1276,5 +1316,6 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       ),
     }))
     persist(sessionId)
+    void releaseKeepAlive()
   }
 }

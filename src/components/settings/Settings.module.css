@@ -607,3 +607,11 @@
   line-height: 18px;
   word-break: break-all;
 }
+
+/* 「已允许」不做成按钮：它没有可点的动作，做成按钮反而让人反复点 */
+.keepAliveAllowed {
+  flex-shrink: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  white-space: nowrap;
+}

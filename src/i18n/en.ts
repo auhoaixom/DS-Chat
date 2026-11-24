@@ -133,6 +133,13 @@ export const en = {
   toolFindFailTooltip: 'No related content found',
   readingLink: 'Reading',
   commonNetworkErrorToast: 'Network Error. Please check your network status.',
+  keepAliveTitle: 'Generating a reply',
+  keepAliveBody: 'Switch back to the app to see the result',
+  keepAliveProgress: 'Generating… (~{count} characters)',
+  settingsKeepAlive: 'Run in background',
+  settingsKeepAliveHint: 'Keeps generating after the screen locks; without it, generation may stop when the screen turns off',
+  settingsKeepAliveAction: 'Open settings',
+  settingsKeepAliveAllowed: 'Allowed',
   replyInvalidApiKey:
     'The API Key is invalid or has been deleted. Please replace it and try again.',
   replyInsufficientBalance: 'Insufficient account balance. Please top up and try again.',

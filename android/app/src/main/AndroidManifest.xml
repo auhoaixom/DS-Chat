@@ -34,11 +34,26 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- 生成期间保活：前台服务让进程不被当成缓存进程冻结，见 KeepAliveService -->
+        <service
+            android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 生成期间的前台服务：不冻结进程，流式读取才能在后台继续 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- 前台服务必须显示通知。被拒绝时服务照常运行，只是通知栏里看不到进度 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 锁屏/息屏时保持 CPU 醒着，否则流式读取会跟着 CPU 一起睡过去 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 设置里的「允许后台运行」：拉起系统的电池优化豁免，救息屏那条路 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 拍照：仅用于把照片加入对话附件，不写入系统相册 -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- 附件面板的「最近照片」：只在用户主动允许后读取相册缩略图 -->

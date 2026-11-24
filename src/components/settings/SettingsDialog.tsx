@@ -26,6 +26,7 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
+import { isBackgroundAllowed, requestBackgroundAllowed } from '../../services/keepAlive.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
@@ -145,6 +146,7 @@ const SettingsContent = () => {
                 <EnterKeySetting />
               </SettingGroup>
               <LocationSetting />
+              <KeepAliveSetting />
             </div>
           ) : (
             <>
@@ -465,6 +467,49 @@ const LocateSetting = () => {
         >
           {t('settingsLocationAutoAction')}
         </Button>
+      }
+    />
+  )
+}
+
+/**
+ * 「允许后台运行」：息屏后仍能继续生成。
+ *
+ * 实测（Redmi 14C / HyperOS）前台服务和唤醒锁都挡不住息屏时的进程冻结，
+ * 只有系统的电池优化豁免能救，所以这里不是一个开关，而是把用户送到那个系统页面。
+ * 从系统页面回来（可见性变化）时重新读一次状态。
+ */
+const KeepAliveSetting = () => {
+  const t = useTranslate()
+  const [allowed, setAllowed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const check = () => {
+      void isBackgroundAllowed().then(setAllowed)
+    }
+    check()
+    document.addEventListener('visibilitychange', check)
+    return () => document.removeEventListener('visibilitychange', check)
+  }, [])
+
+  return (
+    <SettingCell
+      label={t('settingsKeepAlive')}
+      description={t('settingsKeepAliveHint')}
+      status={null}
+      action={
+        allowed ? (
+          <span className={styles.keepAliveAllowed}>{t('settingsKeepAliveAllowed')}</span>
+        ) : (
+          <Button
+            variant="outlined"
+            size="m"
+            className={styles.cellButton}
+            onClick={() => void requestBackgroundAllowed()}
+          >
+            {t('settingsKeepAliveAction')}
+          </Button>
+        )
       }
     />
   )
