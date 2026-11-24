@@ -26,7 +26,7 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
-import { openSystemSettings, readVendorGuide, type VendorGuide } from '../../services/keepAlive.js'
+import { openSystemSettings } from '../../services/keepAlive.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
@@ -472,27 +472,19 @@ const LocateSetting = () => {
   )
 }
 
-/** 提示框里指路的那句话：只跳「应用信息」，用厂商名决定"到那儿找哪一项" */
-const GUIDE_KEYS: Record<VendorGuide, TranslationKey> = {
-  huawei: 'settingsKeepAliveGuideHuawei',
-  xiaomi: 'settingsKeepAliveGuideXiaomi',
-  oppo: 'settingsKeepAliveGuideOppo',
-  vivo: 'settingsKeepAliveGuideVivo',
-  other: 'settingsKeepAliveGuideOther',
-}
-
 /**
  * 「允许后台运行」：切到后台、锁屏后仍继续生成。
  *
- * 各家自建的后台开关（华为的应用启动管理、小米的省电策略…）既读不到状态、也没有可靠的
- * 跳转入口，所以这里只做两件事：说清开了有什么用，然后把人送到**所有安卓机都有**的
- * 「应用信息」页，并在弹框里按机型告诉他到那儿该找哪一项。
+ * 各家自建的后台开关（华为的应用启动管理、小米的省电策略、vivo 的后台高耗电…）既读不到状态、
+ * 也没有能验证的跳转入口，所以这里只有两句话：说清开了有什么用，再给一句通用的指路，
+ * 然后把用户送到所有安卓机都有的系统「设置」首页——具体往哪翻由他自己找。
  *
- * 不显示"已允许/未允许"：那个状态读不准，宁可不说，也不给一个假的结论。
+ * 不按厂商分支：我们只有两台能验证的机器，写五条路径就必然有几条是错的（vivo 那条已经验错）。
+ * 不显示"已允许/未允许"：那个状态读不到，宁可不说，也不给一个假的结论。
  */
 const KeepAliveSetting = () => {
   const t = useTranslate()
-  const [guide, setGuide] = useState<VendorGuide | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   return (
     <>
@@ -505,19 +497,17 @@ const KeepAliveSetting = () => {
             variant="outlined"
             size="m"
             className={styles.cellButton}
-            onClick={() => {
-              void readVendorGuide().then(setGuide)
-            }}
+            onClick={() => setGuideOpen(true)}
           >
             {t('settingsKeepAliveAction')}
           </Button>
         }
       />
-      {guide ? (
+      {guideOpen ? (
         <Modal
           title={t('settingsKeepAlive')}
           closable
-          onClose={() => setGuide(null)}
+          onClose={() => setGuideOpen(false)}
           footer={
             <>
               <ModalCloseButton variant="outlined" size="m">{t('cancel')}</ModalCloseButton>
@@ -525,7 +515,7 @@ const KeepAliveSetting = () => {
                 variant="primary"
                 size="m"
                 onClick={() => {
-                  setGuide(null)
+                  setGuideOpen(false)
                   void openSystemSettings()
                 }}
               >
@@ -534,7 +524,7 @@ const KeepAliveSetting = () => {
             </>
           }
         >
-          <p className={styles.keepAliveGuide}>{t(GUIDE_KEYS[guide])}</p>
+          <p className={styles.keepAliveGuide}>{t('settingsKeepAliveGuide')}</p>
         </Modal>
       ) : null}
     </>

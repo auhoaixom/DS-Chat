@@ -140,16 +140,8 @@ export const en = {
   settingsKeepAliveHint: 'Keeps generating after you switch away or lock the screen; otherwise it stops',
   settingsKeepAliveAction: 'Open system settings',
   settingsKeepAliveOpen: 'Open',
-  settingsKeepAliveGuideHuawei:
-    'Open Settings → Apps and services → App launch, find DS Chat, turn off automatic management, then enable all three switches: auto-launch, secondary launch and run in background.',
-  settingsKeepAliveGuideXiaomi:
-    'Open Settings → Apps → Manage apps → DS Chat → Battery saver, then choose “No restrictions”.',
-  settingsKeepAliveGuideOppo:
-    'Open Settings → Apps → DS Chat → Power usage and allow background activity.',
-  settingsKeepAliveGuideVivo:
-    'Open Settings → Apps and permissions → App manager → DS Chat → Battery and allow high background power usage.',
-  settingsKeepAliveGuideOther:
-    'Open Settings → Apps → DS Chat → Battery and set background activity to unrestricted.',
+  settingsKeepAliveGuide:
+    "In your phone's Settings, look for Battery or App management and turn on background running for DS Chat.",
   replyInvalidApiKey:
     'The API Key is invalid or has been deleted. Please replace it and try again.',
   replyInsufficientBalance: 'Insufficient account balance. Please top up and try again.',

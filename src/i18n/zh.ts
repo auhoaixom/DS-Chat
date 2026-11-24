@@ -135,14 +135,7 @@ export const zh = {
   settingsKeepAliveHint: '切后台、锁屏后继续生成；不开启会中断',
   settingsKeepAliveAction: '打开系统设置',
   settingsKeepAliveOpen: '去设置',
-  settingsKeepAliveGuideHuawei:
-    '打开「设置 → 应用和服务 → 应用启动管理」，找到「DS Chat」，关掉「自动管理」，再把「允许自启动 / 允许关联启动 / 允许后台活动」三个开关全部打开。',
-  settingsKeepAliveGuideXiaomi:
-    '打开「设置 → 应用设置 → 应用管理 → DS Chat → 省电策略」，选择「无限制」。',
-  settingsKeepAliveGuideOppo: '打开「设置 → 应用管理 → DS Chat → 耗电管理」，允许后台活动。',
-  settingsKeepAliveGuideVivo: '打开「设置 → 应用与权限 → 应用管理 → DS Chat → 电池」，允许后台高耗电。',
-  settingsKeepAliveGuideOther:
-    '打开「设置 → 应用 → DS Chat → 电池」，把后台活动设为不限制。',
+  settingsKeepAliveGuide: '到系统的「设置」里找电池或应用管理，把 DS Chat 的后台运行权限打开。',
   replyInvalidApiKey: 'API Key 无效或已被删除，请更换后重试',
   replyInsufficientBalance: '账户余额不足，请充值后重试',
   replyRateLimited: '请求过于频繁，请稍后再试',

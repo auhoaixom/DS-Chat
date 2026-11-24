@@ -80,26 +80,12 @@ public class KeepAlivePlugin extends Plugin {
     }
 
     /**
-     * 厂商名，用来决定"到应用信息里该找哪一项"的提示文案。
-     *
-     * 只跳应用信息页（所有安卓机都有），按厂商变的只是那句话：华为是「应用启动管理」，
-     * 小米是「省电策略」……各家自建的后台开关既读不到状态、也跳不过去，
-     * 所以这里只提供判断依据，不做任何跳转尝试。
-     */
-    @PluginMethod
-    public void getVendor(PluginCall call) {
-        JSObject result = new JSObject();
-        result.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
-        call.resolve(result);
-    }
-
-    /**
      * 打开系统「设置」首页——所有安卓机都有，不会失效。
      *
-     * 之前按厂商猜过具体的后台管理页（小米的电量详情、华为的启动管理四个候选），
-     * 真机上全部失败：要么缺系统内部 extra 启动后自己关掉，要么根本不存在。
+     * 之前按厂商猜过具体的后台管理页（小米的电量详情、华为的启动管理四个候选、vivo 的后台
+     * 高耗电），真机上全部失败：要么缺系统内部 extra 启动后自己关掉，要么根本不存在。
      * 我们没有那么多台机器去逐个验证，所以一刀切：只送到设置入口，
-     * 具体往哪翻由弹窗里那段按机型写的路径告诉用户。
+     * 具体往哪翻由弹窗里那句通用文案告诉用户。
      */
     @PluginMethod
     public void openSystemSettings(PluginCall call) {

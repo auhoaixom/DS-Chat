@@ -4,12 +4,10 @@ import {
   acquireKeepAlive,
   keepAliveCountForTest,
   openSystemSettings,
-  readVendorGuide,
   releaseKeepAlive,
   reportKeepAliveProgress,
   setKeepAliveBridgeForTest,
   setKeepAliveNativeForTest,
-  vendorGuideFor,
 } from '../src/services/keepAlive.js'
 
 /**
@@ -19,7 +17,7 @@ import {
  * 真机上只会表现为"通知栏多一条/少一条"，所以要用单测钉住。
  */
 const makeBridge = () => {
-  const calls = { start: 0, stop: 0, progress: [] as number[] }
+  const calls = { start: 0, stop: 0, progress: [] as number[], opened: 0 }
   return {
     calls,
     bridge: {
@@ -34,8 +32,10 @@ const makeBridge = () => {
       stop: async () => {
         calls.stop += 1
       },
-      getVendor: async () => ({ manufacturer: 'Xiaomi' }),
-      openSystemSettings: async () => ({ opened: true }),
+      openSystemSettings: async () => {
+        calls.opened += 1
+        return { opened: true }
+      },
     },
   }
 }
@@ -73,7 +73,6 @@ test('起服务失败也不能抛错，发消息不依赖保活', async () => {
     stop: async () => {
       stopped += 1
     },
-    getVendor: async () => ({ manufacturer: '' }),
     openSystemSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
@@ -92,7 +91,6 @@ test('停止失败同样吞掉，不影响已经结束的回复', async () => {
     stop: async () => {
       throw new Error('stop failed')
     },
-    getVendor: async () => ({ manufacturer: '' }),
     openSystemSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
@@ -110,8 +108,9 @@ test('非原生平台（浏览器/探针/单测）完全不碰桥', async () => 
   await acquireKeepAlive()
   reportKeepAliveProgress(120)
   await releaseKeepAlive()
+  await openSystemSettings()
 
-  assert.deepEqual(calls, { start: 0, stop: 0, progress: [] })
+  assert.deepEqual(calls, { start: 0, stop: 0, progress: [], opened: 0 })
 })
 
 test('进度两秒内只上报一次，且上报的是最新字数', async () => {
@@ -145,62 +144,16 @@ test('没有流在跑时不上报进度（避免通知里出现幽灵进度）',
   assert.deepEqual(calls.progress, [])
 })
 
-/**
- * 提示框里指路的那句话靠厂商名选：华为是「应用启动管理」，小米是「省电策略」……
- * 认错厂商只会让那句话指错地方，所以映射要钉住，并且大小写、别名都要认。
- */
-test('厂商名映射到对应的指路文案', () => {
-  assert.equal(vendorGuideFor('HUAWEI'), 'huawei')
-  assert.equal(vendorGuideFor('HONOR'), 'huawei', '荣耀和华为同一套设置')
-  assert.equal(vendorGuideFor('Hihonor'), 'huawei')
-  assert.equal(vendorGuideFor('Xiaomi'), 'xiaomi')
-  assert.equal(vendorGuideFor('Redmi'), 'xiaomi')
-  assert.equal(vendorGuideFor('POCO'), 'xiaomi')
-  assert.equal(vendorGuideFor('OPPO'), 'oppo')
-  assert.equal(vendorGuideFor('realme'), 'oppo')
-  assert.equal(vendorGuideFor('OnePlus'), 'oppo')
-  assert.equal(vendorGuideFor('vivo'), 'vivo')
-  assert.equal(vendorGuideFor('iQOO'), 'vivo')
-  assert.equal(vendorGuideFor('samsung'), 'other', '认不出来的走通用说法')
-  assert.equal(vendorGuideFor(''), 'other')
-  assert.equal(vendorGuideFor(null), 'other')
-})
-
-test('读厂商名失败时按"认不出"处理，不抛错', async () => {
+test('跳系统设置打不开也不抛错', async () => {
   setKeepAliveBridgeForTest({
     start: async () => ({ started: true }),
     progress: async () => {},
     stop: async () => {},
-    getVendor: async () => {
-      throw new Error('boom')
+    openSystemSettings: async () => {
+      throw new Error('no such activity')
     },
-    openSystemSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
-  assert.equal(await readVendorGuide(), 'other')
-})
-
-test('非原生平台不读厂商、也不跳系统页面', async () => {
-  let opened = 0
-  let vendor = 0
-  setKeepAliveBridgeForTest({
-    start: async () => ({ started: true }),
-    progress: async () => {},
-    stop: async () => {},
-    getVendor: async () => {
-      vendor += 1
-      return { manufacturer: 'HUAWEI' }
-    },
-    openSystemSettings: async () => {
-      opened += 1
-      return { opened: true }
-    },
-  })
-  setKeepAliveNativeForTest(false)
-
-  assert.equal(await readVendorGuide(), 'other', '浏览器里没有厂商这个概念')
   await openSystemSettings()
-  assert.equal(vendor, 0)
-  assert.equal(opened, 0)
 })

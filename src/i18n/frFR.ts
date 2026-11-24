@@ -142,16 +142,8 @@ export const frFR = {
   settingsKeepAliveHint: "La génération continue si vous quittez l'application ou verrouillez l'écran ; sinon elle s'interrompt",
   settingsKeepAliveAction: "Ouvrir les réglages système",
   settingsKeepAliveOpen: "Ouvrir",
-  settingsKeepAliveGuideHuawei:
-    "Ouvrez « Paramètres → Applications et services → Gestion du démarrage », trouvez DS Chat, désactivez la gestion automatique, puis activez les trois options : démarrage auto, démarrage associé et activité en arrière-plan.",
-  settingsKeepAliveGuideXiaomi:
-    "Ouvrez « Paramètres → Applications → Gérer les applications → DS Chat → Économiseur de batterie » et choisissez « Aucune restriction ».",
-  settingsKeepAliveGuideOppo:
-    "Ouvrez « Paramètres → Gestion des applications → DS Chat → Consommation d'énergie » et autorisez l'activité en arrière-plan.",
-  settingsKeepAliveGuideVivo:
-    "Ouvrez « Paramètres → Applications et autorisations → Gestionnaire d'applications → DS Chat → Batterie » et autorisez une forte consommation en arrière-plan.",
-  settingsKeepAliveGuideOther:
-    "Ouvrez « Paramètres → Applications → DS Chat → Batterie » et retirez les restrictions d'arrière-plan.",
+  settingsKeepAliveGuide:
+    "Dans les réglages du téléphone, cherchez « Batterie » ou « Gestion des applications » et autorisez DS Chat à s'exécuter en arrière-plan.",
   replyInvalidApiKey: "L'API Key est invalide ou a été supprimée. Remplacez-la et réessayez",
   replyInsufficientBalance: "Solde insuffisant. Rechargez le compte et réessayez",
   replyRateLimited: "Trop de requêtes. Réessayez plus tard",

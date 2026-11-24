@@ -18,7 +18,6 @@ type KeepAliveBridge = {
   start(options: { title: string; body: string }): Promise<{ started: boolean }>
   progress(options: { title: string; body: string }): Promise<void>
   stop(): Promise<void>
-  getVendor(): Promise<{ manufacturer: string }>
   openSystemSettings(): Promise<{ opened: boolean }>
 }
 
@@ -102,43 +101,11 @@ export const setKeepAliveNativeForTest = (value: boolean | null): void => {
 }
 
 /**
- * 「允许后台运行」提示框里指路的那句话该用哪一句。
- *
- * 各家自建的后台开关名字不同（华为「应用启动管理」、小米「省电策略」…），
- * 既读不到状态、也没有可靠的跳转入口，所以统一跳到「应用信息」页，
- * 只用厂商名决定"到那儿该找哪一项"。认不出来的一律给通用说法。
- */
-export type VendorGuide = 'huawei' | 'xiaomi' | 'oppo' | 'vivo' | 'other'
-
-const VENDOR_PATTERNS: ReadonlyArray<readonly [VendorGuide, RegExp]> = [
-  ['huawei', /huawei|honor|hihonor/i],
-  ['xiaomi', /xiaomi|redmi|poco/i],
-  ['oppo', /oppo|realme|oneplus/i],
-  ['vivo', /vivo|iqoo/i],
-]
-
-export const vendorGuideFor = (manufacturer: string | null | undefined): VendorGuide =>
-  VENDOR_PATTERNS.find(([, pattern]) => pattern.test(manufacturer ?? ''))?.[0] ?? 'other'
-
-/** 读一次厂商名；拿不到就按"认不出"处理 */
-export const readVendorGuide = async (): Promise<VendorGuide> => {
-  if (!native()) {
-    return 'other'
-  }
-  try {
-    const { manufacturer } = await getBridge().getVendor()
-    return vendorGuideFor(manufacturer)
-  } catch {
-    return 'other'
-  }
-}
-
-/**
  * 打开系统的「设置」首页。
  *
- * 不按厂商猜具体页面：小米的电量详情缺系统内部 extra、启动后自己关掉；华为的启动管理四个
- * 候选在真机上全部落空。没有那么多台机器逐个验证，就一刀切送到设置入口，具体往哪翻由弹窗里
- * 那段按机型写的路径告诉用户。
+ * 不按厂商猜具体页面，也不按厂商改文案：小米的电量详情缺系统内部 extra、启动后自己关掉；
+ * 华为的启动管理四个候选在真机上全部落空；vivo 那条路径实测根本不存在。
+ * 没有那么多台机器逐个验证，就一刀切——跳转只到设置入口，文案只有一句通用的。
  */
 export const openSystemSettings = async (): Promise<void> => {
   if (!native()) {

@@ -142,16 +142,8 @@ export const jaJP = {
   settingsKeepAliveHint: "アプリを離れたり画面をロックしても生成を続けます。許可しないと中断します",
   settingsKeepAliveAction: "システム設定を開く",
   settingsKeepAliveOpen: "設定へ",
-  settingsKeepAliveGuideHuawei:
-    "「設定 → アプリとサービス → アプリ起動管理」を開き、「DS Chat」を見つけて「自動管理」をオフにし、「自動起動 / 関連起動 / バックグラウンド動作」の3つをすべてオンにしてください。",
-  settingsKeepAliveGuideXiaomi:
-    "「設定 → アプリ → アプリを管理 → DS Chat → バッテリーセーバー」を開き、「制限なし」を選んでください。",
-  settingsKeepAliveGuideOppo:
-    "「設定 → アプリ管理 → DS Chat → 電力使用量」を開き、バックグラウンド動作を許可してください。",
-  settingsKeepAliveGuideVivo:
-    "「設定 → アプリと権限 → アプリ管理 → DS Chat → バッテリー」を開き、バックグラウンドでの高消費電力を許可してください。",
-  settingsKeepAliveGuideOther:
-    "「設定 → アプリ → DS Chat → バッテリー」を開き、バックグラウンド動作を「制限なし」にしてください。",
+  settingsKeepAliveGuide:
+    "端末の「設定」で「バッテリー」または「アプリ管理」を探し、DS Chat のバックグラウンド実行を許可してください。",
   replyInvalidApiKey: "API Key が無効か削除されています。交換してから再試行してください",
   replyInsufficientBalance: "アカウント残高が不足しています。チャージしてから再試行してください",
   replyRateLimited: "リクエストが多すぎます。しばらくしてから再試行してください",

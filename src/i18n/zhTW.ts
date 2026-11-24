@@ -142,13 +142,7 @@ export const zhTW = {
   settingsKeepAliveHint: "切背景、鎖屏後繼續生成；不開啟會中斷",
   settingsKeepAliveAction: "開啟系統設定",
   settingsKeepAliveOpen: "去設定",
-  settingsKeepAliveGuideHuawei:
-    "打開「設定 → 應用程式和服務 → 應用程式啟動管理」，找到「DS Chat」，關掉「自動管理」，再把「允許自啟動 / 允許關聯啟動 / 允許背景活動」三個開關全部打開。",
-  settingsKeepAliveGuideXiaomi:
-    "打開「設定 → 應用程式設定 → 應用程式管理 → DS Chat → 省電策略」，選擇「無限制」。",
-  settingsKeepAliveGuideOppo: "打開「設定 → 應用程式管理 → DS Chat → 耗電管理」，允許背景活動。",
-  settingsKeepAliveGuideVivo: "打開「設定 → 應用程式與權限 → 應用程式管理 → DS Chat → 電池」，允許背景高耗電。",
-  settingsKeepAliveGuideOther: "打開「設定 → 應用程式 → DS Chat → 電池」，把背景活動設為不限制。",
+  settingsKeepAliveGuide: "到系統的「設定」裡找電池或應用程式管理，把 DS Chat 的背景執行權限打開。",
   replyInvalidApiKey: "API Key 無效或已被刪除，請更換後重試",
   replyInsufficientBalance: "帳戶餘額不足，請儲值後重試",
   replyRateLimited: "請求過於頻繁，請稍後再試",
