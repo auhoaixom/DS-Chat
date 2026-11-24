@@ -32,6 +32,32 @@ body.dark {
   color-scheme: dark;
 }
 
+/*
+ * 默认一切不可选中：界面上的文字和按钮是"贴图"，不是可复制的内容。
+ * 长按它们弹选字菜单、震动、拖动选择手柄，都是干扰。
+ *
+ * 要允许选中的地方在 JSX 上标 data-selectable（回复正文、提问气泡、模型名），
+ * 或者用原生控件（textarea/input）与 pre/code（诊断、崩溃页的调用栈）。
+ * 反着写（逐处补 user-select: none）必然会漏——这坑复发过三次，
+ * 规矩与检查方式见 STANDARDS.md 第 1 条。
+ */
+html,
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+[data-selectable],
+textarea,
+input,
+pre,
+code {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
 body[data-ds-dark-theme] {
   --scroll-color: rgba(255, 255, 255, 0.15);
   --scroll-color-hover: rgba(255, 255, 255, 0.24);

@@ -3,6 +3,9 @@
   flex-direction: column;
 }
 
+/* 折叠组的标题要和普通设置项标签长得一样（14px 主色），
+   否则同一列里会冒出"小一号、灰一档"的第三种标题（STANDARDS.md 规矩 2）。
+   它仍然是个按钮：右侧多一个三角，表示点开里面有内容。 */
 .head {
   display: flex;
   align-items: center;
@@ -13,9 +16,9 @@
   padding: 6px 0;
   border: none;
   background: none;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
   cursor: pointer;
   text-align: start;
 }

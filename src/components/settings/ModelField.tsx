@@ -111,7 +111,10 @@ export const ModelField = () => {
         </>
       ) : (
         <div className={styles.apiKeySaved}>
-          <span className={styles.modelValue}>{model}</span>
+          {/* 模型名是用户要拿去别处用的，唯一允许选中的设置值 */}
+          <span className={styles.modelValue} data-selectable>
+            {model}
+          </span>
           <IconButton
             tone="primary"
             icon={<IconEditOutline16 />}

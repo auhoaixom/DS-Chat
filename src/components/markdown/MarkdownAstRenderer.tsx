@@ -319,7 +319,7 @@ export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
 
   return useMemo(
     () => (
-      <div className={clsx('ds-markdown', className)} onCopy={handleCopy}>
+      <div className={clsx('ds-markdown', className)} onCopy={handleCopy} data-selectable>
         {/* 解析器在根节点下产出块级内容。 */}
         <MarkdownBlockContentOrDefinitionContent
           nodes={ast.children as Array<BlockContent | DefinitionContent>}

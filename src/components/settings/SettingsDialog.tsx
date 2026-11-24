@@ -135,16 +135,17 @@ const SettingsContent = () => {
         </div>
         <div role="tabpanel" className={styles.content} key={section}>
           {section === 'general' ? (
-            <>
+            <div className={styles.general}>
               <ThemeSetting />
               <LocaleSetting />
+              {/* 「个性化键位设置」以后还会继续加项，保留折叠；
+                  「位置信息」能扩展的已经扩展完了，改成普通设置项，
+                  标题与「主题」「语言」完全一致（STANDARDS.md 规矩 2） */}
               <SettingGroup title={t('settingsPersonalizeKeys')}>
                 <EnterKeySetting />
               </SettingGroup>
-              <SettingGroup title={t('settingsLocation')}>
-                <LocationSetting plain />
-              </SettingGroup>
-            </>
+              <LocationSetting />
+            </div>
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
@@ -262,7 +263,7 @@ const useHistoryDelete = () => {
   }
 }
 
-const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
+const LocationSetting = () => {
   const t = useTranslate()
   const locale = useSettings((state) => state.locale)
   const location = useSettings((state) => state.location)
@@ -271,10 +272,11 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
       ? provinces.find((item) => item.code === location.province)
       : undefined
 
+  // 一整块：位置选择与「用手机定位」同属"位置信息"，块内不画分隔线
   return (
-    <>
+    <div className={styles.locationGroup}>
       <SettingCell
-        label={plain ? undefined : t('settingsLocation')}
+        label={t('settingsLocation')}
         status={null}
         className={styles.locationCell}
         action={
@@ -339,8 +341,8 @@ const LocationSetting = ({ plain = false }: { plain?: boolean }) => {
         </div>
       }
     />
-    {isChineseBrowser() ? <LocateSetting /> : null}
-    </>
+      {isChineseBrowser() ? <LocateSetting /> : null}
+    </div>
   )
 }
 
