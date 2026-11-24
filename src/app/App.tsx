@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
 import { bindBackButton } from './backButton.js'
@@ -61,6 +61,8 @@ export const App = () => {
   )
   const activeId = useChatStore((state) => state.activeId)
   const [exporting, setExporting] = useState(false)
+  /** 启动画面只安排撤一次 */
+  const splashScheduled = useRef(false)
 
   // 保存一直失败时重试没有意义，先把内存里这份导出来
   const onExport = async () => {
@@ -110,7 +112,15 @@ export const App = () => {
       sessionLoadError ||
       (ready && (activeId === null || session !== undefined))
     if (hasSomethingToShow) {
-      dismissSplash()
+      // 等两帧再撤：effect 跑在「DOM 已更新、还没绘制」之间，立刻撤的话会先露出上一帧
+      // 的"正在加载对话"。rAF→rAF 等到欢迎页真的画上屏，启动画面才撤。
+      // 只排一次：deps 里的几个状态可能连着变，别把队列越排越长。
+      if (!splashScheduled.current) {
+        splashScheduled.current = true
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => dismissSplash())
+        })
+      }
     }
   }, [migrationPhase, initError, sessionLoadError, ready, activeId, session])
 
