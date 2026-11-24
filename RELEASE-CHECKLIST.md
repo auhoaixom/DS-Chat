@@ -27,6 +27,8 @@ $env:ANDROID_SDK_ROOT="E:\Android\Sdk"
 | `android/app/build.gradle` | `versionName` |
 | `android/app/build.gradle` | `versionCode`（每版 +1，只增不减） |
 
+**什么时候改这三处**：**开一版的时候就改**，写成"这一版打算发的号"，而不是等发版那一刻。开发包的版本名由 `versionNameSuffix "-dev"` 自动变成 `X.Y.Z-dev`，正式包自动是 `X.Y.Z`——所以发版时不用再动数字，也就不存在"忘了改"。
+
 **1.0 意味着什么（别往上加意思）**：
 
 - 它是**里程碑**，不是兼容性承诺书。功能面到此为止算齐了：多会话与分支、压缩上下文、附件与图片、导入导出、移动端布局，加上契约层的测试与这份清单。
@@ -57,6 +59,25 @@ pnpm test     # 全过
 
 ## 3. 构建与安装
 
+一版要走**两个阶段**：先出**开发包**装到手机上让所有者试，他点头之后才出**正式包**。中间不推进任何版本号。
+
+### 3.1 开发包（每批改动一个，先装在手机上试）
+
+```powershell
+pnpm build
+npx cap sync android
+cd android; .\gradlew.bat assembleDebug --console=plain
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+- `buildTypes.debug` 里**长期挂着** `signingConfig signingConfigs.release` 与 `versionNameSuffix "-dev"`：包名、密钥都与正式包一致，所以 `adb install -r` 直接覆盖，会话数据与 Keystore 里的数据密钥全部保留。**别再临时加、也别再删**（v1.4.0 之前是临时加一次、验完删掉，导致每轮只能出正式包）。
+- 判据：`adb shell dumpsys package com.dschat.app` 里 `firstInstallTime` 不变 = 没卸载过 = 数据没丢；`versionName` 是 `X.Y.Z-dev`。
+- 开发包**不归档、不提交、不打 tag**，产物就留在 `android/app/build/outputs/apk/debug/`。
+- 开发包的 WebView 调试是开的（`BuildConfig.DEBUG`），CDP 自动验证只能在开发包上做。
+- 交付顺序：装好 → 自己先验（截图 / CDP）→ **交给所有者上手** → 他说没问题才进 3.2。任何反馈都改完重新走 3.1，**不碰版本号**。
+
+### 3.2 正式包（所有者点头之后才跑）
+
 ```powershell
 pnpm build
 npx cap sync android
@@ -64,9 +85,13 @@ cd android; .\gradlew.bat assembleRelease --console=plain
 adb install -r app\build\outputs\apk\release\app-release.apk
 ```
 
+- 正式包的版本名自动就是 `X.Y.Z`（去掉 `-dev` 而已），**不需要再改任何数字**：`package.json` / `versionName` / `versionCode` 在开这一版时就写成目标值了（见 §1）。
+- 同号覆盖合法：正式包与开发包签名相同、`versionCode` 相同，`adb install -r` 能互相覆盖。
+- **降级坑**：发完 `versionCode 91` 之后，再装 `91` 的开发包是同号覆盖（可以），装 `90` 的开发包就是降级，要 `adb install -r -d`。正常流程遇不到；遇到就说明 gradle 里的号该往前推了。
+
 从 1.3.x 的数据升到 1.4.0 时，第一次启动会弹加密引导（存量会话要就地加密）。**先在引导里导一次备份再点「开始加密」**——这一步之后就没有降级路了。
 
-要反复验这一段（引导、迁移进度、备份对话、幂等），不必反复装卸旧包：临时给 `debug` 加上 `signingConfig signingConfigs.release`（同一个发布密钥，`adb install -r` 能覆盖且保留数据），装 debug 包后用 CDP 把 IndexedDB `meta` 存储里的 `enc-state` 删掉，重启就会再弹一次引导；验完**把那段 debug 配置删掉**再出 release 包。迁移是幂等的，重放不会二次加密。
+要反复验加密引导（引导、迁移进度、备份对话、幂等），不必反复装卸旧包：开发包本来就装得上，用 CDP 把 IndexedDB `meta` 存储里的 `enc-state` 删掉，重启就会再弹一次引导。迁移是幂等的，重放不会二次加密。
 
 ---
 

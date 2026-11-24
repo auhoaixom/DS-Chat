@@ -26,6 +26,8 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 签名读 `android/keystore.properties`（`storeFile` / `storePassword` / `keyAlias` / `keyPassword`）。这个文件**不入库**，缺了它 gradle 只会出未签名的包——装不上，也不该装。
 
+**先出开发包，再出正式包**：`.\gradlew.bat assembleDebug` + `adb install -r app\build\outputs\apk\debug\app-debug.apk`。开发包与正式包同包名、同签名（`buildTypes.debug` 长期挂着 `signingConfig signingConfigs.release`），所以能直接覆盖已装的正式版，会话数据与 Keystore 里的数据密钥都保留；版本名自动带 `-dev` 后缀。改动先装开发包试用，确认没问题才出正式包，版本号只在真正发版时才推进。细节见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) §3。
+
 **版本号要改三处**：`package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 和 `versionCode`。漏改一个不会报错，只会打出一个装不上的包；现在 `pnpm test` 会拦住这种情况（要求 `versionCode` 不小于历史上任何一版，准备发新版时还必须严格大于上一版）。
 
 完整的发版流程（十一项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。
@@ -40,7 +42,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 | `pnpm lint` | oxlint 检查 |
 | `pnpm test` | 单元测试（`tsc` 编译后跑 `node --test`） |
 | `pnpm android:sync` | `pnpm build` + `cap sync android` |
-| `pnpm android:debug` | 构建 debug APK |
+| `pnpm android:debug` | 构建 debug APK（发布密钥签名，版本名带 `-dev`） |
 
 `pnpm format` 会重写整个仓库（曾一次改动 180 个文件），别随手跑。
 

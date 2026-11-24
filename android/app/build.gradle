@@ -13,8 +13,8 @@ android {
         applicationId "com.dschat.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 90
-        versionName "1.4.0"
+        versionCode 91
+        versionName "1.4.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -39,6 +39,15 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
+        }
+        // 开发包：同一个包名、同一个发布密钥，所以 `adb install -r` 能直接覆盖手机上的正式版，
+        // 会话数据与 Keystore 里的数据密钥都保留 —— 这是"先在手机上试，再出版本号"的前提。
+        // 版本名挂 -dev 后缀与正式包区分；versionCode 与正式包同源（就是正在做的这一版的号）。
+        debug {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            versionNameSuffix "-dev"
         }
     }
 }
