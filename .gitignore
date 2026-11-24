@@ -26,9 +26,9 @@ android/keystore/
 # 单元测试的编译产物
 .test/
 
-# 手工回归的临时截图（证据归档到 apk-archive/）
+# 本机验收截图（证据统一归档到仓库外的 apk-archive/）
+_shots/
 .shots/
 
-# 本机验收截图（证据归档到 apk-archive/）
-_shots/
+# 图标脚本生成的预览图（跟着脚本重跑即可）
 tools/icon/preview.png
