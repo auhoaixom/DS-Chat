@@ -1,5 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 启动页底色：与界面浅色模式背景一致，见 theme.css 里的 alias-bg-base -->
+    <!-- 鍚姩椤靛簳鑹诧細涓庣晫闈㈡祬鑹叉ā寮忚儗鏅竴鑷达紝瑙?theme.css 閲岀殑 alias-bg-base -->
     <color name="splash_background">#FFFFFF</color>
+    <!-- 鍚姩鐢婚潰鎸夊簲鐢ㄥ唴閫夋嫨鐨勬繁娴呰壊鍙栧叾涓竴寮狅紙涓嶆槸鎸夌郴缁燂級锛岃 MainActivity -->
+    <color name="splash_background_light">#FFFFFF</color>
+    <color name="splash_background_dark">#151517</color>
 </resources>
+
+

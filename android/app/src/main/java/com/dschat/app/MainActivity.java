@@ -1,15 +1,27 @@
 package com.dschat.app;
 
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
+
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.Collections;
 
@@ -18,16 +30,118 @@ public class MainActivity extends BridgeActivity {
     private static final int EDGE_SWIPE_WIDTH_DP = 24;
     /** 网页还没完成首次布局时重试几次，取到高度再上报排除区 */
     private static final int EDGE_SWIPE_RETRIES = 5;
+    /** 与 theme.css 的 --dsw-alias-bg-base 保持一致：启动画面的底色必须和网页底色是同一个值 */
+    private static final int DARK_BG = 0xFF151517;
+    private static final int LIGHT_BG = 0xFFFFFFFF;
+    /** 启动画面里字标宽度占屏幕宽度的比例（与 tools/icon/build-icons.py 的 0.46 一致） */
+    private static final float SPLASH_LOGO_RATIO = 0.46f;
+    /** 启动画面最短停留时间（从 onCreate 算）：系统那一屏会先盖住它约 500~600ms，所以要留长一点 */
+    private static final long SPLASH_MIN_MS = 1000;
+
+    private View splashOverlay;
+    private long splashShownAt;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 启动画面按**应用里选的**深浅色二选一（见 styles.xml 的 SplashLight / SplashDark）。
+        // 必须赶在 super.onCreate 之前换主题：窗口是按当前主题建好的，之后再 setTheme 就晚了。
+        setTheme(isDarkTheme() ? R.style.AppTheme_SplashDark : R.style.AppTheme_SplashLight);
         registerPlugin(SystemBarPlugin.class);
         registerPlugin(ClipboardPlugin.class);
         registerPlugin(RecentPhotosPlugin.class);
         registerPlugin(SecureKeyPlugin.class);
         registerPlugin(KeepAlivePlugin.class);
         super.onCreate(savedInstanceState);
+        showSplash(isDarkTheme());
         surviveRendererDeath();
+    }
+
+    /**
+     * 应用内的深浅色：优先用前端上一次存下的选择（SystemBarPlugin 的 setAppTheme），
+     * 没存过（第一次装）就跟随系统。
+     */
+    private boolean isDarkTheme() {
+        String saved = SystemBarPlugin.savedTheme(this);
+        if (saved != null) {
+            return "dark".equals(saved);
+        }
+        int mode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return mode == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    /**
+     * 启动画面：底色 + 居中字标，盖在网页上面，等页面画出来再撤掉。
+     *
+     * 为什么必须自己画一层：安卓 12 起系统的启动画面由平台绘制，颜色我们改不了
+     * （实测改窗口底色、改 windowSplashScreenBackground 都不生效，小米用的是壁纸色），
+     * 而且页面画出来之后它就消失了 —— 光靠窗口背景根本看不到字标（实测连一帧都没有）。
+     *
+     * 同时把 WebView 的底色调成透明：页面还没绘制时露出的是同色窗口背景，不是白色。
+     */
+    private void showSplash(boolean dark) {
+        Bridge bridge = getBridge();
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().setBackgroundColor(Color.TRANSPARENT);
+        }
+        // 挂到 decor 上而不是 android.R.id.content：content 在状态栏/导航栏之下，
+        // 挂那儿会在黑底上面留一条白边（小米实测）。挂 decor 就是整屏覆盖。
+        ViewGroup root = (ViewGroup) getWindow().getDecorView();
+        if (root == null) {
+            return;
+        }
+        // Capacitor 的 BridgeActivity.onCreate 会把自己主题换回 AppTheme.NoActionBar
+        // （android:background=@null），窗口底色因此变成默认的浅色 —— 状态栏/导航栏那两条
+        // 就是这么白出来的。这里显式给窗口上一次色，整屏（含两条系统栏）才是同一个底色。
+        getWindow().setBackgroundDrawable(new ColorDrawable(dark ? DARK_BG : LIGHT_BG));
+
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(dark ? DARK_BG : LIGHT_BG);
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.splash_logo);
+        int width = Math.round(getResources().getDisplayMetrics().widthPixels * SPLASH_LOGO_RATIO);
+        overlay.addView(
+            logo,
+            new FrameLayout.LayoutParams(width, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+        );
+
+        root.addView(
+            overlay,
+            new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        );
+        splashOverlay = overlay;
+        splashShownAt = SystemClock.uptimeMillis();
+        SystemBarPlugin.apply(getWindow(), dark ? DARK_BG : LIGHT_BG, dark);
+        // 再补一次：Capacitor 启动时会用自己的默认值刷一遍状态栏（浅色），
+        // 那一下会把我们上面设的颜色盖掉，于是启动画面顶部留下一条白边。
+        overlay.postDelayed(
+            () -> SystemBarPlugin.apply(getWindow(), dark ? DARK_BG : LIGHT_BG, dark),
+            220
+        );
+    }
+
+    /** 撤掉启动画面；至少留 SPLASH_MIN_MS，避免页面来得快时字标一闪而过 */
+    private void hideSplash() {
+        final View overlay = splashOverlay;
+        if (overlay == null) {
+            return;
+        }
+        splashOverlay = null;
+        long waited = SystemClock.uptimeMillis() - splashShownAt;
+        overlay.postDelayed(
+            () -> {
+                ViewGroup parent = (ViewGroup) overlay.getParent();
+                if (parent != null) {
+                    parent.removeView(overlay);
+                }
+                getWindow().getDecorView().setBackgroundColor(isDarkTheme() ? DARK_BG : LIGHT_BG);
+                WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+            },
+            Math.max(0, SPLASH_MIN_MS - waited)
+        );
     }
 
     /**
@@ -44,6 +158,11 @@ public class MainActivity extends BridgeActivity {
         }
         bridge.addWebViewListener(
             new WebViewListener() {
+                @Override
+                public void onPageLoaded(WebView webView) {
+                    hideSplash();
+                }
+
                 @Override
                 public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
                     webView.post(webView::reload);

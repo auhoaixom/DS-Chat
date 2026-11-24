@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { useSettings, type ThemePreference } from '../services/settings.js'
-import { setSystemStatusBar } from '../services/systemBar.js'
+import { setNativeAppTheme, setSystemStatusBar } from '../services/systemBar.js'
 
 export type Theme = 'light' | 'dark'
 
@@ -76,6 +76,8 @@ const applyTheme = (theme: Theme) => {
     body.removeAttribute('data-ds-dark-theme')
   }
   document.documentElement.style.colorScheme = theme
+  // 记到原生：下一次启动的启动画面据此选黑底还是白底那张，否则只能跟着系统走
+  void setNativeAppTheme(theme)
   // 首次背景色同步在样式表加载完成后执行，适配 WebKit 的 defer 脚本执行顺序。
   if (document.readyState === 'complete') {
     syncPageBackground()

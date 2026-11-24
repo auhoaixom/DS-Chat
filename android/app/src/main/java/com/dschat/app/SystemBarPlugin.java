@@ -1,6 +1,7 @@
 package com.dschat.app;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
 import android.util.Log;
 import android.view.View;
@@ -35,6 +36,10 @@ public class SystemBarPlugin extends Plugin {
 
     private static final String TAG = "DSChatSystemBar";
 
+    /** 存界面偏好用的 SharedPreferences（与加密那套 ds-chat-secure 分开） */
+    private static final String PREFS = "ds-chat-ui";
+    private static final String KEY_THEME = "theme";
+
     /** 最后一次生效的设定；窗口被重新装饰后用它重放 */
     private static Integer lastColor = null;
     private static boolean lastLightIcons = true;
@@ -64,11 +69,35 @@ public class SystemBarPlugin extends Plugin {
     }
 
     /**
+     * 记下应用内选的深浅色，给**下一次启动**的启动画面用。
+     * 前端的选择原本只存在 WebView 的 localStorage 里，原生读不到，启动时就只能跟着系统走，
+     * 于是「应用深色 + 系统浅色」会先闪一屏浅色。存一份到 SharedPreferences 才能对上。
+     */
+    @PluginMethod
+    public void setAppTheme(PluginCall call) {
+        String theme = call.getString("theme", "");
+        if (!"dark".equals(theme) && !"light".equals(theme)) {
+            call.reject("invalid theme: " + theme);
+            return;
+        }
+        getContext()
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_THEME, theme)
+            .apply();
+        call.resolve();
+    }
+
+    /** 读上次存下的深浅色；没存过（首次启动）返回 null，由调用方跟随系统 */
+    public static String savedTheme(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_THEME, null);
+    }
+
+    /**
      * 窗口状态变了（小窗 / 分屏 / 画中画 / 全屏互切）之后，按最后一次设定重新刷一遍。
      * 前端不知道这些变化，也不会因此再调一次插件，所以只能由原生自己补。
      */
-    public static void reapply(Activity activity) {
-        Integer color = lastColor;
+    public static void reapply(Activity activity) {        Integer color = lastColor;
         if (activity == null || color == null) {
             return;
         }
@@ -76,7 +105,7 @@ public class SystemBarPlugin extends Plugin {
         activity.runOnUiThread(() -> apply(activity.getWindow(), color, lightIcons));
     }
 
-    private static void apply(Window window, int color, boolean lightIcons) {
+    static void apply(Window window, int color, boolean lightIcons) {
         // setStatusBarColor 需要这两个 flag 才会被系统采用
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);

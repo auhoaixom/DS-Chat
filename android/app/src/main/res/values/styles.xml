@@ -13,11 +13,38 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!--
+          Capacitor 的 BridgeActivity 会把主题强制换回这一个，所以系统栏在窗口创建时的颜色
+          由这里决定；之后网页会用自己的颜色覆盖。不设的话启动画面顶部会挂一条浅色。
+        -->
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
     </style>
 
-
-    <!-- 启动页窗口底色：跟随系统深浅色（见 values-night/colors.xml），不再是那张纯白图 -->
+    <!--
+      manifest 里挂的主题，给「系统抢先画的那一帧」用，所以只能跟随系统深浅色
+      （@color/splash_background 在 values-night 里是深色）。
+      真正的启动画面是 MainActivity 里的那个覆盖层，按应用内选的深浅色来。
+    -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@color/splash_background</item>
+        <item name="android:windowBackground">@drawable/splash_default</item>
+        <item name="android:background">@drawable/splash_default</item>
+    </style>
+
+    <!--
+      MainActivity 在 super.onCreate 之前换上的主题：窗口底色按**应用里选的**深浅色二选一。
+      字标本体由代码里的覆盖层画（见 MainActivity#showSplash），窗口底色只是兜底，
+      保证 WebView 透明期间露出来的是同色，而不是白色。
+    -->
+    <style name="AppTheme.SplashLight" parent="Theme.SplashScreen">
+        <item name="android:windowBackground">@drawable/splash_light</item>
+        <item name="android:background">@drawable/splash_light</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+
+    <style name="AppTheme.SplashDark" parent="Theme.SplashScreen">
+        <item name="android:windowBackground">@drawable/splash_dark</item>
+        <item name="android:background">@drawable/splash_dark</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

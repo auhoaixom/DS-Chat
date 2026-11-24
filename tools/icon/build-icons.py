@@ -30,6 +30,11 @@ BG = (0, 0, 0)
 DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
 LEGACY_BASE = 48  # mdpi 下旧式图标边长
 
+# 启动页那张字标：宽度取该密度典型屏宽的多少。
+# layer-list 里的 bitmap 不会随屏幕宽度缩放，只能按密度各出一张，所以这里按典型屏宽算比例。
+SPLASH_RATIO = 0.46
+SPLASH_SCREENS = {"mdpi": 320, "hdpi": 480, "xhdpi": 720, "xxhdpi": 1080, "xxxhdpi": 1440}
+
 
 def load_wordmark() -> Image.Image:
     im = Image.open(SRC).convert("RGBA")
@@ -103,6 +108,14 @@ def main() -> int:
         legacy(word, legacy_px, False).save(os.path.join(folder, "ic_launcher.png"))
         legacy(word, legacy_px, True).save(os.path.join(folder, "ic_launcher_round.png"))
         print(f"  mipmap-{name}: fg {fg_px}px, legacy {legacy_px}px")
+
+    # 启动页字标：每个密度一张，宽度 = 该密度典型屏宽 × SPLASH_RATIO
+    for name, screen_w in SPLASH_SCREENS.items():
+        folder = os.path.join(RES, f"drawable-{name}")
+        os.makedirs(folder, exist_ok=True)
+        logo = scaled(word, screen_w * SPLASH_RATIO)
+        logo.save(os.path.join(folder, "splash_logo.png"))
+        print(f"  drawable-{name}/splash_logo.png {logo.size[0]}x{logo.size[1]}")
 
     # README 顶部那张（圆角、四角透明），跟着图标一起生成，别手放
     assets = os.path.join(ROOT, "assets")

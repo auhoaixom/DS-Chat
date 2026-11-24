@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 
 interface SystemBarPlugin {
   setStatusBarColor(options: { color: string; lightIcons: boolean }): Promise<void>
+  setAppTheme(options: { theme: 'light' | 'dark' }): Promise<void>
 }
 
 const SystemBar = registerPlugin<SystemBarPlugin>('SystemBar')
@@ -14,4 +15,15 @@ const SystemBar = registerPlugin<SystemBarPlugin>('SystemBar')
 export const setSystemStatusBar = (color: string, lightIcons: boolean): Promise<void> =>
   Capacitor.isNativePlatform()
     ? SystemBar.setStatusBarColor({ color, lightIcons })
+    : Promise.resolve()
+
+/**
+ * 把应用内选的深浅色告诉原生，供**下一次启动**的启动画面使用。
+ *
+ * 光看网页的话，原生读不到这个选择，启动画面只能跟着系统走：
+ * 「应用深色 + 系统浅色」就会先闪一屏浅色。失败不影响界面，吞掉即可。
+ */
+export const setNativeAppTheme = (theme: 'light' | 'dark'): Promise<void> =>
+  Capacitor.isNativePlatform()
+    ? SystemBar.setAppTheme({ theme }).catch(() => {})
     : Promise.resolve()
