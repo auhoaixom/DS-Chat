@@ -139,9 +139,19 @@ export const frFR = {
   keepAliveBody: "Revenez dans l'application pour voir le résultat",
   keepAliveProgress: "Génération… (~{count} caractères)",
   settingsKeepAlive: "Exécution en arrière-plan",
-  settingsKeepAliveHint: "La génération continue après le verrouillage de l'écran ; sinon elle peut s'interrompre",
-  settingsKeepAliveAction: "Ouvrir les réglages",
-  settingsKeepAliveAllowed: "Autorisé",
+  settingsKeepAliveHint: "La génération continue si vous quittez l'application ou verrouillez l'écran ; sinon elle s'interrompt",
+  settingsKeepAliveAction: "Ouvrir les réglages de l'application",
+  settingsKeepAliveOpen: "Ouvrir",
+  settingsKeepAliveGuideHuawei:
+    "Dans « Infos sur l'application », ouvrez « Gestion du démarrage », désactivez la gestion automatique, puis activez les trois options : démarrage auto, démarrage associé et activité en arrière-plan.",
+  settingsKeepAliveGuideXiaomi:
+    "Dans « Infos sur l'application », ouvrez « Économiseur de batterie » et choisissez « Aucune restriction ».",
+  settingsKeepAliveGuideOppo:
+    "Dans « Infos sur l'application », ouvrez « Consommation d'énergie » (parfois « Batterie ») et autorisez l'activité en arrière-plan.",
+  settingsKeepAliveGuideVivo:
+    "Dans « Infos sur l'application », ouvrez « Forte consommation en arrière-plan » et autorisez l'exécution en arrière-plan.",
+  settingsKeepAliveGuideOther:
+    "Dans « Infos sur l'application », cherchez les réglages de batterie ou d'arrière-plan et retirez les restrictions pour cette application.",
   replyInvalidApiKey: "L'API Key est invalide ou a été supprimée. Remplacez-la et réessayez",
   replyInsufficientBalance: "Solde insuffisant. Rechargez le compte et réessayez",
   replyRateLimited: "Trop de requêtes. Réessayez plus tard",

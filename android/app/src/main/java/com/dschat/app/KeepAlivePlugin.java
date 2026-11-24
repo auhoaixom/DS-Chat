@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -82,68 +81,33 @@ public class KeepAlivePlugin extends Plugin {
     }
 
     /**
-     * 是否已获得"忽略电池优化"（MIUI 里就是「省电策略 = 无限制」）。
+     * 厂商名，用来决定"到应用信息里该找哪一项"的提示文案。
      *
-     * 息屏那条路上系统和厂商的冻结策略比前台服务更强势：实测前台服务 + 唤醒锁都挡不住
-     * `reason = screen off` 的冻结，只有这条豁免能救。所以设置里要能显示当前状态。
+     * 只跳应用信息页（所有安卓机都有），按厂商变的只是那句话：华为是「应用启动管理」，
+     * 小米是「省电策略」……各家自建的后台开关既读不到状态、也跳不过去，
+     * 所以这里只提供判断依据，不做任何跳转尝试。
      */
     @PluginMethod
-    public void isIgnoringBatteryOptimizations(PluginCall call) {
-        boolean ignoring = false;
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PowerManager power =
-                        (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
-                ignoring =
-                        power != null
-                                && power.isIgnoringBatteryOptimizations(
-                                        getContext().getPackageName());
-            } else {
-                ignoring = true;
-            }
-        } catch (Exception error) {
-            Log.w(TAG, "isIgnoringBatteryOptimizations failed: " + error);
-        }
+    public void getVendor(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("ignoring", ignoring);
+        result.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
         call.resolve(result);
     }
 
-    /**
-     * 拉起系统/厂商的"允许后台运行"设置。
-     *
-     * 先请求标准的电池优化豁免弹窗；被系统拒绝（部分 ROM 不允许直接弹）就退回应用信息页，
-     * 那里能看到 MIUI 的「省电策略」。两条都失败也只是没跳转，不影响任何功能。
-     */
+    /** 打开本应用的「应用信息」页；打不开也只是没跳转，不影响任何功能 */
     @PluginMethod
-    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+    public void openAppSettings(PluginCall call) {
         boolean opened = false;
         try {
-            String pkg = getContext().getPackageName();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Intent request =
-                        new Intent(
-                                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                        Uri.parse("package:" + pkg))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(request);
-                opened = true;
-            }
+            Intent details =
+                    new Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:" + getContext().getPackageName()))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(details);
+            opened = true;
         } catch (Exception error) {
-            Log.w(TAG, "requestIgnoreBatteryOptimizations failed: " + error);
-        }
-        if (!opened) {
-            try {
-                Intent details =
-                        new Intent(
-                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        Uri.parse("package:" + getContext().getPackageName()))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(details);
-                opened = true;
-            } catch (Exception error) {
-                Log.w(TAG, "open app settings failed: " + error);
-            }
+            Log.w(TAG, "openAppSettings failed: " + error);
         }
         JSObject result = new JSObject();
         result.put("opened", opened);

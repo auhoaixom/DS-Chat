@@ -139,9 +139,18 @@ export const jaJP = {
   keepAliveBody: "アプリに戻って結果を確認できます",
   keepAliveProgress: "回答を生成中…（約 {count} 文字）",
   settingsKeepAlive: "バックグラウンド実行を許可",
-  settingsKeepAliveHint: "画面ロック後も生成を続けます。許可しないと画面オフで中断されることがあります",
-  settingsKeepAliveAction: "設定を開く",
-  settingsKeepAliveAllowed: "許可済み",
+  settingsKeepAliveHint: "アプリを離れたり画面をロックしても生成を続けます。許可しないと中断します",
+  settingsKeepAliveAction: "アプリ設定を開く",
+  settingsKeepAliveOpen: "設定へ",
+  settingsKeepAliveGuideHuawei:
+    "「アプリ情報」で「アプリ起動管理」を開き、「自動管理」をオフにしてから「自動起動 / 関連起動 / バックグラウンド動作」の3つをすべてオンにしてください。",
+  settingsKeepAliveGuideXiaomi: "「アプリ情報」で「バッテリーセーバー」を開き、「制限なし」を選んでください。",
+  settingsKeepAliveGuideOppo:
+    "「アプリ情報」で「電力使用量」（機種によっては「バッテリー」）を開き、バックグラウンド動作を許可してください。",
+  settingsKeepAliveGuideVivo:
+    "「アプリ情報」で「バックグラウンドでの高消費電力」を開き、バックグラウンド動作を許可してください。",
+  settingsKeepAliveGuideOther:
+    "「アプリ情報」でバッテリーやバックグラウンドに関する設定を探し、このアプリを「制限なし」にしてください。",
   replyInvalidApiKey: "API Key が無効か削除されています。交換してから再試行してください",
   replyInsufficientBalance: "アカウント残高が不足しています。チャージしてから再試行してください",
   replyRateLimited: "リクエストが多すぎます。しばらくしてから再試行してください",

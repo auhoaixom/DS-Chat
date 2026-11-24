@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
 import {
   acquireKeepAlive,
-  isBackgroundAllowed,
   keepAliveCountForTest,
+  openAppSettings,
+  readVendorGuide,
   releaseKeepAlive,
   reportKeepAliveProgress,
-  requestBackgroundAllowed,
   setKeepAliveBridgeForTest,
   setKeepAliveNativeForTest,
+  vendorGuideFor,
 } from '../src/services/keepAlive.js'
 
 /**
@@ -33,8 +34,8 @@ const makeBridge = () => {
       stop: async () => {
         calls.stop += 1
       },
-      isIgnoringBatteryOptimizations: async () => ({ ignoring: false }),
-      requestIgnoreBatteryOptimizations: async () => ({ opened: true }),
+      getVendor: async () => ({ manufacturer: 'Xiaomi' }),
+      openAppSettings: async () => ({ opened: true }),
     },
   }
 }
@@ -72,8 +73,8 @@ test('起服务失败也不能抛错，发消息不依赖保活', async () => {
     stop: async () => {
       stopped += 1
     },
-    isIgnoringBatteryOptimizations: async () => ({ ignoring: false }),
-    requestIgnoreBatteryOptimizations: async () => ({ opened: true }),
+    getVendor: async () => ({ manufacturer: '' }),
+    openAppSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
@@ -91,8 +92,8 @@ test('停止失败同样吞掉，不影响已经结束的回复', async () => {
     stop: async () => {
       throw new Error('stop failed')
     },
-    isIgnoringBatteryOptimizations: async () => ({ ignoring: false }),
-    requestIgnoreBatteryOptimizations: async () => ({ opened: true }),
+    getVendor: async () => ({ manufacturer: '' }),
+    openAppSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
@@ -144,36 +145,62 @@ test('没有流在跑时不上报进度（避免通知里出现幽灵进度）',
   assert.deepEqual(calls.progress, [])
 })
 
-test('「允许后台运行」的状态读取失败时一律当作未允许', async () => {
+/**
+ * 提示框里指路的那句话靠厂商名选：华为是「应用启动管理」，小米是「省电策略」……
+ * 认错厂商只会让那句话指错地方，所以映射要钉住，并且大小写、别名都要认。
+ */
+test('厂商名映射到对应的指路文案', () => {
+  assert.equal(vendorGuideFor('HUAWEI'), 'huawei')
+  assert.equal(vendorGuideFor('HONOR'), 'huawei', '荣耀和华为同一套设置')
+  assert.equal(vendorGuideFor('Hihonor'), 'huawei')
+  assert.equal(vendorGuideFor('Xiaomi'), 'xiaomi')
+  assert.equal(vendorGuideFor('Redmi'), 'xiaomi')
+  assert.equal(vendorGuideFor('POCO'), 'xiaomi')
+  assert.equal(vendorGuideFor('OPPO'), 'oppo')
+  assert.equal(vendorGuideFor('realme'), 'oppo')
+  assert.equal(vendorGuideFor('OnePlus'), 'oppo')
+  assert.equal(vendorGuideFor('vivo'), 'vivo')
+  assert.equal(vendorGuideFor('iQOO'), 'vivo')
+  assert.equal(vendorGuideFor('samsung'), 'other', '认不出来的走通用说法')
+  assert.equal(vendorGuideFor(''), 'other')
+  assert.equal(vendorGuideFor(null), 'other')
+})
+
+test('读厂商名失败时按"认不出"处理，不抛错', async () => {
   setKeepAliveBridgeForTest({
     start: async () => ({ started: true }),
     progress: async () => {},
     stop: async () => {},
-    isIgnoringBatteryOptimizations: async () => {
+    getVendor: async () => {
       throw new Error('boom')
     },
-    requestIgnoreBatteryOptimizations: async () => ({ opened: true }),
+    openAppSettings: async () => ({ opened: true }),
   })
   setKeepAliveNativeForTest(true)
 
-  assert.equal(await isBackgroundAllowed(), false)
+  assert.equal(await readVendorGuide(), 'other')
 })
 
-test('非原生平台不请求后台豁免，也不声称已允许', async () => {
-  let requested = 0
+test('非原生平台不读厂商、也不跳系统页面', async () => {
+  let opened = 0
+  let vendor = 0
   setKeepAliveBridgeForTest({
     start: async () => ({ started: true }),
     progress: async () => {},
     stop: async () => {},
-    isIgnoringBatteryOptimizations: async () => ({ ignoring: true }),
-    requestIgnoreBatteryOptimizations: async () => {
-      requested += 1
+    getVendor: async () => {
+      vendor += 1
+      return { manufacturer: 'HUAWEI' }
+    },
+    openAppSettings: async () => {
+      opened += 1
       return { opened: true }
     },
   })
   setKeepAliveNativeForTest(false)
 
-  assert.equal(await isBackgroundAllowed(), false, '浏览器里没有这个概念')
-  await requestBackgroundAllowed()
-  assert.equal(requested, 0)
+  assert.equal(await readVendorGuide(), 'other', '浏览器里没有厂商这个概念')
+  await openAppSettings()
+  assert.equal(vendor, 0)
+  assert.equal(opened, 0)
 })

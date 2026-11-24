@@ -137,9 +137,18 @@ export const en = {
   keepAliveBody: 'Switch back to the app to see the result',
   keepAliveProgress: 'Generating… (~{count} characters)',
   settingsKeepAlive: 'Run in background',
-  settingsKeepAliveHint: 'Keeps generating after the screen locks; without it, generation may stop when the screen turns off',
-  settingsKeepAliveAction: 'Open settings',
-  settingsKeepAliveAllowed: 'Allowed',
+  settingsKeepAliveHint: 'Keeps generating after you switch away or lock the screen; otherwise it stops',
+  settingsKeepAliveAction: 'Open app settings',
+  settingsKeepAliveOpen: 'Open',
+  settingsKeepAliveGuideHuawei:
+    'In App info, open “App launch”, turn off automatic management, then enable all three switches: auto-launch, secondary launch and run in background.',
+  settingsKeepAliveGuideXiaomi: 'In App info, open “Battery saver” and choose “No restrictions”.',
+  settingsKeepAliveGuideOppo:
+    'In App info, open “Power usage” (called “Battery” on some models) and allow background activity.',
+  settingsKeepAliveGuideVivo:
+    'In App info, open “High background power usage” and allow running in background.',
+  settingsKeepAliveGuideOther:
+    'In App info, look for battery or background settings and set this app to unrestricted.',
   replyInvalidApiKey:
     'The API Key is invalid or has been deleted. Please replace it and try again.',
   replyInsufficientBalance: 'Insufficient account balance. Please top up and try again.',

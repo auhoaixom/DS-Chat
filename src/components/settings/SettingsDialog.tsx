@@ -26,7 +26,7 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
-import { isBackgroundAllowed, requestBackgroundAllowed } from '../../services/keepAlive.js'
+import { openAppSettings, readVendorGuide, type VendorGuide } from '../../services/keepAlive.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
@@ -472,46 +472,72 @@ const LocateSetting = () => {
   )
 }
 
+/** 提示框里指路的那句话：只跳「应用信息」，用厂商名决定"到那儿找哪一项" */
+const GUIDE_KEYS: Record<VendorGuide, TranslationKey> = {
+  huawei: 'settingsKeepAliveGuideHuawei',
+  xiaomi: 'settingsKeepAliveGuideXiaomi',
+  oppo: 'settingsKeepAliveGuideOppo',
+  vivo: 'settingsKeepAliveGuideVivo',
+  other: 'settingsKeepAliveGuideOther',
+}
+
 /**
- * 「允许后台运行」：息屏后仍能继续生成。
+ * 「允许后台运行」：切到后台、锁屏后仍继续生成。
  *
- * 实测（Redmi 14C / HyperOS）前台服务和唤醒锁都挡不住息屏时的进程冻结，
- * 只有系统的电池优化豁免能救，所以这里不是一个开关，而是把用户送到那个系统页面。
- * 从系统页面回来（可见性变化）时重新读一次状态。
+ * 各家自建的后台开关（华为的应用启动管理、小米的省电策略…）既读不到状态、也没有可靠的
+ * 跳转入口，所以这里只做两件事：说清开了有什么用，然后把人送到**所有安卓机都有**的
+ * 「应用信息」页，并在弹框里按机型告诉他到那儿该找哪一项。
+ *
+ * 不显示"已允许/未允许"：那个状态读不准，宁可不说，也不给一个假的结论。
  */
 const KeepAliveSetting = () => {
   const t = useTranslate()
-  const [allowed, setAllowed] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    const check = () => {
-      void isBackgroundAllowed().then(setAllowed)
-    }
-    check()
-    document.addEventListener('visibilitychange', check)
-    return () => document.removeEventListener('visibilitychange', check)
-  }, [])
+  const [guide, setGuide] = useState<VendorGuide | null>(null)
 
   return (
-    <SettingCell
-      label={t('settingsKeepAlive')}
-      description={t('settingsKeepAliveHint')}
-      status={null}
-      action={
-        allowed ? (
-          <span className={styles.keepAliveAllowed}>{t('settingsKeepAliveAllowed')}</span>
-        ) : (
+    <>
+      <SettingCell
+        label={t('settingsKeepAlive')}
+        description={t('settingsKeepAliveHint')}
+        status={null}
+        action={
           <Button
             variant="outlined"
             size="m"
             className={styles.cellButton}
-            onClick={() => void requestBackgroundAllowed()}
+            onClick={() => {
+              void readVendorGuide().then(setGuide)
+            }}
           >
             {t('settingsKeepAliveAction')}
           </Button>
-        )
-      }
-    />
+        }
+      />
+      {guide ? (
+        <Modal
+          title={t('settingsKeepAlive')}
+          closable
+          onClose={() => setGuide(null)}
+          footer={
+            <>
+              <ModalCloseButton variant="outlined" size="m">{t('cancel')}</ModalCloseButton>
+              <Button
+                variant="primary"
+                size="m"
+                onClick={() => {
+                  setGuide(null)
+                  void openAppSettings()
+                }}
+              >
+                {t('settingsKeepAliveOpen')}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.keepAliveGuide}>{t(GUIDE_KEYS[guide])}</p>
+        </Modal>
+      ) : null}
+    </>
   )
 }
 

@@ -18,8 +18,8 @@ type KeepAliveBridge = {
   start(options: { title: string; body: string }): Promise<{ started: boolean }>
   progress(options: { title: string; body: string }): Promise<void>
   stop(): Promise<void>
-  isIgnoringBatteryOptimizations(): Promise<{ ignoring: boolean }>
-  requestIgnoreBatteryOptimizations(): Promise<{ opened: boolean }>
+  getVendor(): Promise<{ manufacturer: string }>
+  openAppSettings(): Promise<{ opened: boolean }>
 }
 
 /** 进度文案最多两秒更新一次；后台没有定时器可用，靠"数据到达"这个事件驱动 */
@@ -102,32 +102,51 @@ export const setKeepAliveNativeForTest = (value: boolean | null): void => {
 }
 
 /**
- * 系统是否已允许"忽略电池优化"（MIUI 里就是「省电策略 = 无限制」）。
+ * 「允许后台运行」提示框里指路的那句话该用哪一句。
  *
- * 为什么需要它：实测前台服务 + 唤醒锁都挡不住 MIUI `reason = screen off` 的冻结，
- * 只有这条豁免能救息屏那条路。设置里据此显示「已允许」或「去设置」。
+ * 各家自建的后台开关名字不同（华为「应用启动管理」、小米「省电策略」…），
+ * 既读不到状态、也没有可靠的跳转入口，所以统一跳到「应用信息」页，
+ * 只用厂商名决定"到那儿该找哪一项"。认不出来的一律给通用说法。
  */
-export const isBackgroundAllowed = async (): Promise<boolean> => {
+export type VendorGuide = 'huawei' | 'xiaomi' | 'oppo' | 'vivo' | 'other'
+
+const VENDOR_PATTERNS: ReadonlyArray<readonly [VendorGuide, RegExp]> = [
+  ['huawei', /huawei|honor|hihonor/i],
+  ['xiaomi', /xiaomi|redmi|poco/i],
+  ['oppo', /oppo|realme|oneplus/i],
+  ['vivo', /vivo|iqoo/i],
+]
+
+export const vendorGuideFor = (manufacturer: string | null | undefined): VendorGuide =>
+  VENDOR_PATTERNS.find(([, pattern]) => pattern.test(manufacturer ?? ''))?.[0] ?? 'other'
+
+/** 读一次厂商名；拿不到就按"认不出"处理 */
+export const readVendorGuide = async (): Promise<VendorGuide> => {
   if (!native()) {
-    return false
+    return 'other'
   }
   try {
-    const { ignoring } = await getBridge().isIgnoringBatteryOptimizations()
-    return ignoring
+    const { manufacturer } = await getBridge().getVendor()
+    return vendorGuideFor(manufacturer)
   } catch {
-    return false
+    return 'other'
   }
 }
 
-/** 拉起系统/厂商的"允许后台运行"设置页；跳不出去也只是没跳转，不影响任何功能 */
-export const requestBackgroundAllowed = async (): Promise<void> => {
+/**
+ * 打开本应用的「应用信息」页。
+ *
+ * 只跳这一个页面：所有安卓机都有，不会失效。厂商的后台开关藏在它下面，
+ * 具体找哪一项由提示框里的文案说清楚——我们不去猜厂商的页面，也不假装知道状态。
+ */
+export const openAppSettings = async (): Promise<void> => {
   if (!native()) {
     return
   }
   try {
-    await getBridge().requestIgnoreBatteryOptimizations()
+    await getBridge().openAppSettings()
   } catch {
-    // 打不开系统设置页面而已，不用告诉用户
+    // 打不开系统页面而已，不用告诉用户
   }
 }
 
