@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.4.6 | 2026-11-25 | 96 | 有 | feat: show the DSc splash on launch, and keep it up until the chats are loaded (v1.4.6) |
 | v1.4.5 | 2026-11-24 | 95 | 有 | feat: black dsc icon, logo on the welcome screen, and no white flash on launch (v1.4.5) |
 | v1.4.4 | 2026-11-24 | 94 | 有 | fix: one generic sentence instead of per-vendor paths (v1.4.4) |
 | v1.4.3 | 2026-11-24 | 93 | 有 | fix: give each vendor a real path, and only jump where we know the page works (v1.4.3) |

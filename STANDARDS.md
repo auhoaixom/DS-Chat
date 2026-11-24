@@ -98,6 +98,7 @@
 | 2026-10 | 点开深度思考小窗，视口被拽到最底部 | 展开后内容变高 + 贴底跟随同时生效 | `99i-thinking.mjs --hold` |
 | 2026-10 | 键盘收起后仍在"吃输入" | 系统「收起键盘」只藏 IME、不动焦点 | `keyboardViewport.ts` 判据 |
 | 2026-09 | 诊断摘要七行变八行、折行 | 一行只有约 24 个汉字（规矩 3） | `test/diagnosticsReport.test.ts` |
+| 2026-11 | 用 PowerShell 改带中文的源文件（`Get-Content -Raw \| Set-Content/Out-File`），全文件的注释变成乱码，或开头多出 `\ufeff` 让 gradle 直接编译失败 | PowerShell 的 `Set-Content/Out-File` 会按控制台代码页重编码。**带中文的源文件只能用编辑工具改**；非要用命令，用 Node 读写成 `utf8`（`fs.readFileSync/ writeFileSync`），不要经过 PowerShell 字符串管道 | 踩过三次（`test/keepAlive.test.ts`、`MainActivity.java` 两次）；改完用 `git diff` 看一眼中文还在不在 |
 
 ---
 
