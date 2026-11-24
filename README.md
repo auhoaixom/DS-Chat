@@ -167,7 +167,7 @@ tools/icon/            字标抠图与各密度图标生成
 
 [MIT](LICENSE)，`Copyright (c) 2026 auhoaixom`。
 
-本项目是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo)（MIT）的改造版，上游版权声明与许可原文保留在 `LICENSE` 的 Upstream notice 段。第三方依赖遵循各自的许可证，清单见 [NOTICE.md](NOTICE.md)——**分发 APK 时这份声明要跟着走**。
+本项目是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo)（MIT）的改造版，上游的版权声明与许可原文保留在 [NOTICE.md](NOTICE.md) 的「上游项目」段。第三方依赖遵循各自的许可证，清单同样在 [NOTICE.md](NOTICE.md)——**分发 APK 时这份声明要跟着走**。
 
 **名称与标志不在 MIT 范围内**：`DS Chat`、`DSC` 字标与 `design/wordmark.png` 是本项目的标识；「DeepSeek」及其标志是深度求索的商标，本仓库不代表也没有获得其背书。要发布自己改的版本，请换一个不与 DeepSeek 混淆的名字和标志。
 
