@@ -19,7 +19,7 @@ type KeepAliveBridge = {
   progress(options: { title: string; body: string }): Promise<void>
   stop(): Promise<void>
   getVendor(): Promise<{ manufacturer: string }>
-  openBackgroundSettings(options: { guide: string }): Promise<{ opened: boolean }>
+  openSystemSettings(): Promise<{ opened: boolean }>
 }
 
 /** 进度文案最多两秒更新一次；后台没有定时器可用，靠"数据到达"这个事件驱动 */
@@ -134,20 +134,20 @@ export const readVendorGuide = async (): Promise<VendorGuide> => {
 }
 
 /**
- * 打开系统的「后台 / 自启动管理」页。
+ * 打开系统的「设置」首页。
  *
- * 各家的页面组件名随版本变，所以这里只传厂商类别，由原生侧按候选列表逐个试，
- * 全都找不到再退回「应用信息」页（那一页一定有）。跳转永远是加分项：
- * 弹窗里那段完整路径才是主力，跳不过去用户也能自己走完。
+ * 不按厂商猜具体页面：小米的电量详情缺系统内部 extra、启动后自己关掉；华为的启动管理四个
+ * 候选在真机上全部落空。没有那么多台机器逐个验证，就一刀切送到设置入口，具体往哪翻由弹窗里
+ * 那段按机型写的路径告诉用户。
  */
-export const openBackgroundSettings = async (guide: VendorGuide): Promise<void> => {
+export const openSystemSettings = async (): Promise<void> => {
   if (!native()) {
     return
   }
   try {
-    await getBridge().openBackgroundSettings({ guide })
+    await getBridge().openSystemSettings()
   } catch {
-    // 打不开系统页面而已，不用告诉用户
+    // 打不开系统设置而已，不用告诉用户
   }
 }
 

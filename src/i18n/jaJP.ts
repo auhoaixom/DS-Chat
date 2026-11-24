@@ -140,7 +140,7 @@ export const jaJP = {
   keepAliveProgress: "回答を生成中…（約 {count} 文字）",
   settingsKeepAlive: "バックグラウンド実行を許可",
   settingsKeepAliveHint: "アプリを離れたり画面をロックしても生成を続けます。許可しないと中断します",
-  settingsKeepAliveAction: "アプリ設定を開く",
+  settingsKeepAliveAction: "システム設定を開く",
   settingsKeepAliveOpen: "設定へ",
   settingsKeepAliveGuideHuawei:
     "「設定 → アプリとサービス → アプリ起動管理」を開き、「DS Chat」を見つけて「自動管理」をオフにし、「自動起動 / 関連起動 / バックグラウンド動作」の3つをすべてオンにしてください。",

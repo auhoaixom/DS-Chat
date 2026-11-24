@@ -1,10 +1,8 @@
 package com.dschat.app;
 
 import android.app.NotificationManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
@@ -96,28 +94,23 @@ public class KeepAlivePlugin extends Plugin {
     }
 
     /**
-     * 打开系统的「应用信息」页——所有安卓机都有，实测每台都能到。
+     * 打开系统「设置」首页——所有安卓机都有，不会失效。
      *
-     * 曾经按厂商试过跳「应用启动管理」之类的页面（华为四个候选、小米电量详情等），结论是：
-     * 小米那个缺系统 extra，启动后立刻自己关掉；华为四个候选在真机上全部落空（最后退回的就是
-     * 这一页）。既然都到不了，就不要再绕：只跳应用信息，具体找哪一项交给弹窗里那段文案。
-     *
-     * 参数 guide 保留但不再使用：文案仍然按厂商给，将来若真拿到实机验证过的组件名，
-     * 在这里按 guide 分流即可，网页侧不用改。
+     * 之前按厂商猜过具体的后台管理页（小米的电量详情、华为的启动管理四个候选），
+     * 真机上全部失败：要么缺系统内部 extra 启动后自己关掉，要么根本不存在。
+     * 我们没有那么多台机器去逐个验证，所以一刀切：只送到设置入口，
+     * 具体往哪翻由弹窗里那段按机型写的路径告诉用户。
      */
     @PluginMethod
-    public void openBackgroundSettings(PluginCall call) {
+    public void openSystemSettings(PluginCall call) {
         boolean opened = false;
         try {
-            Intent details =
-                    new Intent(
-                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    Uri.parse("package:" + getContext().getPackageName()))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(details);
+            Intent intent =
+                    new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
             opened = true;
         } catch (Exception error) {
-            Log.w(TAG, "open app settings failed: " + error);
+            Log.w(TAG, "openSystemSettings failed: " + error);
         }
         JSObject result = new JSObject();
         result.put("opened", opened);

@@ -138,7 +138,7 @@ export const en = {
   keepAliveProgress: 'Generating… (~{count} characters)',
   settingsKeepAlive: 'Run in background',
   settingsKeepAliveHint: 'Keeps generating after you switch away or lock the screen; otherwise it stops',
-  settingsKeepAliveAction: 'Open app settings',
+  settingsKeepAliveAction: 'Open system settings',
   settingsKeepAliveOpen: 'Open',
   settingsKeepAliveGuideHuawei:
     'Open Settings → Apps and services → App launch, find DS Chat, turn off automatic management, then enable all three switches: auto-launch, secondary launch and run in background.',

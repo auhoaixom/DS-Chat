@@ -133,7 +133,7 @@ export const zh = {
   keepAliveProgress: '正在生成回答…（约 {count} 字）',
   settingsKeepAlive: '允许后台运行',
   settingsKeepAliveHint: '切后台、锁屏后继续生成；不开启会中断',
-  settingsKeepAliveAction: '打开应用设置',
+  settingsKeepAliveAction: '打开系统设置',
   settingsKeepAliveOpen: '去设置',
   settingsKeepAliveGuideHuawei:
     '打开「设置 → 应用和服务 → 应用启动管理」，找到「DS Chat」，关掉「自动管理」，再把「允许自启动 / 允许关联启动 / 允许后台活动」三个开关全部打开。',

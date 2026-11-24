@@ -140,7 +140,7 @@ export const ruRU = {
   keepAliveProgress: "Генерация… (~{count} символов)",
   settingsKeepAlive: "Работа в фоне",
   settingsKeepAliveHint: "Генерация продолжается, если свернуть приложение или заблокировать экран; без этого она прервётся",
-  settingsKeepAliveAction: "Открыть настройки приложения",
+  settingsKeepAliveAction: "Открыть настройки системы",
   settingsKeepAliveOpen: "Перейти",
   settingsKeepAliveGuideHuawei:
     "Откройте «Настройки → Приложения и сервисы → Запуск приложений», найдите DS Chat, отключите автоматическое управление и включите все три переключателя: автозапуск, связанный запуск и работа в фоне.",

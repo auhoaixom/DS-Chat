@@ -140,7 +140,7 @@ export const frFR = {
   keepAliveProgress: "Génération… (~{count} caractères)",
   settingsKeepAlive: "Exécution en arrière-plan",
   settingsKeepAliveHint: "La génération continue si vous quittez l'application ou verrouillez l'écran ; sinon elle s'interrompt",
-  settingsKeepAliveAction: "Ouvrir les réglages de l'application",
+  settingsKeepAliveAction: "Ouvrir les réglages système",
   settingsKeepAliveOpen: "Ouvrir",
   settingsKeepAliveGuideHuawei:
     "Ouvrez « Paramètres → Applications et services → Gestion du démarrage », trouvez DS Chat, désactivez la gestion automatique, puis activez les trois options : démarrage auto, démarrage associé et activité en arrière-plan.",

@@ -140,7 +140,7 @@ export const zhTW = {
   keepAliveProgress: "正在生成回答…（約 {count} 字）",
   settingsKeepAlive: "允許背景執行",
   settingsKeepAliveHint: "切背景、鎖屏後繼續生成；不開啟會中斷",
-  settingsKeepAliveAction: "開啟應用程式設定",
+  settingsKeepAliveAction: "開啟系統設定",
   settingsKeepAliveOpen: "去設定",
   settingsKeepAliveGuideHuawei:
     "打開「設定 → 應用程式和服務 → 應用程式啟動管理」，找到「DS Chat」，關掉「自動管理」，再把「允許自啟動 / 允許關聯啟動 / 允許背景活動」三個開關全部打開。",
