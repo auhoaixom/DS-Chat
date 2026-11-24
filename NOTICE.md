@@ -46,5 +46,5 @@
 
 ## 名称与标志
 
-`DS Chat`、`DSc` 字标与 `design/wordmark.png`、`assets/icon.png` 是本项目的标识，**不在上述任何
+`DS Chat`、`DSC` 字标与 `design/wordmark.png`、`assets/icon.png` 是本项目的标识，**不在上述任何
 许可证的授权范围内**。「DeepSeek」及其标志是深度求索的商标，本项目与其没有隶属或背书关系。

@@ -5,7 +5,7 @@
 # DS Chat
 
 > **非官方项目。** 本项目与 DeepSeek（杭州深度求索人工智能基础技术研究有限公司）**没有隶属、合作或背书关系**。
-> `DS Chat` 与 `DSc` 字标只是本项目的名字和标志，不代表 DeepSeek 官方；「DeepSeek」及其标志是深度求索的商标。
+> `DS Chat` 与 `DSC` 字标只是本项目的名字和标志，不代表 DeepSeek 官方；「DeepSeek」及其标志是深度求索的商标。
 > 程序调用的是 DeepSeek 公开的 API，需要你自己在 [platform.deepseek.com](https://platform.deepseek.com) 申请 API Key。
 
 一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
@@ -169,7 +169,7 @@ tools/icon/            字标抠图与各密度图标生成
 
 本项目是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo)（MIT）的改造版，上游版权声明与许可原文保留在 `LICENSE` 的 Upstream notice 段。第三方依赖遵循各自的许可证，清单见 [NOTICE.md](NOTICE.md)——**分发 APK 时这份声明要跟着走**。
 
-**名称与标志不在 MIT 范围内**：`DS Chat`、`DSc` 字标与 `design/wordmark.png` 是本项目的标识；「DeepSeek」及其标志是深度求索的商标，本仓库不代表也没有获得其背书。要发布自己改的版本，请换一个不与 DeepSeek 混淆的名字和标志。
+**名称与标志不在 MIT 范围内**：`DS Chat`、`DSC` 字标与 `design/wordmark.png` 是本项目的标识；「DeepSeek」及其标志是深度求索的商标，本仓库不代表也没有获得其背书。要发布自己改的版本，请换一个不与 DeepSeek 混淆的名字和标志。
 
 ## 其他文档
 
