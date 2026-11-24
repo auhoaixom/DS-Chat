@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="112" alt="DS Chat">
+</p>
+
 # DS Chat
 
 > **非官方项目。** 本项目与 DeepSeek（杭州深度求索人工智能基础技术研究有限公司）**没有隶属、合作或背书关系**。

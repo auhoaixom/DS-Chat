@@ -66,6 +66,27 @@ def legacy(word: Image.Image, size_px: int, round_icon: bool) -> Image.Image:
     return out
 
 
+def readme_icon(word: Image.Image, size_px: int = 512, radius_ratio: float = 0.225) -> Image.Image:
+    """README 里用的那张：圆角黑底 + 字标，四角透明。
+
+    桌面图标是给启动器画的（方角、留出安全区），直接贴进 README 会出现
+    「黑方块看不见边界」的问题：GitHub 深色主题下图标边缘会和背景融成一片。
+    所以这里单独出一张圆角、四角透明的版本。
+    """
+    canvas = Image.new("RGBA", (size_px, size_px), BG + (255,))
+    w = scaled(word, size_px * WORD_RATIO)
+    canvas.alpha_composite(w, ((size_px - w.size[0]) // 2, (size_px - w.size[1]) // 2))
+    mask = Image.new("L", (size_px, size_px), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, size_px - 1, size_px - 1], radius=int(size_px * radius_ratio), fill=255
+    )
+    # 圆角边缘做一点抗锯齿，不然缩放后会看到台阶
+    mask = mask.filter(ImageFilter.GaussianBlur(max(0.5, size_px / 256)))
+    out = Image.new("RGBA", (size_px, size_px), (0, 0, 0, 0))
+    out.paste(canvas, (0, 0), mask.point(lambda v: 255 if v > 127 else 0))
+    return out
+
+
 def main() -> int:
     if not os.path.exists(SRC):
         print("missing source:", SRC)
@@ -82,6 +103,12 @@ def main() -> int:
         legacy(word, legacy_px, False).save(os.path.join(folder, "ic_launcher.png"))
         legacy(word, legacy_px, True).save(os.path.join(folder, "ic_launcher_round.png"))
         print(f"  mipmap-{name}: fg {fg_px}px, legacy {legacy_px}px")
+
+    # README 顶部那张（圆角、四角透明），跟着图标一起生成，别手放
+    assets = os.path.join(ROOT, "assets")
+    os.makedirs(assets, exist_ok=True)
+    readme_icon(word).save(os.path.join(assets, "icon.png"))
+    print("  assets/icon.png 512px")
 
     # 自查：模拟启动器把这层塞进 72dp 形状里，看比例对不对
     preview = Image.new("RGBA", (432, 432), (238, 240, 244, 255))
