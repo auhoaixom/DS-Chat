@@ -16,7 +16,8 @@
     </style>
 
 
+    <!-- 启动页窗口底色：跟随系统深浅色（见 values-night/colors.xml），不再是那张纯白图 -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="android:background">@color/splash_background</item>
     </style>
 </resources>

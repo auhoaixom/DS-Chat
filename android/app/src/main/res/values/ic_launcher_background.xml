@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 桌面图标底色：黑底，由 tools/icon/build-icons.py 配合同名前景层使用 -->
+    <color name="ic_launcher_background">#000000</color>
 </resources>

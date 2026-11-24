@@ -28,3 +28,7 @@ android/keystore/
 
 # 手工回归的临时截图（证据归档到 apk-archive/）
 .shots/
+
+# 本机验收截图（证据归档到 apk-archive/）
+_shots/
+tools/icon/preview.png

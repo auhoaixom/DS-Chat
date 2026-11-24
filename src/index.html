@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#ffffff" />
     <title>DS Chat</title>
+    <script>
+      // 首帧防白闪：样式表和 JS 都还没到的时候，先按已保存的深浅色设置给画布上底色。
+      // 不这么做的话，深色模式下打开应用会先白一屏再变黑（实测约 0.3 秒）。
+      ;(() => {
+        try {
+          const saved = localStorage.getItem('chat-demo:theme-preference')
+          const dark =
+            saved === 'dark' ||
+            ((saved === null || saved === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          const color = dark ? '#151517' : '#ffffff'
+          document.documentElement.style.backgroundColor = color
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+          const meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) {
+            meta.setAttribute('content', color)
+          }
+        } catch {
+          // 拿不到设置就当浅色，别让脚本异常挡住页面
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

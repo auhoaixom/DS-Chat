@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动页底色：与界面浅色模式背景一致，见 theme.css 里的 alias-bg-base -->
+    <color name="splash_background">#FFFFFF</color>
+</resources>

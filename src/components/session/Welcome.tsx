@@ -1,3 +1,4 @@
+import wordmark from '../../assets/wordmark.png'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
@@ -15,7 +16,10 @@ export const Welcome = () => {
     <div className={styles.container}>
       {isMobile ? <MobileHeader /> : null}
       <div className={styles.welcome}>
-        <div className={styles.greeting}>{t('welcomeMessageChat250808')}</div>
+        <div className={styles.head}>
+          <img className={styles.logo} src={wordmark} alt="" draggable={false} />
+          <div className={styles.greeting}>{t('welcomeMessageChat250808')}</div>
+        </div>
         <ChatInput sessionId={null} />
         {isMobile && !attachPanelOpen ? (
           <div className={styles.caveat}>{t('contentCaveat')}</div>
