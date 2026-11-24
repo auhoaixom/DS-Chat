@@ -46,6 +46,8 @@ public class MainActivity extends BridgeActivity {
     private static MainActivity current;
 
     private View splashOverlay;
+    /** postVisualStateCallback 的请求号，只增不减 */
+    private long nextVisualStateId = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -151,8 +153,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * 撤掉启动画面。由网页的信号触发（时机 = 会话列表读完 / 弹出加密对话框 / 出现错误页），
-     * 原生这边没有任何计时器；重复调用无害。
+     * 撤掉启动画面。由网页的信号触发（时机 = 会话列表读完 / 弹出加密对话框 / 出现错误页）。
+     *
+     * 不立刻 removeView，而是先问 WebView「你当前这一帧画完了吗」
+     * （{@link WebView#postVisualStateCallback}）。页面被这层覆盖着时，合成器可能落后于
+     * DOM 一两个帧，直接撤会露出上一帧的"正在加载对话"——实测撤早了 100~200ms。
+     * 等它回报"这一帧已经画出来"，再撤，一帧都不早。
      */
     private void hideSplash() {
         final View overlay = splashOverlay;
@@ -160,11 +166,35 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         splashOverlay = null;
+        Bridge bridge = getBridge();
+        WebView webView = bridge == null ? null : bridge.getWebView();
+        final Runnable remove = () -> removeSplashOverlay(overlay);
+        if (webView == null) {
+            remove.run();
+            return;
+        }
+        webView.postVisualStateCallback(
+            nextVisualStateId++,
+            new WebView.VisualStateCallback() {
+                @Override
+                public void onComplete(long requestId) {
+                    Log.i(TAG, "webview painted, removing splash at " + System.currentTimeMillis());
+                    remove.run();
+                }
+            }
+        );
+        // 兜底：万一这一帧的回报没来（页面卡住/进程异常），1 秒后也撤
+        overlay.postDelayed(remove, 1000);
+    }
+
+    /** 真正把覆盖层摘掉；重复调用无害 */
+    private void removeSplashOverlay(View overlay) {
+        if (overlay.getParent() == null) {
+            return;
+        }
         Log.i(TAG, "splash dismissed at " + System.currentTimeMillis());
         ViewGroup parent = (ViewGroup) overlay.getParent();
-        if (parent != null) {
-            parent.removeView(overlay);
-        }
+        parent.removeView(overlay);
         getWindow().getDecorView().setBackgroundColor(isDarkTheme() ? DARK_BG : LIGHT_BG);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
     }
