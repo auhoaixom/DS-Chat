@@ -364,17 +364,18 @@ adb shell dumpsys gfxinfo com.dschat.app | Select-String "Total frames|Janky|per
 ## 6. 产物核对
 
 ```powershell
-# APK 归档 + 桌面副本
+# APK 只归档一份
 Copy-Item android\app\build\outputs\apk\release\app-release.apk ..\apk-archive\DS-Chat-vX.Y.Z.apk
-Copy-Item android\app\build\outputs\apk\release\app-release.apk ..\DS-Chat-vX.Y.Z.apk
 
 # 哈希必须与构建产物一致（证明装机的就是这个包）
-Get-FileHash ..\DS-Chat-vX.Y.Z.apk -Algorithm SHA256
+Get-FileHash ..\apk-archive\DS-Chat-vX.Y.Z.apk -Algorithm SHA256
 Get-FileHash android\app\build\outputs\apk\release\app-release.apk -Algorithm SHA256
 
 # 设备上的版本
 adb shell dumpsys package com.dschat.app | Select-String 'versionName|versionCode'
 ```
+
+**只归档一份，不要在 `deepseek-chatbot\` 根目录再放副本。** 以前那里放副本是为了方便拷给手机装，现在装机一律走 `adb install -r` 从构建产物直接装，副本没用；而每版 8 MB 攒了 56 个（454 MB），其中 41 个与归档逐字节重复。装机要用的包就从 `apk-archive` 拿。
 
 归档完成后，在 `RELEASES.md` 的表格**顶部**追加本版一行：版本、日期、`versionCode`、APK 状态、一句话变更。台账只有发版时顺手写才活得下去，补写一次就会积成八十行。
 
