@@ -13,7 +13,8 @@
 .top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* 只剩收起按钮一个子元素：留在右上角，跟去掉应用名之前的位置一致 */
+  justify-content: flex-end;
   gap: 8px;
   box-sizing: border-box;
   height: 48px;
