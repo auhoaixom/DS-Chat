@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.4.2 | 2026-11-24 | 92 | 有 | fix: point "run in background" at the app info page instead of guessing vendor settings (v1.4.2) |
 | v1.4.1 | 2026-11-24 | 91 | 有 | feat: keep generating in the background and continue after a dropped connection (v1.4.1) |
 | v1.4.0 | 2026-11-23 | 90 | 有 | feat: encrypt session bodies and the API Key with a hardware-backed key |
 | v1.3.2 | 2026-11-23 | 89 | 有 | fix: drop the "imported" line once the picker no longer matches it |
