@@ -1,14 +1,19 @@
 # DS Chat
 
-一个用自己 API Key 的安卓聊天客户端，前端直接连 DeepSeek API，没有自己的服务端。
+> **非官方项目。** 本项目与 DeepSeek（杭州深度求索人工智能基础技术研究有限公司）**没有隶属、合作或背书关系**。
+> `DS Chat` 与 `DSc` 字标只是本项目的名字和标志，不代表 DeepSeek 官方；「DeepSeek」及其标志是深度求索的商标。
+> 程序调用的是 DeepSeek 公开的 API，需要你自己在 [platform.deepseek.com](https://platform.deepseek.com) 申请 API Key。
 
-私有自用：不分发、不上架应用商店、不做多端同步。当前版本 `1.4.0`（`versionCode 90`）。
+一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
+
+当前版本 `1.4.5`（`versionCode 95`）。MIT 许可，欢迎 issue 与 PR。
 
 ## 这是什么
 
-- 一个 React 前端（React 18 + zustand + TypeScript strict + rspack/SWC）套在 Capacitor 8 的安卓壳里，装到自己手机上用。
+- 一个 React 前端（React 18 + zustand + TypeScript strict + rspack/SWC）套在 Capacitor 8 的安卓壳里，打包成 APK 装到手机上。
 - WebView 的页面 origin 固定为 `https://localhost`。这个不能改：`file://` 的 null origin 会让 IndexedDB 直接失效，整个会话存储都保不住。
-- 没有账号体系、没有云端备份、没有后端。数据只在本机，API Key 也只在本机；落盘的那部分是密文，见「本地数据加密」。
+- 没有账号体系、没有云端备份、没有后端、没有统计与崩溃上报。数据只在本机，API Key 也只在本机；落盘的那部分是密文，见「本地数据加密」。
+- 不发布到应用商店：自己构建、自己签名、自己装（见「出包」）。
 - 它不做的事：语音输入与朗读（早期版本有，已移除，相关代码不再存在）、多设备同步、应用内计费。
 
 ## 出包
@@ -24,13 +29,13 @@ cd android
 adb install -r app\build\outputs\apk\release\app-release.apk
 ```
 
-签名读 `android/keystore.properties`（`storeFile` / `storePassword` / `keyAlias` / `keyPassword`）。这个文件**不入库**，缺了它 gradle 只会出未签名的包——装不上，也不该装。
+签名读 `android/keystore.properties`（`storeFile` / `storePassword` / `keyAlias` / `keyPassword`）。这个文件**不入库**，自己用 `keytool` 生成一份；缺了它 gradle 只会出未签名的包——装不上，也不该装。
 
 **先出开发包，再出正式包**：`.\gradlew.bat assembleDebug` + `adb install -r app\build\outputs\apk\debug\app-debug.apk`。开发包与正式包同包名、同签名（`buildTypes.debug` 长期挂着 `signingConfig signingConfigs.release`），所以能直接覆盖已装的正式版，会话数据与 Keystore 里的数据密钥都保留；版本名自动带 `-dev` 后缀。改动先装开发包试用，确认没问题才出正式包，版本号只在真正发版时才推进。细节见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) §3。
 
 **版本号要改三处**：`package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 和 `versionCode`。漏改一个不会报错，只会打出一个装不上的包；现在 `pnpm test` 会拦住这种情况（要求 `versionCode` 不小于历史上任何一版，准备发新版时还必须严格大于上一版）。
 
-完整的发版流程（十一项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。改界面前先看 [STANDARDS.md](STANDARDS.md)（界面规矩与坑台账，配 `tools/probe/99k-ui-rules.mjs` 可机检）。
+完整的发版流程（十二项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本见 [RELEASES.md](RELEASES.md)。改界面前先看 [STANDARDS.md](STANDARDS.md)（界面规矩与坑台账，配 `tools/probe/99k-ui-rules.mjs` 可机检）。
 
 ## 开发
 
@@ -65,6 +70,7 @@ src/
   utils/               通用工具
 test/                  单元测试
 tools/probe/           真机问题的 CDP 复现探针
+tools/icon/            字标抠图与各密度图标生成
 ```
 
 ## 功能
@@ -79,7 +85,7 @@ tools/probe/           真机问题的 CDP 复现探针
 - 加密：会话正文、标题、压缩摘要与 API Key 以硬件密钥加密落盘；图片字节不加密。细节见下文「本地数据加密」。
 - 外观：深色/浅色主题、六种界面语言（简体中文 / 繁體中文 / English / 日本語 / Русский / Français）、移动端布局；默认模型 `deepseek-flash`，模型名可在设置里改。
 - 位置：设置 → 通用 → 位置信息里可以下拉选省市，也可以点「定位」用手机坐标自动填到市（精度差于 5 公里时拒绝写入并提示）。
-- 输入：手机回车默认换行（设置 → 通用 → 个性化键位设置里可切成"直接发送"）；非 flash 模型自动降级为纯对话（不发服务端工具、不请求标题、不注入位置提醒）。
+- 输入：手机回车默认换行（设置 → 通用 → 个性化键位设置里可切成「直接发送」）；非 flash 模型自动降级为纯对话（不发服务端工具、不请求标题、不注入位置提醒）。
 - 后台：生成期间起一个前台服务，切到别的应用或锁屏时继续生成；通知栏显示「正在生成回答…（约 N 字）」。这一路还需要系统放行：设置 → 通用 → 允许后台运行 → 打开系统设置，在系统设置里找到电池或应用管理，把 DS Chat 的后台运行权限打开。**各家叫法不同、位置也不同，应用只给一句通用指路，不猜具体页面**；只关电池优化在华为上不管用。
 - 断流：切网络、信号掉线导致连接断开时，会**自动接着写一次**（把已经写出来的那段当前缀重新请求），不丢内容、不从头重来；再断才报错。
 
@@ -146,11 +152,20 @@ tools/probe/           真机问题的 CDP 复现探针
 - 非 flash 模型没有搜索、链接阅读和标题生成 —— 那是服务端按模型开放的能力，App 只是不再发这些字段。
 - 版本号三处必须同时改，见上文"出包"。
 
+## 参与
+
+- 提 PR 之前先本地跑 `pnpm type`、`pnpm lint`、`pnpm test`（212 项）。
+- 改界面前读一遍 [STANDARDS.md](STANDARDS.md)，它配了可机检的探针 `tools/probe/99k-ui-rules.mjs`。
+- 不要跑 `pnpm format`（会重写整仓）。
+- 缩进、引号、分号这些别顺手改：仓库里混着两三种风格，统一格式化属于单独一版的工作。
+
 ## 许可
 
 [MIT](LICENSE)，`Copyright (c) 2026 auhoaixom`。
 
 本项目是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo)（MIT）的改造版，上游版权声明与许可原文保留在 `LICENSE` 的 Upstream notice 段。第三方依赖遵循各自的许可证。
+
+**名称与标志不在 MIT 范围内**：`DS Chat`、`DSc` 字标与 `design/wordmark.png` 是本项目的标识；「DeepSeek」及其标志是深度求索的商标，本仓库不代表也没有获得其背书。要发布自己改的版本，请换一个不与 DeepSeek 混淆的名字和标志。
 
 ## 其他文档
 

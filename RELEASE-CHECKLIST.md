@@ -15,7 +15,7 @@ $env:ANDROID_HOME="E:\Android\Sdk"
 $env:ANDROID_SDK_ROOT="E:\Android\Sdk"
 ```
 
-设备：`US95VW7T9LEQNBBI`（Redmi 14C，720×1640，density 2.0）
+设备：一台 Redmi 14C（720×1640，density 2.0）
 
 ---
 
@@ -300,7 +300,7 @@ mSystemGestureExclusion=SkRegion((0,1190,48,1590))   # 上报整高 48px 宽，�
 - 屏幕中段/上段：贴边右滑仍会被系统当成「返回」，应用拿不到这条手势
 - 因此真正可用的一层在网页里（`src/app/siderSwipe.ts`）：起手位置不限（开合都行，只避开输入框、可横向滚动的内容和所有浮层）、横向位移 ≥45dp（≈0.71cm，300dp 抽屉的 0.15）、方向必须在 400ms 内判出
 
-**第 7 项的跟手是怎么做到的（别改回布尔开关）**：抽屉位置不再由 `open` 布尔驱动，而是 `mobileSiderState.ts` 里一个 0→1 的进度，拖动时直接写元素的 `--sider-x` 和遮罩 `opacity`，**不经过 React**；松手后 `settleSider()` 才让 CSS transition 收敛。改动前后的实测（US95VW7T9LEQNBBI，探针用 `performance.now()`）：
+**第 7 项的跟手是怎么做到的（别改回布尔开关）**：抽屉位置不再由 `open` 布尔驱动，而是 `mobileSiderState.ts` 里一个 0→1 的进度，拖动时直接写元素的 `--sider-x` 和遮罩 `opacity`，**不经过 React**；松手后 `settleSider()` 才让 CSS transition 收敛。改动前后的实测（Redmi 14C，探针用 `performance.now()`）：
 
 ```text
 改前：越阈 → 挂载完成 449ms → 首帧 11ms   （React 更新被连续 touchmove 饿死，松手才提交）
