@@ -30,7 +30,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 **版本号要改三处**：`package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 和 `versionCode`。漏改一个不会报错，只会打出一个装不上的包；现在 `pnpm test` 会拦住这种情况（要求 `versionCode` 不小于历史上任何一版，准备发新版时还必须严格大于上一版）。
 
-完整的发版流程（十一项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。
+完整的发版流程（十一项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本和它们的 APK 见 [RELEASES.md](RELEASES.md)。改界面前先看 [STANDARDS.md](STANDARDS.md)（界面规矩与坑台账，配 `tools/probe/99k-ui-rules.mjs` 可机检）。
 
 ## 开发
 

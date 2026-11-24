@@ -97,6 +97,17 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 ## 4. 手工回归（十一项，逐项截图）
 
+### 4.0 先跑界面规矩探针（必跑）
+
+```powershell
+adb shell cat /proc/net/unix | Select-String webview_devtools_remote
+adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>
+$env:CDP_HOST='127.0.0.1:9333'
+node tools/probe/99k-ui-rules.mjs --strict      # 输出必须为空，退出码 0
+```
+
+它查两件事：有没有还能被长按选中的静态文字（`STANDARDS.md` 规矩 1）、设置面板同一组的字号颜色是否只有一个值（规矩 2）。**有违规先修再往下走**，别带着违规进手工回归。输出贴进证据目录。
+
 每一项都要在真机上做，并留下截图。
 
 | # | 项 | 操作 | 通过标准 |

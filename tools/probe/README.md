@@ -31,6 +31,21 @@ pnpm dev                     # rspack serve，127.0.0.1:8090
 | `99h-mobile.mjs` | 同上，但切到 **400×860 移动仿真**再量 | 判据是"视口顶部那一条提问"是否还是展开前那条 |
 | `99i-thinking.mjs [--expand] [--hold]` | 深度思考小窗：灌 600 字思考，看结束时的展开状态与页面跟随距离；`--hold` 额外断言点开/收起后标题行位移 ≤6px | 默认判据是「结束时应收起」，`--expand` 反过来；两种都逐 50ms 采样 |
 | `99j-composer-focus.mjs` | 输入栏焦点归属：点「深度思考 / 智能搜索 / ＋」之后 `activeElement` 是不是还是 textarea | 键盘本身在浏览器里看不到，所以断言的是成因，不是结果 |
+| `99k-ui-rules.mjs` | 界面规矩：① 列出还能被长按选中的静态文字（按 `data-selectable` 白名单判定）② 设置面板字号/颜色分布 | `--strict` 有违规退出码 1；**这个可以在真机上跑**，见下节 |
+
+## 真机跑探针
+
+`-dev` 开发包默认开着 WebView 调试，所以 `99k` 可以直接跑在真机上——比桌面仿真可信（真机的 `user-select`、字号、换行都是最终结果）：
+
+```powershell
+adb shell am start -n com.dschat.app/.MainActivity
+adb shell cat /proc/net/unix | Select-String webview_devtools_remote   # @webview_devtools_remote_<pid>
+adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>
+$env:CDP_HOST = '127.0.0.1:9333'
+node tools/probe/99k-ui-rules.mjs
+```
+
+其余脚本（靠 `Input.dispatchMouseEvent` 按坐标点的）目前只在桌面配置里跑过，真机上坐标对不上，别直接套。
 
 ## 三条踩过的坑
 
