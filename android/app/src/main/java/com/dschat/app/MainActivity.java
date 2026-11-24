@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
@@ -41,6 +42,11 @@ public class MainActivity extends BridgeActivity {
      * 免得一直卡在 logo 上。正常路径不看时间，撤掉完全由网页的信号决定。
      */
     private static final long SPLASH_WATCHDOG_MS = 10_000;
+    /**
+     * 启动画面最短可见时长，从「这一层第一次被绘制出来」算（不是从 onCreate 算）。
+     * 数据加载比它快时把 logo 补齐到这么久；比它慢时这条永不生效。
+     */
+    private static final long SPLASH_MIN_VISIBLE_MS = 300;
 
     /** 当前实例，供 SplashPlugin 转调 */
     private static MainActivity current;
@@ -48,6 +54,11 @@ public class MainActivity extends BridgeActivity {
     private View splashOverlay;
     /** postVisualStateCallback 的请求号，只增不减 */
     private long nextVisualStateId = 1;
+    /** 覆盖层第一次被绘制出来的时刻；0 表示还没画过 */
+    private long splashFirstDrawnAt;
+    /** 收到「可以撤了」的时刻 */
+    private long splashRequestedAt;
+    private boolean splashDismissRequested;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -141,6 +152,27 @@ public class MainActivity extends BridgeActivity {
         );
         splashOverlay = overlay;
         Log.i(TAG, "splash shown at " + System.currentTimeMillis());
+        // 记下「这一层第一次真的被画出来」的时刻：最短可见时长从这一刻算，不从 onCreate 算
+        overlay
+            .getViewTreeObserver()
+            .addOnDrawListener(
+                new ViewTreeObserver.OnDrawListener() {
+                    @Override
+                    public void onDraw() {
+                        if (splashFirstDrawnAt == 0) {
+                            splashFirstDrawnAt = System.currentTimeMillis();
+                            Log.i(TAG, "splash first drawn at " + splashFirstDrawnAt);
+                        }
+                        // 监听器不能在回调里直接摘，下一帧再摘
+                        overlay.post(() -> {
+                            ViewTreeObserver observer = overlay.getViewTreeObserver();
+                            if (observer.isAlive()) {
+                                observer.removeOnDrawListener(this);
+                            }
+                        });
+                    }
+                }
+            );
         SystemBarPlugin.apply(getWindow(), dark ? DARK_BG : LIGHT_BG, dark);
         // 再补一次：Capacitor 启动时会用自己的默认值刷一遍状态栏（浅色），
         // 那一下会把我们上面设的颜色盖掉，于是启动画面顶部留下一条白边。
@@ -155,17 +187,38 @@ public class MainActivity extends BridgeActivity {
     /**
      * 撤掉启动画面。由网页的信号触发（时机 = 会话列表读完 / 弹出加密对话框 / 出现错误页）。
      *
-     * 不立刻 removeView，而是先问 WebView「你当前这一帧画完了吗」
-     * （{@link WebView#postVisualStateCallback}）。页面被这层覆盖着时，合成器可能落后于
-     * DOM 一两个帧，直接撤会露出上一帧的"正在加载对话"——实测撤早了 100~200ms。
-     * 等它回报"这一帧已经画出来"，再撤，一帧都不早。
+     * 两道闸：
+     * 1. 最短可见 SPLASH_MIN_VISIBLE_MS —— 数据加载太快时 logo 会来不及被看见，
+     *    这一闸只补「还没被看够」的那部分；数据慢于它时永不生效。
+     * 2. 撤之前问 WebView「你当前这一帧画完了吗」（{@link WebView#postVisualStateCallback}）：
+     *    页面被这层覆盖着时合成器可能落后于 DOM，直接撤会露出上一帧的"正在加载对话"。
      */
     private void hideSplash() {
         final View overlay = splashOverlay;
-        if (overlay == null) {
+        if (overlay == null || splashDismissRequested) {
             return;
         }
-        splashOverlay = null;
+        splashDismissRequested = true;
+        splashRequestedAt = System.currentTimeMillis();
+        waitForMinimumVisibleTime(overlay);
+    }
+
+    /** 数据已经就绪；如果 logo 还没被看见够，就先等等 */
+    private void waitForMinimumVisibleTime(View overlay) {
+        // 极端情况下没记录到「第一次绘制」，就从收到请求那一刻算，保证不会原地打转
+        long base = splashFirstDrawnAt != 0 ? splashFirstDrawnAt : splashRequestedAt;
+        long visibleFor = System.currentTimeMillis() - base;
+        long remaining = SPLASH_MIN_VISIBLE_MS - visibleFor;
+        if (remaining > 0) {
+            Log.i(TAG, "splash visible " + visibleFor + "ms, keep " + remaining + "ms more");
+            overlay.postDelayed(() -> waitForMinimumVisibleTime(overlay), remaining);
+            return;
+        }
+        removeAfterNextPaint(overlay);
+    }
+
+    /** 等 WebView 把当前这一帧画出来，再摘覆盖层 */
+    private void removeAfterNextPaint(View overlay) {
         Bridge bridge = getBridge();
         WebView webView = bridge == null ? null : bridge.getWebView();
         final Runnable remove = () -> removeSplashOverlay(overlay);
