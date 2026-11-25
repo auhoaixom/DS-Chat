@@ -5,6 +5,12 @@ import { defineConfig } from '@rspack/cli'
 import { rspack, type Configuration } from '@rspack/core'
 
 const dev = process.env.NODE_ENV !== 'production'
+/**
+ * 诊断入口只给开发时排查用，发行版里不该出现：普通用户拿到那份报告也没有用处。
+ * 默认连 dev 构建也关掉，这样真机试用的包在行为上等于发行版；
+ * 要看诊断时单独 `DSH_DIAGNOSTICS=1 pnpm build`。
+ */
+const diagnostics = process.env.DSH_DIAGNOSTICS === '1'
 const targets = ['chrome >= 105', 'edge >= 105', 'safari >= 16', 'firefox >= 110']
 const root = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
@@ -81,7 +87,12 @@ export const createConfig = ({
       scriptLoading: 'defer',
       meta: { 'application-version': version },
     }),
-    new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
+    new rspack.DefinePlugin({
+      __API_ORIGIN__: JSON.stringify(apiOrigin),
+      __DIAGNOSTICS__: JSON.stringify(diagnostics),
+      // 设置页底部那行版本号用它，省得前端再读一次 package.json
+      __APP_VERSION__: JSON.stringify(version),
+    }),
     new rspack.CopyRspackPlugin({
       patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
     }),

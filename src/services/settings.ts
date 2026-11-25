@@ -30,6 +30,10 @@ type Settings = {
   siderCollapsed: boolean
   /** 手机回车键的行为：true = 换行（默认），false = 直接发送 */
   enterNewline: boolean
+  /** 顶栏的上下文用量入口；关掉后用量明细、手动压缩与会话合计一起消失 */
+  showContextMeter: boolean
+  /** 每条回复底部的金额；关掉只影响显示，计费照记 */
+  showMessageCost: boolean
 }
 
 /**
@@ -55,6 +59,8 @@ const KEYS = {
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
   enterNewline: 'chat-demo:enter-newline',
+  showContextMeter: 'chat-demo:show-context-meter',
+  showMessageCost: 'chat-demo:show-message-cost',
 } as const
 
 const rawRead = (key: string) => {
@@ -138,6 +144,9 @@ export const useSettings = create<Settings>(() => ({
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
   // 没有存过就按换行：手机上回车直接发送太容易误触
   enterNewline: read(KEYS.enterNewline) !== 'false',
+  // 没存过就是显示：老版本升上来的用户看到的界面与升级前一致
+  showContextMeter: read(KEYS.showContextMeter) !== 'false',
+  showMessageCost: read(KEYS.showMessageCost) !== 'false',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -233,4 +242,14 @@ export const setSiderCollapsed = (siderCollapsed: boolean) => {
 export const setEnterNewline = (enterNewline: boolean) => {
   write(KEYS.enterNewline, String(enterNewline))
   useSettings.setState({ enterNewline })
+}
+
+export const setShowContextMeter = (showContextMeter: boolean) => {
+  write(KEYS.showContextMeter, String(showContextMeter))
+  useSettings.setState({ showContextMeter })
+}
+
+export const setShowMessageCost = (showMessageCost: boolean) => {
+  write(KEYS.showMessageCost, String(showMessageCost))
+  useSettings.setState({ showMessageCost })
 }

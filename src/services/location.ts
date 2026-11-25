@@ -36,6 +36,22 @@ const overrides = regionNameOverrides as Record<string, Record<string, string> |
 export const getRegionName = (code: string, locale: Locale): string =>
   regions.has(code) ? (overrides[locale]?.[code] ?? displayNamesFor(locale).of(code) ?? code) : ''
 
+/**
+ * 位置在界面与提示里的写法：中文区写到市（没选市就写省），其它地区只写国家名。
+ * 没选位置时返回空串，调用方自己决定这一项还留不留。
+ */
+export const locationDisplayName = (location: UserLocation | null, locale: Locale): string => {
+  if (!location) {
+    return ''
+  }
+  if (location.region === 'CN' && (locale === 'zh-CN' || locale === 'zh-TW')) {
+    const province = provinces.find((item) => item.code === location.province)
+    const city = province?.cities.find((item) => item.code === location.city)
+    return city?.name ?? province?.name ?? getRegionName('CN', locale)
+  }
+  return getRegionName(location.region, locale)
+}
+
 export const normalizeLocation = (value: unknown): UserLocation | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null

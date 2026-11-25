@@ -9,53 +9,29 @@
 .dialogMain {
   display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
   color: var(--dsw-alias-label-primary);
 }
 
-.navigation {
-  position: relative;
+/*
+ * 第一层：分类列表。每行是一个整行按钮，右侧一个 `>`，
+ * 行间用和设置项同一种线（.sectionRow + .sectionRow）。
+ */
+.sectionList {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  gap: 4px;
-  width: 172px;
-  margin: 6px 12px 0 -12px;
-  padding-top: 4px;
 }
 
-/* 选中态的暗色滑块：位置和尺寸由测量得出，切换时整体平移 */
-.navSlider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border-radius: 12px;
-  background-color: var(--dsw-alias-interactive-bg-hover);
-  pointer-events: none;
-  transition:
-    transform 0.3s var(--ds-ease-in-out),
-    width 0.3s var(--ds-ease-in-out),
-    height 0.3s var(--ds-ease-in-out);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .navSlider {
-    transition: none;
-  }
-}
-
-.navItem {
-  position: relative;
+.sectionRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   box-sizing: border-box;
-  width: calc(100% - 8px);
-  min-height: 40px;
-  margin: 0 4px;
-  padding: 9px 10px 9px 8px;
+  min-height: 68px;
+  padding: 10px 0;
   border: none;
-  border-radius: 12px;
   background-color: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -65,17 +41,17 @@
   cursor: pointer;
   user-select: none;
   outline: none;
-  transition: background-color var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  & + & {
+    box-shadow: inset 0 1px 0 0 var(--dsw-alias-border-l2-darkmode-thin);
+  }
 
   svg {
     flex-shrink: 0;
+    color: var(--dsw-alias-label-caption);
   }
 
-  /**
-   * 只在"真有鼠标"的设备上给悬停底色。
-   * 手机上点一下会让 :hover 粘在刚点的那一项上，于是出现两个块：
-   * 一个是跳过去的新位置，一个是慢慢滑的滑块 —— 看着像动画分了层。
-   */
+  /* 手机上点了会粘住 :hover，只在真有鼠标的设备上给悬停底色 */
   @media (hover: hover) and (pointer: fine) {
     &:hover {
       background-color: var(--dsw-alias-interactive-bg-hover);
@@ -84,7 +60,44 @@
 
   &:focus-visible {
     box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);
+    border-radius: 8px;
   }
+}
+
+/* 分类名在上、状态摘要在下；摘要沿用设置项那套 12px 次要色，不新造一档字号 */
+.sectionText {
+  display: flex;
+  flex: 1 0 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sectionSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 子页标题左边的返回箭头：同一颗右尖括号转 180°，不新造图标 */
+.back svg {
+  transform: rotate(180deg);
+}
+
+/*
+ * 标题栏两页同高：子页因为返回键是 44dp，标题栏本来就 44 高；
+ * 分类列表页把它也撑到 44，标题的垂直位置就一致了（不然低 8dp）。
+ * 关闭键的触控区一并提到 44dp——图标仍是 14px，只是周围可点的范围变大。
+ */
+.header {
+  min-height: 44px;
+}
+
+.header > button:last-child {
+  width: 44px;
+  height: 44px;
+  /* 图标中心留在原来的位置：按钮比原来宽 16，右边就多让 8 */
+  margin-right: -18px;
 }
 
 .content {
@@ -96,20 +109,50 @@
   margin-right: -24px;
   padding: 0 24px;
   overflow-y: auto;
-  /* 切页时整块淡入并轻微上移；key 变化才重新触发 */
-  animation: content-in 0.24s ease-out both;
+  outline: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .content {
-    animation: none;
+/* 窗口最底下那行版本号：小字、次要色，不参与滚动 */
+.version {
+  flex-shrink: 0;
+  padding-top: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  user-select: none;
+}
+
+/*
+ * 换页的平移：进入子页从右侧滑入，返回列表从左滑入。
+ * 容器带 key，换页即重挂载，动画自然重播；同时滚动位置归零。
+ */
+.pageForward {
+  animation: page-forward 0.22s ease-out both;
+}
+
+.pageBack {
+  animation: page-back 0.22s ease-out both;
+}
+
+@keyframes page-forward {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
   }
 }
 
-@keyframes content-in {
+@keyframes page-back {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateX(-24%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageForward,
+  .pageBack {
+    animation: none;
   }
 }
 
@@ -134,18 +177,23 @@
 }
 
 /*
- * 通用设置的四个设置项之间要有一条分隔线，用的是和 .cell 之间同一种线。
- * 以前只有"相邻的两个 .cell"之间才会画线，而主题（.theme）与键位（折叠组）
- * 都不是 .cell，于是中间什么都没有，反倒在最下面那一块内部冒出一条——
- * 因为「位置信息」和它下面的「用手机定位…」是两个相邻的 .cell。
+ * 子页里的设置项之间要有一条分隔线，用的是和 .cell 之间同一种线。
+ * 只有"相邻的两个 .cell"之间画不出全部——主题（.theme）不是 .cell，
+ * 于是线的责任交给这一层容器：谁在这层里紧挨着谁，线就长在后者身上。
+ * 「位置信息」那一块内部的两行例外，见 .locationGroup。
  */
-.general {
+.pageBody {
   display: flex;
   flex-direction: column;
 }
 
-.general > * + * {
+.pageBody > * + * {
   box-shadow: inset 0 1px 0 0 var(--dsw-alias-border-l2-darkmode-thin);
+}
+
+/* 带开关的行：右侧只有一个 48px 的开关，不用为长按钮留那么宽的让位 */
+.switchCell .text {
+  padding-right: 8px;
 }
 
 /* 「位置信息」是一整块：内部两行不画线，线只画在这一块与上一项之间 */
@@ -374,47 +422,30 @@
 }
 
 @media not all and (min-width: 768px) {
+  /*
+   * 手机上是一个固定高度的矮窗口：五个分类 + 底部一行版本号正好装下，
+   * 剩下的留白只当收尾。列表页与子页用同一个高度——子页内容超出时在
+   * 里面滚动，不去改窗口高度，免得进子页时顶边往上跳一下。
+   */
   .dialog {
     align-self: flex-end;
     width: 100%;
     max-width: none;
-    height: calc(100% - 64px);
-    max-height: 800px;
+    height: min(calc(100% - 64px), 500px);
     border-radius: 24px 24px 0 0;
   }
 
-  .dialogMain {
-    flex-direction: column;
-  }
-
-  .navigation {
-    flex-direction: row;
-    width: auto;
-    margin: 6px -4px;
-    padding: 4px 0;
-    overflow-x: auto;
-  }
-
-  .navItem {
-    flex: 1 0 auto;
-    justify-content: center;
-    width: auto;
-    min-width: 108px;
-    margin: 0;
-    white-space: nowrap;
-
-    &:first-child {
-      margin-left: 4px;
-    }
-
-    &:last-child {
-      margin-right: 4px;
-    }
-  }
-
   .content {
-    padding-top: 24px;
+    /* 标题下面这一截原来留了 24px，加上设置项自己的上内边距，第一项离标题快 50px。
+       两层结构里标题已经足够分界，压到 8px 更紧凑 */
+    padding-top: 8px;
     padding-left: 0;
+    /* 最后一项与底部版本号之间留一口气，免得贴着 */
+    padding-bottom: 12px;
+  }
+
+  /* 版本号钉在窗口底部：内容滚动时不跟着走，也躲开手势条 */
+  .version {
     padding-bottom: env(safe-area-inset-bottom);
   }
 

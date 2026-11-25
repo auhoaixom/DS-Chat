@@ -1,0 +1,65 @@
+/*
+ * 开关：外层按钮只是命中区，看得见的是里面的轨道。
+ * 关态用最淡的分隔线色，开态用品牌蓝；滑块颜色随态切换，
+ * 这样在浅色与深色下都不会出现「白滑块压在浅轨道上」看不见的情况。
+ */
+.switch {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: -4px;
+    border-radius: 12px;
+  }
+}
+
+.track {
+  position: relative;
+  box-sizing: border-box;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  background-color: var(--dsw-alias-border-l2);
+  transition: background-color 0.16s ease;
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--dsw-alias-label-primary);
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.on {
+  .track {
+    background-color: var(--dsw-alias-brand-primary);
+  }
+
+  .knob {
+    background-color: var(--dsw-alias-label-primary-foreground);
+    transform: translateX(16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track,
+  .knob {
+    transition: none;
+  }
+}

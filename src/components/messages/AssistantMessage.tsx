@@ -7,6 +7,7 @@ import { canContinueReply } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply, useChatStore } from '../../services/chat/store.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
+import { useSettings } from '../../services/settings.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
@@ -43,6 +44,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   onSelectVersion: SelectMessageVersion
 }) {
   const t = useTranslate()
+  // 每条回复底部的金额可以在设置里关掉；计费本身不受影响
+  const showMessageCost = useSettings((state) => state.showMessageCost)
   const view = useReplyView(message, streaming)
   const panelEntry = useSearchPanel((state) => state.entry)
   const notice = streaming ? null : describeReply(message)
@@ -112,7 +115,7 @@ export const AssistantMessage = memo(function AssistantMessage({
                 <button
                   type="button"
                   className={styles.noticeAction}
-                  onClick={() => openSettings('data')}
+                  onClick={() => openSettings('account')}
                 >
                   {t('changeApiKey')}
                 </button>
@@ -150,7 +153,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       ) : null}
       {streaming ? null : (
         <div className={styles.bottom}>
-          <MessageCost message={message} />
+          {showMessageCost ? <MessageCost message={message} /> : null}
           <BranchSwitcher versions={versions} disabled={busy} onSelect={onSelectVersion} />
           <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
             {copyText ? <CopyButton text={copyText} /> : null}

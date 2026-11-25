@@ -11,6 +11,10 @@
 import 'fake-indexeddb/auto'
 
 globalThis.__API_ORIGIN__ = 'https://api.example.test'
+/** 诊断入口的编译期开关，与 rspack 的默认值一致 */
+globalThis.__DIAGNOSTICS__ = false
+/** 版本号由 rspack 从 package.json 注入 */
+globalThis.__APP_VERSION__ = '0.0.0-test'
 
 /**
  * 流式回复把增量按帧批量提交（requestAnimationFrame / cancelAnimationFrame），

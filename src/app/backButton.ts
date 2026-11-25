@@ -5,7 +5,7 @@ import { finishInAppCamera, isInAppCameraOpen } from '../components/camera/inApp
 import { closeAttachPanel, isAttachPanelOpen } from '../components/chatInput/attachPanelState.js'
 import { useFilePreview } from '../components/files/filePreviewState.js'
 import { closeSearchPanel, useSearchPanel } from '../components/search/searchPanelState.js'
-import { closeSettings, useSettingsDialog } from '../components/settings/settingsDialogState.js'
+import { backToRoot, closeSettings, settingsBackAction, useSettingsDialog } from '../components/settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { newChat, useChatStore } from '../services/chat/store.js'
 
@@ -40,7 +40,12 @@ export const bindBackButton = () => {
       return
     }
     if (useSettingsDialog.getState().open) {
-      closeSettings()
+      // 设置是两层的：在子页先退回分类列表，已经在列表才关窗
+      if (settingsBackAction() === 'section') {
+        backToRoot()
+      } else {
+        closeSettings()
+      }
       return
     }
     if (useSearchPanel.getState().entry !== null) {

@@ -94,8 +94,18 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </div>
       </div>
       <div className={styles.bottom}>
-        <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
-          <span className={styles.settingsIcon}>
+        <button
+          type="button"
+          className={styles.settings}
+          onClick={() => {
+            // 抽屉和设置弹窗同时动：抽屉滑回去的同时设置面板从底部上来。
+            // 以前是先留着抽屉、关设置时再收，用户会看见「设置没了→抽屉还在→抽屉也没了」两段。
+            if (mobile) {
+              closeMobileSider()
+            }
+            openSettings()
+          }}
+        >          <span className={styles.settingsIcon}>
             <IconSettingsOutline16 />
           </span>
           <span className={styles.settingsLabel}>{t('settings')}</span>

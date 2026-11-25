@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.5.0 | 2026-11-25 | 99 | 有 | feat: split the settings into five categories behind a list page, add two display switches, and keep diagnostics out of release (v1.5.0) |
 | v1.4.8 | 2026-11-25 | 98 | 有 | fix: keep the viewport where it was when switching versions, and price compaction (v1.4.8) |
 | v1.4.7 | 2026-11-25 | 97 | 有 | feat: show what each reply cost, and the session total, priced on our side (v1.4.7) |
 | v1.4.6 | 2026-11-25 | 96 | 有 | feat: show the DSc splash on launch, and keep it up until the chats are loaded (v1.4.6) |

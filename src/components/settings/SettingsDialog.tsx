@@ -1,19 +1,18 @@
 import clsx from 'clsx'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  IconChevronRightOutline14,
   IconDarkOutline16,
-  IconDataOutline16,
   IconDownloadOutline16,
   IconFollowsystemOutline16,
   IconLightOutline16,
-  IconSettingsOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
 import { clearHistory, exportToShare, importHistory } from '../../services/chat/backup.js'
 import { useBackupProgress } from '../../services/backupProgress.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
-import { regionCodes, getRegionName, provinces } from '../../services/location.js'
+import { regionCodes, getRegionName, locationDisplayName, provinces } from '../../services/location.js'
 import { locate, MAX_ACCURACY_M } from '../../services/locate.js'
 import {
   isChineseBrowser,
@@ -21,6 +20,8 @@ import {
   setEnterNewline,
   setLocale,
   setLocation,
+  setShowContextMeter,
+  setShowMessageCost,
   setThemePreference,
   useSettings,
   type ThemePreference,
@@ -29,166 +30,244 @@ import { fetchBalance, formatBalance, type BalanceAvailability } from '../../ser
 import { openSystemSettings } from '../../services/keepAlive.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
+import { IconButton } from '../base/IconButton.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
+import { Switch } from '../base/Switch.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
 import { Diagnostics } from './Diagnostics.js'
 import { ModelField } from './ModelField.js'
-import { SettingGroup } from './SettingGroup.js'
-import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
+import {
+  backToRoot,
+  closeSettings,
+  openSection,
+  SETTINGS_SECTIONS,
+  useSettingsDialog,
+  type SettingsSection,
+} from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
 /**
- * 设置弹窗：分「通用设置」（主题、语言、朗读音色、位置）与「数据管理」（API Key、导入、导出、删除）。
- * 桌面端为居中弹窗、左侧导航；移动端为底部弹层、导航横排在内容上方
+ * 设置弹窗是两层的：先列出五个分类，点进去才是该分类的具体设置项。
+ * 手机上它仍是从底部滑出的那个窗口（尺寸、圆角都不变），变的只是窗口内部。
  */
 export const SettingsDialog = () => {
   const open = useSettingsDialog((state) => state.open)
   return open ? <SettingsContent /> : null
 }
 
-const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode }[] = [
-  {
-    value: 'general',
-    label: 'settingDialogAsideGeneralOptionLabel',
-    icon: <IconSettingsOutline16 />,
-  },
-  { value: 'data', label: 'settingDialogAsideDataOptionLabel', icon: <IconDataOutline16 /> },
-]
+/** 分类名；列表与子页标题共用同一份文案 */
+const sectionTitles: Record<SettingsSection, TranslationKey> = {
+  account: 'settingsSectionAccount',
+  data: 'settingsSectionData',
+  region: 'settingsSectionRegion',
+  personalization: 'settingsSectionPersonalization',
+  chat: 'settingsSectionChat',
+}
 
 const SettingsContent = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
-  // 打开时按调用方指定的分组选中，之后在弹窗内切换
-  const [section, setSection] = useState(() => useSettingsDialog.getState().section)
-  // 切换分组不丢失正在输入的 API Key 与导入状态
+  // null = 分类列表，其余 = 停在该分类的子页
+  const section = useSettingsDialog((state) => state.section)
+  // 换页不丢失正在输入的 API Key 与导入状态
   const apiKeyEditor = useApiKeyEditor()
   const historyImport = useHistoryImport()
   const historyDelete = useHistoryDelete()
   const replacingHistory = useChatStore((state) => state.importingHistory)
   const historyBusy = historyImport.busy || historyDelete.busy || replacingHistory
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
-  /** 导航高亮块：按选中项实测的位置和尺寸铺一层，避免"整条导航一起变暗" */
-  const navRef = useRef<HTMLDivElement>(null)
-  const [navSlider, setNavSlider] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const rowsRef = useRef(new Map<SettingsSection, HTMLButtonElement>())
+  /** 上一次停留的子页：返回列表后把焦点还给那一行 */
+  const lastSection = useRef<SettingsSection | null>(null)
+  /** 首次挂载不播平移动画，弹窗本身已经有淡入 */
+  const mounted = useRef(false)
 
-  useLayoutEffect(() => {
-    const nav = navRef.current
-    if (!nav) {
+  /**
+   * 分类行下面那句状态。
+   *
+   * 全是本地已有的数据，不为一行摘要去发请求——所以「账户」只写模型名，
+   * 余额仍然要进子页才查。状态变化时这行会跟着变，用户不点进去也知道现在是什么样。
+   */
+  const model = useSettings((state) => state.model)
+  const sessionCount = useChatStore((state) => state.sessions.length)
+  const locale = useSettings((state) => state.locale)
+  const location = useSettings((state) => state.location)
+  const themePreference = useSettings((state) => state.themePreference)
+  const enterNewline = useSettings((state) => state.enterNewline)
+  const showContextMeter = useSettings((state) => state.showContextMeter)
+  const showMessageCost = useSettings((state) => state.showMessageCost)
+  const hiddenDisplays = (showContextMeter ? 0 : 1) + (showMessageCost ? 0 : 1)
+  const themeLabel = themeOptions.find((item) => item.value === themePreference)?.label
+  const summaries: Record<SettingsSection, string> = {
+    account: model,
+    data: t('settingsSummarySessions', { count: sessionCount }),
+    region: [
+      LOCALES.find((item) => item.value === locale)?.label,
+      locationDisplayName(location, locale),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    personalization: [
+      themeLabel ? t(themeLabel) : '',
+      hiddenDisplays > 0 ? t('settingsSummaryHidden', { count: hiddenDisplays }) : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    chat: t(enterNewline ? 'settingsSummaryEnterNewline' : 'settingsSummaryEnterSend'),
+  }
+
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
       return
     }
-    const measure = () => {
-      const active = nav.querySelector<HTMLElement>('[aria-selected="true"]')
-      if (!active) {
-        return
-      }
-      setNavSlider({
-        left: active.offsetLeft,
-        top: active.offsetTop,
-        width: active.offsetWidth,
-        height: active.offsetHeight,
-      })
+    if (section) {
+      lastSection.current = section
+      // 新页面刚出现，把焦点送进去，读屏才知道换页了
+      contentRef.current?.focus()
+      return
     }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    rowsRef.current.get(lastSection.current ?? 'account')?.focus()
   }, [section])
 
   return (
     <>
       <Modal
-        title={t('settings')}
+        title={section ? t(sectionTitles[section]) : t('settings')}
+        leading={
+          section ? (
+            <IconButton
+              size="xl"
+              tone="primary"
+              className={styles.back}
+              icon={<IconChevronRightOutline14 />}
+              aria-label={t('settingsBack')}
+              onClick={backToRoot}
+            />
+          ) : undefined
+        }
         closable
         className={styles.dialog}
         mainClassName={styles.dialogMain}
+        headerClassName={styles.header}
         onClose={() => {
           if (!historyDelete.busy) {
             closeSettings()
           }
         }}
       >
-        <div role="tablist" className={styles.navigation} ref={navRef}>
-          {navSlider ? (
-            <span
-              className={styles.navSlider}
-              style={{
-                width: navSlider.width,
-                height: navSlider.height,
-                transform: `translate(${navSlider.left}px, ${navSlider.top}px)`,
-              }}
-              aria-hidden
-            />
-          ) : null}
-          {sections.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="tab"
-              aria-selected={section === item.value}
-              className={styles.navItem}
-              onClick={() => setSection(item.value)}
-            >
-              {item.icon}
-              {t(item.label)}
-            </button>
-          ))}
-        </div>
-        <div role="tabpanel" className={styles.content} key={section}>
-          {section === 'general' ? (
-            <div className={styles.general}>
-              <ThemeSetting />
-              <LocaleSetting />
-              {/* 「个性化键位设置」以后还会继续加项，保留折叠；
-                  「位置信息」能扩展的已经扩展完了，改成普通设置项，
-                  标题与「主题」「语言」完全一致（STANDARDS.md 规矩 2） */}
-              <SettingGroup title={t('settingsPersonalizeKeys')}>
-                <EnterKeySetting />
-              </SettingGroup>
-              <LocationSetting />
-              <KeepAliveSetting />
+        {/* key 变化 = 换页：重播动画，顺带把滚动位置归零 */}
+        <div
+          ref={contentRef}
+          tabIndex={-1}
+          className={clsx(
+            styles.content,
+            mounted.current && (section ? styles.pageForward : styles.pageBack)
+          )}
+          key={section ?? 'root'}
+        >
+          {section === null ? (
+            <div className={styles.sectionList}>
+              {SETTINGS_SECTIONS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={styles.sectionRow}
+                  ref={(element) => {
+                    if (element) {
+                      rowsRef.current.set(item, element)
+                    } else {
+                      rowsRef.current.delete(item)
+                    }
+                  }}
+                  onClick={() => openSection(item)}
+                >
+                  <span className={styles.sectionText}>
+                    <span>{t(sectionTitles[item])}</span>
+                    <span className={clsx(styles.description, styles.sectionSummary)}>
+                      {summaries[item]}
+                    </span>
+                  </span>
+                  <IconChevronRightOutline14 />
+                </button>
+              ))}
             </div>
           ) : (
-            <>
-              <ApiKeyField editor={apiKeyEditor} />
-              <ModelField />
-              <BalanceSetting />
-              <ImportHistory historyImport={historyImport} disabled={historyBusy} />
-              <ExportHistory disabled={historyBusy} />
-              <SettingCell
-                label={t('diagnostics')}
-                description={t('diagnosticsHint')}
-                status={null}
-                action={
-                  <Button
-                    variant="outlined"
-                    size="m"
-                    className={styles.cellButton}
-                    onClick={() => setDiagnosticsOpen(true)}
-                  >
-                    {t('diagnosticsView')}
-                  </Button>
-                }
-              />
-              <SettingCell
-                label={t('deleteAllSessions')}
-                status={null}
-                action={
-                  <Button
-                    variant="dangerOutlined"
-                    size="m"
-                    className={styles.cellButton}
-                    disabled={historyBusy}
-                    onClick={historyDelete.open}
-                  >
-                    {t('delete')}
-                  </Button>
-                }
-              />
-              {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
-            </>
+            <div className={styles.pageBody}>
+              {section === 'account' ? (
+                <>
+                  <ApiKeyField editor={apiKeyEditor} />
+                  <ModelField />
+                  <BalanceSetting />
+                  {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
+                </>
+              ) : null}
+              {section === 'data' ? (
+                <>
+                  <ImportHistory historyImport={historyImport} disabled={historyBusy} />
+                  <ExportHistory disabled={historyBusy} />
+                  {/* 诊断是给我排查用的，发行版直接不显示入口（见 rspack 的 __DIAGNOSTICS__） */}
+                  {__DIAGNOSTICS__ ? (
+                    <SettingCell
+                      label={t('diagnostics')}
+                      description={t('diagnosticsHint')}
+                      status={null}
+                      action={
+                        <Button
+                          variant="outlined"
+                          size="m"
+                          className={styles.cellButton}
+                          onClick={() => setDiagnosticsOpen(true)}
+                        >
+                          {t('diagnosticsView')}
+                        </Button>
+                      }
+                    />
+                  ) : null}
+                  <SettingCell
+                    label={t('deleteAllSessions')}
+                    status={null}
+                    action={
+                      <Button
+                        variant="dangerOutlined"
+                        size="m"
+                        className={styles.cellButton}
+                        disabled={historyBusy}
+                        onClick={historyDelete.open}
+                      >
+                        {t('delete')}
+                      </Button>
+                    }
+                  />
+                </>
+              ) : null}
+              {section === 'region' ? (
+                <>
+                  <LocaleSetting />
+                  <LocationSetting />
+                </>
+              ) : null}
+              {section === 'personalization' ? (
+                <>
+                  <ThemeSetting />
+                  <ShowContextMeterSetting />
+                  <ShowMessageCostSetting />
+                </>
+              ) : null}
+              {section === 'chat' ? (
+                <>
+                  <EnterKeySetting />
+                  <KeepAliveSetting />
+                </>
+              ) : null}
+            </div>
           )}
         </div>
+        {/* 窗口最底下一行版本号：固定在那里，不跟内容滚 */}
+        <div className={styles.version}>{`DS Chat ${__APP_VERSION__}`}</div>
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
@@ -279,6 +358,7 @@ const LocationSetting = () => {
     <div className={styles.locationGroup}>
       <SettingCell
         label={t('settingsLocation')}
+        description={t('settingsLocationHint')}
         status={null}
         className={styles.locationCell}
         action={
@@ -537,7 +617,11 @@ const LocaleSetting = () => {
   return (
     <SettingCell
       label={t('settingsLocalePreference')}
+      description={t('settingsLocaleHint')}
       status={null}
+      // 与「位置信息」同一种排法：说明文字单独占一行，选择器换到下一行，
+      // 否则说明挤在窄栏里会折成「…用哪种语 / 言」这种单字余行
+      className={styles.locationCell}
       action={
         <div className={styles.localeAction}>
           {/* 固定的英文提示：看不懂当前界面语言的人，靠这个词找到语言设置 */}
@@ -562,20 +646,67 @@ const EnterKeySetting = () => {
   const enterNewline = useSettings((state) => state.enterNewline)
   return (
     <SettingCell
-      label={t('settingsMobileEnterKey')}
+      label={t('settingsEnterKey')}
       description={t(
-        enterNewline ? 'settingsMobileEnterDescNewline' : 'settingsMobileEnterDescSend'
+        enterNewline ? 'settingsEnterKeyDescNewline' : 'settingsEnterKeyDescSend'
       )}
       status={null}
       action={
         <Select
-          ariaLabel={t('settingsMobileEnterKey')}
+          ariaLabel={t('settingsEnterKey')}
           value={enterNewline ? 'newline' : 'send'}
           options={[
-            { value: 'newline', label: t('settingsMobileEnterNewline') },
-            { value: 'send', label: t('settingsMobileEnterSend') },
+            { value: 'newline', label: t('settingsEnterNewline') },
+            { value: 'send', label: t('settingsEnterSend') },
           ]}
           onChange={(value) => setEnterNewline(value === 'newline')}
+        />
+      }
+    />
+  )
+}
+
+/**
+ * 「上下文用量与压缩」：顶栏那个圆环入口。
+ *
+ * 关掉不只是藏一个百分比——用量明细、手动压缩、撤销压缩、会话合计花费都在那个浮层里，
+ * 所以它们绑定成一个开关，关了就一起没有。自动压缩不依赖这个入口，照常工作。
+ */
+const ShowContextMeterSetting = () => {
+  const t = useTranslate()
+  const showContextMeter = useSettings((state) => state.showContextMeter)
+  return (
+    <SettingCell
+      label={t('settingsShowContextMeter')}
+      description={t('settingsShowContextMeterHint')}
+      status={null}
+      className={styles.switchCell}
+      action={
+        <Switch
+          checked={showContextMeter}
+          ariaLabel={t('settingsShowContextMeter')}
+          onChange={setShowContextMeter}
+        />
+      }
+    />
+  )
+}
+
+/** 「单条消息花费」：只藏每条回复底部那行金额，计费与会话合计都不受影响 */
+const ShowMessageCostSetting = () => {
+  const t = useTranslate()
+  const showMessageCost = useSettings((state) => state.showMessageCost)
+  return (
+    <SettingCell
+      label={t('settingsShowMessageCost')}
+      description={t('settingsShowMessageCostHint')}
+      status={null}
+      className={styles.switchCell}
+      action={
+        <Switch
+          checked={showMessageCost}
+          ariaLabel={t('settingsShowMessageCost')}
+          onChange={setShowMessageCost}
         />
       }
     />

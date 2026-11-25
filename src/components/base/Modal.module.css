@@ -98,6 +98,25 @@
   font-weight: 500;
 }
 
+/*
+ * 标题左边的入口（设置子页的返回箭头）。
+ * 负左边距把那颗 44dp 按钮的空白抵掉，箭头看起来贴齐面板左边缘。
+ */
+.leading {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: -8px;
+}
+
+/* 有左侧入口时标题吃掉剩余宽度、超长省略，关闭按钮仍然贴右 */
+.withLeading {
+  flex: 1 0 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .close {
   margin-right: -10px;
 

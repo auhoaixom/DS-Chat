@@ -41,14 +41,18 @@ const EXIT_MS = 180
 /** 遮罩 + 居中卡片，Esc / 点遮罩关闭 */
 export const Modal = ({
   title,
+  leading,
   children,
   footer,
   closable = false,
   className,
   mainClassName,
+  headerClassName,
   onClose,
 }: {
   title: ReactNode
+  /** 标题左边的入口（如返回上一级）；不传时标题栏与以前完全一致 */
+  leading?: ReactNode
   children?: ReactNode
   footer?: ReactNode
   /** 标题栏右侧显示关闭按钮 */
@@ -56,6 +60,8 @@ export const Modal = ({
   className?: string
   /** 内容区的 class */
   mainClassName?: string
+  /** 标题栏的 class：需要统一标题栏高度时用，不传则保持默认 */
+  headerClassName?: string
   onClose: () => void
 }) => {
   const t = useTranslate()
@@ -127,8 +133,9 @@ export const Modal = ({
         aria-labelledby={titleId}
       >
         <ModalCloseContext.Provider value={requestClose}>
-          <div className={styles.header}>
-            <div id={titleId} className={styles.title}>
+          <div className={clsx(styles.header, headerClassName)}>
+            {leading ? <div className={styles.leading}>{leading}</div> : null}
+            <div id={titleId} className={clsx(styles.title, leading && styles.withLeading)}>
               {title}
             </div>
             {closable ? (

@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
+import { useSettings } from '../../services/settings.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { useAttachPanelOpen } from '../chatInput/attachPanelState.js'
 import { MessageList } from '../messages/MessageList.js'
@@ -21,6 +22,8 @@ export const SessionView = ({
 }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
+  // 用量入口可以在设置里关掉；关掉后顶栏那一块什么都不留
+  const showContextMeter = useSettings((state) => state.showContextMeter)
   // 附件面板展开时占住底部，免责声明让位
   const attachPanelOpen = useAttachPanelOpen()
   const title = session.title || t('untitledChat')
@@ -28,7 +31,7 @@ export const SessionView = ({
     <div className={styles.view}>
       {isMobile ? (
         <MobileHeader title={title}>
-          <ContextMeter session={session} />
+          {showContextMeter ? <ContextMeter session={session} /> : null}
         </MobileHeader>
       ) : (
         <div className={styles.header}>
@@ -36,7 +39,7 @@ export const SessionView = ({
             {title}
           </div>
           <div className={styles.headerRight}>
-            <ContextMeter session={session} />
+            {showContextMeter ? <ContextMeter session={session} /> : null}
           </div>
         </div>
       )}
