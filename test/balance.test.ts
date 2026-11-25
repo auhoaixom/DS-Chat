@@ -36,3 +36,23 @@ test('人民币带符号，其它币种把代码写在后面', () => {
   assert.equal(formatBalance({ currency: 'USD', total: '1.00', granted: '', toppedUp: '' }), '$1.00')
   assert.equal(formatBalance({ currency: 'EUR', total: '1.00', granted: '', toppedUp: '' }), '1.00 EUR')
 })
+
+const cny = (total: string): string => formatBalance({ currency: 'CNY', total, granted: '', toppedUp: '' })
+
+test('余额的小数位跟着服务端走：给两位就两位，给更多就取四位', () => {
+  assert.equal(cny('12.34'), '¥12.34')
+  // 服务端给到八位（见过这种账号）时四舍五入到四位
+  assert.equal(cny('13.39692526'), '¥13.3969')
+  // 服务端自己写了四位就保持四位
+  assert.equal(cny('13.4000'), '¥13.4000')
+})
+
+test('余额不足两位小数时补到分，不补到四位', () => {
+  assert.equal(cny('13.4'), '¥13.40')
+  assert.equal(cny('13'), '¥13.00')
+})
+
+test('余额解析不出来时原样透传，不改写拿到的数据', () => {
+  assert.equal(cny('—'), '¥—')
+  assert.equal(cny(''), '¥')
+})

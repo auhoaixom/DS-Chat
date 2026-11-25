@@ -124,8 +124,33 @@ export const fetchBalance = async (apiKey: string, signal?: AbortSignal): Promis
   return { ok: false, message: lastMessage || '未知错误', tried }
 }
 
+/** 余额最多显示到四位：服务端给得更多时四舍五入，不给满就不补 */
+const MAX_BALANCE_DECIMALS = 4
+/** 钱的习惯刻度是分；服务端只给整数或一位小数时补到这里 */
+const MIN_BALANCE_DECIMALS = 2
+
+/**
+ * 余额的小数位由服务端决定，不是我们编的。
+ *
+ * 接口返回的是字符串：它给几位就显示几位（夹在 2–4 位之间）。
+ * 服务端只给到分就显示两位，绝不用补零假装精确到万分之一；
+ * 给到 8 位（见过这种账号）就四舍五入到 4 位。
+ * 解析不出来时原样透传——宁可显示得难看，也不改写拿到的数据。
+ */
+const formatAmount = (raw: string): string => {
+  const text = raw.trim()
+  const match = /^-?\d+(?:\.(\d*))?$/.exec(text)
+  if (!match) {
+    return raw
+  }
+  const given = (match[1] ?? '').length
+  const decimals = Math.min(MAX_BALANCE_DECIMALS, Math.max(MIN_BALANCE_DECIMALS, given))
+  return Number(text).toFixed(decimals)
+}
+
 /** 用于展示：¥ 或对应币种前缀 */
 export const formatBalance = ({ currency, total }: BalanceInfo): string => {
   const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : ''
-  return symbol ? `${symbol}${total}` : `${total} ${currency}`
+  const amount = formatAmount(total)
+  return symbol ? `${symbol}${amount}` : `${amount} ${currency}`
 }

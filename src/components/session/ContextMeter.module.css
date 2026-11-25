@@ -234,6 +234,40 @@
   line-height: 18px;
 }
 
+/* ---------- 花费 ---------- */
+
+/* 只统计有成本记录的回复；整块在没有这类回复时根本不渲染 */
+.cost {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.costHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.costAmount {
+  margin-left: auto;
+  color: var(--dsw-alias-label-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.costRounds {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.costNote {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .divider {
   height: 1px;
   margin: 0;

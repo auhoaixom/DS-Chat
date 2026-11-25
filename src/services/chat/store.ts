@@ -17,6 +17,7 @@ import {
   type CompactionProgress,
 } from './compaction.js'
 import { upgradeSession } from './contentVersion.js'
+import { accrueCost } from './cost.js'
 import * as db from './db.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { supportsServerFeatures } from './capabilities.js'
@@ -1208,6 +1209,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       let receivedContent = false
       /** 这一枪有没有真的接到过服务端的事件（用来分清"断网空转"和"生成到一半断了"） */
       let gotReplyEvent = false
+      /**
+       * 这一枪的用量是否已经记账。
+       * message_delta 可能多次到达（含累计值），只认第一份带 usage 的，免得重复计费。
+       * 断线自动续写会重进这个循环，标记随 attempt 重置 —— 那是新的一次请求，该再记一笔。
+       */
+      let accrued = false
       try {
         // 发送前按阈值压缩一次；压缩失败不影响本轮请求，由超限重试兜底
         if (!compactionTried) {
@@ -1253,6 +1260,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           latestReminder,
           withServerFeatures
         )
+        // 峰谷按发起时刻定档：请求跑几十秒也可能跨过时段边界，结束时算会飘
+        const requestedAt = Date.now()
         const events = streamMessage(
           useSettings.getState().apiKey ?? '',
           {
@@ -1285,6 +1294,10 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             titleRequests.delete(controller)
           }
           reply = applyEvent(reply, event, Date.now(), blockIndexes)
+          if (event.type === 'message_delta' && event.usage && !accrued) {
+            accrued = true
+            reply = accrueCost(reply, event.usage, requestedAt)
+          }
           reportKeepAliveProgress(replyChars(reply))
           if (document.visibilityState === 'hidden') {
             flushHidden()

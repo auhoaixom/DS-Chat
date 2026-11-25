@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
 import { getCacheStats, getContextUsage } from '../../services/chat/compaction.js'
+import { sessionCost } from '../../services/chat/cost.js'
+import { PRICING_UPDATED_AT, formatCost } from '../../services/chat/pricing.js'
 import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
 import { cancelCompaction, compactSession, undoCompaction, useChatStore } from '../../services/chat/store.js'
 import { formatTokensK } from '../../services/chat/tokens.js'
@@ -25,6 +27,8 @@ export const ContextMeter = ({ session }: { session: Session }) => {
   const [open, setOpen] = useState(false)
   const usage = useMemo(() => getContextUsage(session, SYSTEM_PROMPT), [session])
   const cache = useMemo(() => getCacheStats(session), [session])
+  // 只统计有成本记录的回复：导入的历史与旧版本留下的消息没有这个字段
+  const cost = useMemo(() => sessionCost(session), [session])
   const run = useChatStore((state) => state.compacting[session.id])
   const { anchorRef, floatingRef, position } = useAnchoredPosition<HTMLSpanElement, HTMLDivElement>(
     open,
@@ -165,6 +169,29 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                   ) : null}
                 </dl>
               </div>
+
+              {cost ? (
+                <>
+                  <div className={styles.divider} />
+                  <div className={styles.cost}>
+                    <div className={styles.costHead}>
+                      <span>{t('costUsage')}</span>
+                      <span className={styles.costAmount}>{formatCost(cost.nano)}</span>
+                      <span className={styles.costRounds}>
+                        {t('costPricedRounds', { count: cost.priced })}
+                      </span>
+                    </div>
+                    {cost.unpriced > 0 ? (
+                      <div className={styles.costNote}>
+                        {t('costUnpricedRounds', { count: cost.unpriced })}
+                      </div>
+                    ) : null}
+                    <div className={styles.costNote}>
+                      {t('costPricingDate', { date: PRICING_UPDATED_AT })}
+                    </div>
+                  </div>
+                </>
+              ) : null}
 
               <div className={styles.divider} />
 

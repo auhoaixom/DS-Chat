@@ -71,6 +71,30 @@ export type ReplyBlock = ThinkingPart | TextPart | ServerToolBlock
  */
 export type ReplyStatus = 'pending' | 'streaming' | 'done' | 'stopped' | 'error'
 
+/**
+ * 一次请求的花费记录。写在消息上，只有「我们 App 自己发出的请求」才有：
+ * 导入的会话、旧版本留下的消息都没有这个字段，界面因此不显示任何金额。
+ * 单价随记录快照一起存，改价不会改写历史。
+ */
+export type RequestCost = {
+  /** 请求发起时刻（毫秒）；峰谷按它判定，不由结束时决定 */
+  at: number
+  /** 这次请求是否按峰价 */
+  peak: boolean
+  /** 实际计价用的模型名（服务端回报的优先） */
+  model: string
+  /** 未命中输入的 token（不含缓存写入） */
+  input: number
+  cacheRead: number
+  /** 缓存写入的 token，按未命中价计 */
+  cacheWrite: number
+  output: number
+  /** 单价快照，纳元 / token */
+  rates: { miss: number; hit: number; write: number; out: number }
+  /** 这次请求的成本，纳元 */
+  nano: number
+}
+
 export type AssistantMessage = MessageBranch & {
   id: string
   role: 'assistant'
@@ -94,6 +118,11 @@ export type AssistantMessage = MessageBranch & {
   stopDetails?: StopDetails
   /** 最近一次请求的用量，续写后更新 */
   usage?: MessageUsage
+  /**
+   * 已发生的收费请求，按时间顺序追加。续写与断线自动续写各算一次，
+   * 所以一条消息可能有多笔；界面显示的是它们的合计。
+   */
+  costs?: RequestCost[]
   /** 发出这次请求时的提示侧估算（token），用于按"表面净增减"推算当前上下文占用 */
   promptEstimate?: number
   error?: {
