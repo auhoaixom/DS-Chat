@@ -663,12 +663,29 @@ const runCompaction = async (
       aggressive,
       onProgress: (progress) => setCompactionRun(sessionId, { ...progress, mode, startedAt }),
     })
-    if (!outcome.ok) {
-      return outcome.reason
+    if (outcome.ok) {
+      const { compaction, costs } = outcome
+      updateSession(sessionId, (current) => ({
+        ...current,
+        compaction,
+        // 压缩用的请求不属于任何一条回复：只进会话合计，不挂在某条回答头上
+        ...(costs.length > 0
+          ? { extraCosts: [...(current.extraCosts ?? []), ...costs] }
+          : {}),
+      }))
+      persist(sessionId)
+      return 'done'
     }
-    updateSession(sessionId, (current) => ({ ...current, compaction: outcome.compaction }))
-    persist(sessionId)
-    return 'done'
+    // 没压成也花过钱（no-gain 的那一次摘要请求），照样记账，否则合计会少一截
+    if (outcome.costs.length > 0) {
+      const { costs } = outcome
+      updateSession(sessionId, (current) => ({
+        ...current,
+        extraCosts: [...(current.extraCosts ?? []), ...costs],
+      }))
+      persist(sessionId)
+    }
+    return outcome.reason
   } finally {
     setCompactionRun(sessionId, null)
   }

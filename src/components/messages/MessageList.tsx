@@ -185,23 +185,60 @@ export const MessageList = ({
     return () => observer.disconnect()
   }, [isMobile, scrollToBottom])
 
+  /**
+   * 把切换后的版本选择器钉回它切换前所在的那条水平线。
+   *
+   * 只量一次不够。切版本会换掉这条回复的整棵子树，这一帧里新内容还没布局，
+   * 消息上的 `content-visibility` 先用估算高度顶着，滚动容器的高度会瞬间塌下去，
+   * 浏览器顺手把 `scrollTop` 夹小 —— 长会话底部实测从 5.5 万直接夹到 0。
+   * 等真实高度回来，位置已经丢了。所以按帧补，直到高度连续两帧不再变化为止。
+   */
+  const pinVersionAnchor = useCallback(
+    (scroll: HTMLElement, anchor: { messageId: string; top: number }) => {
+      const selector = `[data-message-version="${CSS.escape(anchor.messageId)}"]`
+      let frames = 0
+      let lastHeight = -1
+      let stable = 0
+      const step = () => {
+        const switcher = scroll.querySelector<HTMLElement>(selector)
+        if (switcher) {
+          const delta = switcher.getBoundingClientRect().top - anchor.top
+          if (Math.abs(delta) >= 1) {
+            scroll.scrollTop += delta
+            scrollTopRef.current = scroll.scrollTop
+            const metrics = cutMetricsRef.current
+            if (metrics) {
+              metrics.top = scroll.scrollTop
+              metrics.height = scroll.scrollHeight
+            }
+          }
+        }
+        const height = scroll.scrollHeight
+        stable = height === lastHeight ? stable + 1 : 0
+        lastHeight = height
+        frames += 1
+        // 高度稳定两帧就收工；最多盯 40 帧（约 0.6 秒），不跟用户的手抢
+        if (frames < 40 && stable < 2) {
+          requestAnimationFrame(step)
+        }
+      }
+      requestAnimationFrame(step)
+    },
+    []
+  )
+
   // 切换版本后将选择器留在原位置，避免回答长短变化导致操作区跳出视口。
   useLayoutEffect(() => {
     const anchor = restoreScrollRef.current
     const scroll = scrollRef.current
     if (anchor && scroll) {
-      const switcher = scroll.querySelector<HTMLElement>(
-        `[data-message-version="${CSS.escape(anchor.messageId)}"]`
-      )
-      if (switcher) {
-        scroll.scrollTop += switcher.getBoundingClientRect().top - anchor.top
-      }
       restoreScrollRef.current = null
+      pinVersionAnchor(scroll, anchor)
       return
     }
     stickyRef.current = true
     scrollToBottom()
-  }, [session.id, lastMessageId, scrollToBottom])
+  }, [session.id, lastMessageId, scrollToBottom, pinVersionAnchor])
 
   useEffect(closeSearchPanel, [session.id, lastMessageId])
 
@@ -356,7 +393,13 @@ export const MessageList = ({
                 />
               ) : (
                 <AssistantMessage
-                  key={message.id}
+                  /*
+                   * key 用父消息而不是回复自己的 id：同一轮的多个版本是兄弟，
+                   * 换版本时 React 才会复用同一个组件实例。按 id 作 key 的话每次切换
+                   * 都整棵卸载重挂，`content-visibility` 的实测高度跟着丢掉，
+                   * 滚动容器的高度会塌下去一截（切换版本后视口跳到对话最上方就是这个）。
+                   */
+                  key={message.parentId ?? message.id}
                   sessionId={session.id}
                   message={message}
                   isLast={index === lastIndex}

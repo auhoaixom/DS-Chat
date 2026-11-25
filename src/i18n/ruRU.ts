@@ -318,6 +318,8 @@ export const ruRU = {
   contextSystem: "Системный промпт",
   contextOverhead: "Накладные расходы запроса",
   contextCompactHint: "Сжать ранние сообщения в сводку; оригиналы сохраняются на устройстве и доступны для просмотра",
+  messageCostOffPeak: 'Вне',
+  messageCostMixed: 'Смеш.',
   messageCostPeak: 'Пик',
   messageCostAria: 'Стоимость ответа {amount}',
   messageCostDetailTitle: 'Стоимость ответа',

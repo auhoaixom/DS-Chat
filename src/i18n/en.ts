@@ -329,6 +329,8 @@ export const en = {
   contextSystem: 'System prompt',
   contextOverhead: 'Request overhead',
   contextCompactHint: 'Condenses earlier messages into a summary; the originals stay on this device',
+  messageCostOffPeak: 'Off',
+  messageCostMixed: 'Mixed',
   messageCostPeak: 'Peak',
   messageCostAria: 'This reply cost {amount}',
   messageCostDetailTitle: 'Reply cost',

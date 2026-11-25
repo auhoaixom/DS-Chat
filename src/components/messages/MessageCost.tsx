@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
-import { messageAllPeak, messageCostNano } from '../../services/chat/cost.js'
+import { messageCostNano, messageTier } from '../../services/chat/cost.js'
 import { formatCost, formatRate } from '../../services/chat/pricing.js'
 import type { AssistantMessage } from '../../services/chat/types.js'
 import { useAnchoredPosition, useDismiss } from '../base/anchored.js'
@@ -46,7 +46,7 @@ export const MessageCost = ({ message }: { message: AssistantMessage }) => {
   if (costs.length === 0) {
     return null
   }
-  const peak = messageAllPeak(message)
+  const tier = messageTier(message)
   const amount = formatCost(messageCostNano(message))
 
   return (
@@ -60,7 +60,14 @@ export const MessageCost = ({ message }: { message: AssistantMessage }) => {
           aria-haspopup="dialog"
           onClick={() => setOpen((value) => !value)}
         >
-          {peak ? <span className={styles.peakTag}>{t('messageCostPeak')}</span> : null}
+          {/* 峰贵一倍、谷是半价、续写跨了时段边界就是混：三种颜色分开认 */}
+          {tier === 'peak' ? (
+            <span className={clsx(styles.tag, styles.tagPeak)}>{t('messageCostPeak')}</span>
+          ) : tier === 'off' ? (
+            <span className={clsx(styles.tag, styles.tagOff)}>{t('messageCostOffPeak')}</span>
+          ) : tier === 'mixed' ? (
+            <span className={clsx(styles.tag, styles.tagMixed)}>{t('messageCostMixed')}</span>
+          ) : null}
           <span>{amount}</span>
         </button>
       </span>

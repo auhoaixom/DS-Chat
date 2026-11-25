@@ -27,14 +27,41 @@
   }
 }
 
-/* 峰价的标记：同样一句话贵一倍，不标出来会被当成算错 */
-.peakTag {
+/**
+ * 档位标记：峰红、谷蓝、混棕。
+ * 谷是常态也标出来，是为了让「同一条回复换个时间跑，价格为什么差一倍」有解释；
+ * 混（续写跨了时段边界）用第三种颜色，免得被当成其中任何一档。
+ */
+.tag {
   padding: 0 4px;
   border-radius: 4px;
   background-color: var(--dsw-alias-bg-layer-3);
-  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 16px;
+}
+
+.tagPeak {
+  color: var(--dsw-static-red-600);
+}
+
+.tagOff {
+  color: var(--dsw-alias-brand-primary);
+}
+
+.tagMixed {
+  color: #8a5a2b;
+}
+
+:global(body[data-ds-dark-theme]) .tagPeak {
+  color: var(--dsw-static-red-400);
+}
+
+:global(body[data-ds-dark-theme]) .tagOff {
+  color: var(--dsw-alias-brand-primary);
+}
+
+:global(body[data-ds-dark-theme]) .tagMixed {
+  color: #c99a63;
 }
 
 /* ---------- 明细浮层 ---------- */

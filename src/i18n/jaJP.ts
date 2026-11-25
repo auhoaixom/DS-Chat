@@ -318,6 +318,8 @@ export const jaJP = {
   contextSystem: "システムプロンプト",
   contextOverhead: "リクエストのオーバーヘッド",
   contextCompactHint: "古い会話を要約にまとめます。原文はこの端末に保存され、いつでも確認できます",
+  messageCostOffPeak: 'オフ',
+  messageCostMixed: '混在',
   messageCostPeak: 'ピーク',
   messageCostAria: 'この返信の費用 {amount}',
   messageCostDetailTitle: 'この返信の費用',

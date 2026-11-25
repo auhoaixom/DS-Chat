@@ -316,6 +316,8 @@ export const zhTW = {
   contextSystem: "系統提示詞",
   contextOverhead: "請求開銷",
   contextCompactHint: "把較早的對話濃縮成一段摘要，原文儲存在本機，隨時可查看",
+  messageCostOffPeak: '谷',
+  messageCostMixed: '混',
   messageCostPeak: '峰',
   messageCostAria: '本輪花費 {amount}',
   messageCostDetailTitle: '本輪花費',

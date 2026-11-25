@@ -313,6 +313,8 @@ export const zh = {
   contextSystem: '系统提示词',
   contextOverhead: '请求开销',
   contextCompactHint: '把较早的对话浓缩成一段摘要，原文保存在本机，随时可查看',
+  messageCostOffPeak: '谷',
+  messageCostMixed: '混',
   messageCostPeak: '峰',
   messageCostAria: '本轮花费 {amount}',
   messageCostDetailTitle: '本轮花费',

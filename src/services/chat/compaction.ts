@@ -3,10 +3,18 @@ import type { ChatModel, CreateMessageRequest, MessageUsage } from '../api/types
 import { useSettings } from '../settings.js'
 import { getVisibleMessages } from './branches.js'
 import { supportsServerFeatures } from './capabilities.js'
+import { requestCost } from './cost.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
 import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
-import type { Compaction, FileAttachment, Message, Session, UserMessage } from './types.js'
+import type {
+  Compaction,
+  FileAttachment,
+  Message,
+  RequestCost,
+  Session,
+  UserMessage,
+} from './types.js'
 
 /**
  * 上下文压缩：把当前分支开头的一段消息（保留最近一截原文）交给模型总结成结构化摘要，
@@ -596,11 +604,11 @@ const continuesFrom = (previous: Compaction, covered: Message[]): boolean =>
   previous.coveredIds.length < covered.length &&
   previous.coveredIds.every((id, index) => covered[index]?.id === id)
 
-/** 压缩结果：要么给出记录，要么说明为什么没压 */
+/** 压缩结果：要么给出记录，要么说明为什么没压。costs 是这趟真正花掉的钱（可能一次请求，也可能多次） */
 export type CompactionOutcome =
-  | { ok: true; compaction: Compaction }
+  | { ok: true; compaction: Compaction; costs: RequestCost[] }
   /** empty：消息还不够；no-gain：压完省不下上下文（摘要比被吞掉的原文还长） */
-  | { ok: false; reason: 'empty' | 'no-gain' }
+  | { ok: false; reason: 'empty' | 'no-gain'; costs: RequestCost[] }
 
 /** 允许的估算误差：缩小不到 5% 就当作没收益 */
 const NO_GAIN_RATIO = 0.05
@@ -635,9 +643,11 @@ export const buildCompaction = async ({
   onProgress?: (progress: CompactionProgress) => void
 }): Promise<CompactionOutcome> => {
   const visible = getVisibleMessages(session)
+  /** 这趟压缩真正花掉的请求，按发生顺序；空的结果也算（钱已经花了） */
+  const costs: RequestCost[] = []
   const plan = planCompaction(visible, window, { manual: mode === 'manual', aggressive })
   if (!plan) {
-    return { ok: false, reason: 'empty' }
+    return { ok: false, reason: 'empty', costs }
   }
   const covered = visible.slice(0, plan.coveredIds.length)
   // 能接着上次压：只总结「旧摘要 + 上次之后新增的原文」
@@ -660,6 +670,7 @@ export const buildCompaction = async ({
     const lastReply = [...visible]
       .reverse()
       .find((message) => message.role === 'assistant' && message.search !== undefined)
+    const at = Date.now()
     result = await requestReplaySummary(
       apiKey,
       model,
@@ -669,6 +680,10 @@ export const buildCompaction = async ({
       (text) =>
         onProgress?.({ phase: 'summary', done: 0, total: 1, chars: text.length })
     )
+    const cost = result.usage ? requestCost(result.usage, at, model) : null
+    if (cost) {
+      costs.push(cost)
+    }
   } else {
     const entries = fresh.map((message, index) =>
       toTranscriptEntry(message, merge ? index + previous.coveredIds.length : index)
@@ -687,6 +702,7 @@ export const buildCompaction = async ({
       const notes: string[] = []
       for (const [index, chunk] of chunks.entries()) {
         signal.throwIfAborted()
+        const at = Date.now()
         const note = await requestSummary(
           apiKey,
           model,
@@ -696,11 +712,16 @@ export const buildCompaction = async ({
           (text) =>
             onProgress?.({ phase: 'chunk', done: index, total: chunks.length, chars: text.length })
         )
+        const cost = note.usage ? requestCost(note.usage, at, model) : null
+        if (cost) {
+          costs.push(cost)
+        }
         notes.push(`### 第 ${index + 1} 段\n${note.text}`)
       }
       input = `下面是同一段对话按时间顺序排列的分段要点：\n\n${notes.join('\n\n')}\n\n请据此写出最终摘要。`
     }
     signal.throwIfAborted()
+    const finalAt = Date.now()
     result = await requestSummary(
       apiKey,
       model,
@@ -710,6 +731,10 @@ export const buildCompaction = async ({
       (text) =>
         onProgress?.({ phase: 'summary', done: chunks.length, total: chunks.length, chars: text.length })
     )
+    const finalCost = result.usage ? requestCost(result.usage, finalAt, model) : null
+    if (finalCost) {
+      costs.push(finalCost)
+    }
   }
   const summary = result.text
   // 诊断留痕：核对摘要请求是否吃到前缀缓存（真机可读 logcat 的 chromium 控制台）
@@ -727,12 +752,13 @@ export const buildCompaction = async ({
   const freshTokens = fresh.reduce((sum, message) => sum + estimateMessageTokens(message), 0)
   const beforeTokens = freshTokens + (merge && previous ? estimateTokens(previous.summary) : 0)
   const afterTokens = estimateTokens(summary)
-  // 摘要没比被替换掉的原文短，等于白花一次钱：作废，不改动现有记录
+  // 摘要没比被替换掉的原文短，等于白花一次钱：作废，不改动现有记录（但钱照记）
   if (!hasGain(beforeTokens, afterTokens)) {
-    return { ok: false, reason: 'no-gain' }
+    return { ok: false, reason: 'no-gain', costs }
   }
   return {
     ok: true,
+    costs,
     compaction: {
       summary,
       coveredIds: plan.coveredIds,

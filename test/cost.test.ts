@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { accrueCost, messageAllPeak, messageCostNano, sessionCost } from '../src/services/chat/cost.js'
+import { accrueCost, messageCostNano, messageTier, sessionCost } from '../src/services/chat/cost.js'
 import type { AssistantMessage, Message, Session } from '../src/services/chat/types.js'
 import { assistantMessage, userMessage } from './helpers.js'
 
@@ -75,11 +75,14 @@ test('服务端回报的模型名决定单价', () => {
   assert.equal(priced.costs?.[0]?.model, 'deepseek-v4-pro-0813')
 })
 
-test('全部请求都峰价才标峰；混一笔谷价就不标', () => {
+test('档位三态：全峰、全谷、跨时段边界的混合', () => {
   const allPeak = accrueCost(accrueCost(reply(), usage(10, 0, 0), PEAK_AT), usage(10, 0, 0), PEAK_AT)
-  assert.equal(messageAllPeak(allPeak), true)
+  assert.equal(messageTier(allPeak), 'peak')
+  const allOff = accrueCost(accrueCost(reply(), usage(10, 0, 0), OFF_AT), usage(10, 0, 0), OFF_AT)
+  assert.equal(messageTier(allOff), 'off')
   const mixed = accrueCost(allPeak, usage(10, 0, 0), OFF_AT)
-  assert.equal(messageAllPeak(mixed), false)
+  assert.equal(messageTier(mixed), 'mixed')
+  assert.equal(messageTier(reply()), null)
 })
 
 test('会话累计：没有成本记录时返回 null，界面整块不渲染', () => {
@@ -108,4 +111,22 @@ test('会话累计：还没收到事件的空壳不算未计价的一轮', () =>
     { ...assistantMessage(''), status: 'pending', blocks: [] } as AssistantMessage,
   ])
   assert.equal(sessionCost(session)?.unpriced, 0)
+})
+
+test('压缩这类不属于任何回复的请求，只进会话合计', () => {
+  const pricedReply = accrueCost(reply(), usage(1_000, 0, 0), OFF_AT)
+  const compactionCost = accrueCost(reply(), usage(0, 0, 200), OFF_AT).costs ?? []
+  const session = sessionOf([userMessage('问'), pricedReply])
+  session.extraCosts = compactionCost
+  const cost = sessionCost(session)
+  assert.equal(cost?.priced, 1)
+  assert.equal(cost?.nano, 1_000 * 1_000 + 200 * 4_000)
+})
+
+test('只有压缩开销、没有已计价回复时也给出合计', () => {
+  const session = sessionOf([userMessage('问'), assistantMessage('答')])
+  session.extraCosts = accrueCost(reply(), usage(0, 0, 200), OFF_AT).costs ?? []
+  const cost = sessionCost(session)
+  assert.equal(cost?.priced, 0)
+  assert.equal(cost?.nano, 200 * 4_000)
 })

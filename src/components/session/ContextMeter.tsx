@@ -177,9 +177,12 @@ export const ContextMeter = ({ session }: { session: Session }) => {
                     <div className={styles.costHead}>
                       <span>{t('costUsage')}</span>
                       <span className={styles.costAmount}>{formatCost(cost.nano)}</span>
-                      <span className={styles.costRounds}>
-                        {t('costPricedRounds', { count: cost.priced })}
-                      </span>
+                      {/* 只有压缩花过钱、没有已计价回复时，不写「0 条」 */}
+                      {cost.priced > 0 ? (
+                        <span className={styles.costRounds}>
+                          {t('costPricedRounds', { count: cost.priced })}
+                        </span>
+                      ) : null}
                     </div>
                     {cost.unpriced > 0 ? (
                       <div className={styles.costNote}>

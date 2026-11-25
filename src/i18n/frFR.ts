@@ -318,6 +318,8 @@ export const frFR = {
   contextSystem: "Prompt système",
   contextOverhead: "Surcoût de la requête",
   contextCompactHint: "Condense les anciens messages en un résumé ; les originaux restent sur cet appareil et sont consultables",
+  messageCostOffPeak: 'Creux',
+  messageCostMixed: 'Mixte',
   messageCostPeak: 'Pic',
   messageCostAria: 'Coût de cette réponse {amount}',
   messageCostDetailTitle: 'Coût de cette réponse',
