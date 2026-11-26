@@ -329,6 +329,8 @@ settingsSupportAuthorAction: 'Open GitHub',
   compactionModeManual: 'Manual',
   compactionUndo: 'Undo compaction',
   compactionShowOriginals: 'View originals',
+  loadOlderMore: 'Load {count} earlier messages',
+  loadOlderRemaining: ' ({remaining} left in total)',
   compactionOriginalsMore: 'Show more ({count} left)',
   compactionHideOriginals: 'Hide originals',
   compactionOriginalsTitle:
