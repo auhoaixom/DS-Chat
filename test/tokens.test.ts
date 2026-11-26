@@ -8,6 +8,11 @@ import {
   getContextWindow,
   getPromptTokens,
 } from '../src/services/chat/tokens.js'
+import {
+  deriveDocumentPrices,
+  commitDerivedPrices,
+  resetFileTokensForTest,
+} from '../src/services/chat/fileTokens.js'
 import { assistantMessage, documentFile, imageFile, userMessage } from './helpers.js'
 
 test('中文按字数折算、ASCII 按约 3.3 字符折算，并且向上取整', () => {
@@ -37,6 +42,19 @@ test('用户消息带固定的 8 token 开销，附件按类别折算', () => {
 
   const withBoth = { ...userMessage(''), files: [imageFile(), documentFile()] }
   assert.equal(estimateMessageTokens(withBoth), 1_500 + 2_000 + 8)
+})
+
+test('拿到真价的附件按真价算，不再用占位值', async () => {
+  resetFileTokensForTest()
+  const document = documentFile('doc-priced')
+  const withDocument = { ...userMessage(''), files: [{ ...document, serverId: 'file-priced' }] }
+  assert.equal(estimateMessageTokens(withDocument), 2_000 + 8)
+
+  // 反推：实测 2900、估算 2600、占位 2000 → 真价 2300
+  const derived = deriveDocumentPrices([{ file: document, count: 1 }], 2_900, 2_600)
+  assert.ok(derived)
+  await commitDerivedPrices(derived, 'deepseek-flash')
+  assert.equal(estimateMessageTokens(withDocument), 2_300 + 8)
 })
 
 test('助手消息只累计文本块', () => {

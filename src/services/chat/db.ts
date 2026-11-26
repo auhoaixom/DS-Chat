@@ -559,6 +559,29 @@ export const writeMeta = async (key: string, value: unknown): Promise<void> => {
   await (await getDB()).put('meta', { key, value })
 }
 
+/**
+ * 按前缀读一批 meta（附件价格这类成片的小记录）。
+ * 返回 `[key, value]`，键按存储顺序，不做排序；调用方自己剥前缀。
+ */
+export const readMetaEntries = async (prefix: string): Promise<Array<[string, unknown]>> => {
+  const db = await getDB()
+  const read = db.transaction('meta', 'readonly')
+  const entries: Array<[string, unknown]> = []
+  try {
+    let cursor = await read.store.openCursor()
+    while (cursor) {
+      const key = String(cursor.key)
+      if (key.startsWith(prefix)) {
+        entries.push([key, (cursor.value as { value?: unknown }).value])
+      }
+      cursor = await cursor.continue()
+    }
+  } finally {
+    await read.done
+  }
+  return entries
+}
+
 export const countSessions = async (): Promise<number> => (await getDB()).count('sessions')
 
 /** 迁移的分批大小：一批一条游标事务，内存里同时最多这么多条会话 */

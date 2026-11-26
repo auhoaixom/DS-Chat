@@ -1,5 +1,6 @@
 import type { MessageUsage } from '../api/types.js'
 import { DEFAULT_CONTEXT_WINDOW } from '../settings.js'
+import { fileTokensOf } from './fileTokens.js'
 import type { Message } from './types.js'
 
 /**
@@ -25,16 +26,12 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
  *
  * 什么时候 +1（改任何一项都要）：
  * - `estimateTokens` 的 0.75 / 0.32 两个系数
- * - `IMAGE_TOKENS` / `DOCUMENT_TOKENS` / `READ_LINK_TOKENS` 占位值
+ * - `READ_LINK_TOKENS` 占位值
  * - `compaction.ts` 的 `REQUEST_OVERHEAD`
- * - 附件真值（fileTokens）改变了某类附件的取值方式
+ * - `fileTokens.ts` 的 `IMAGE_TOKENS` / `DOCUMENT_TOKENS` 占位值，或附件真值的取值方式
  */
 export const ESTIMATE_VERSION = 2
 
-/** 图片经 Files API 展开成视觉 token；按偏大估，宁可提前压缩 */
-const IMAGE_TOKENS = 1_500
-/** 文档按解析后的文本量差异很大，取一个保守的均价 */
-const DOCUMENT_TOKENS = 2_000
 /**
  * 抓取结果块的固定开销。页面正文加密在 signature 里、`content.source.data` 是空串，
  * 请求只带一个不透明的签名，服务端不按页面长度计费。
@@ -71,10 +68,9 @@ export const estimateTokens = (text: string): number => {
 /** 单条消息进入请求后的 token 估算 */
 export const estimateMessageTokens = (message: Message): number => {
   if (message.role === 'user') {
-    const files = message.files.reduce(
-      (sum, file) => sum + (file.isImage ? IMAGE_TOKENS : DOCUMENT_TOKENS),
-      0
-    )
+    // 附件单价问 fileTokens：拿得到服务端真值（图片）或反推值（文档）就用它，
+    // 拿不到才退回占位值——占位值本身由 fileTokens.ts 管，别在这里再写一份
+    const files = message.files.reduce((sum, file) => sum + fileTokensOf(file), 0)
     return estimateTokens(message.content) + files + 8
   }
   let tokens = 8

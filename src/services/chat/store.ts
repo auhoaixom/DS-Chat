@@ -20,9 +20,10 @@ import {
 import { upgradeSession } from './contentVersion.js'
 import { accrueCost } from './cost.js'
 import * as db from './db.js'
+import { deriveDocumentPrices, commitDerivedPrices, hydrateFileTokens, type DocumentEntry } from './fileTokens.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { supportsServerFeatures } from './capabilities.js'
-import { ESTIMATE_VERSION, estimateTokens } from './tokens.js'
+import { ESTIMATE_VERSION, estimateTokens, getPromptTokens } from './tokens.js'
 import {
   clearAllDrafts,
   clearDraft,
@@ -348,6 +349,8 @@ export const initChat = (): Promise<void> => {
   set({ initError: false })
   initTask = (async () => {
     try {
+      // 附件真值先水合：第一次估算就能用上，读不到就静默退回占位值
+      await hydrateFileTokens()
       const summaries = await db.loadSessionSummaries()
       if (epoch === historyEpoch) {
         set({ ready: true, sessions: sortSessions(summaries) })
@@ -970,6 +973,46 @@ const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
 }
 
 /**
+ * 文档附件的定价：第一次带着某份文档发出请求、拿到服务端用量之后，
+ * 用「实测 − 这次请求的估算」反推它的真实开销，写进 meta，此后一直用它
+ * （`count_tokens` 对文档只算壳子，用不了——实测 44 vs 真发 599）。
+ *
+ * 顺带把这一枪的 `promptEstimate` 修正到新尺子：否则下一次测算会把这笔校准
+ * 当成"对话变长了"，数字凭空上跳。
+ */
+const calibrateDocuments = async (
+  reply: AssistantMessage,
+  prepared: { history: Message[]; question: UserMessage }
+): Promise<AssistantMessage> => {
+  const estimate = reply.promptEstimate
+  if (!reply.usage || estimate === undefined) {
+    return reply
+  }
+  const counts = new Map<string, DocumentEntry>()
+  for (const message of [...prepared.history, prepared.question]) {
+    if (message.role !== 'user') {
+      continue
+    }
+    for (const file of message.files) {
+      // 图片走上传后的一次 count_tokens；没有 serverId 的附件根本不进请求
+      if (file.isImage || !file.serverId) {
+        continue
+      }
+      counts.set(file.id, { file, count: (counts.get(file.id)?.count ?? 0) + 1 })
+    }
+  }
+  if (counts.size === 0) {
+    return reply
+  }
+  const derived = deriveDocumentPrices([...counts.values()], getPromptTokens(reply.usage), estimate)
+  if (!derived) {
+    return reply
+  }
+  await commitDerivedPrices(derived, reply.servedModel ?? reply.model ?? '')
+  return { ...reply, promptEstimate: Math.max(0, estimate + derived.delta) }
+}
+
+/**
  * 附件的服务端 id：已有直接用；正在上传的等待同一任务；否则读取本地原件补传。
  * 本地也没有原件（导入的文档附件只有元数据）时返回 null，该附件只展示、不进入请求。
  */
@@ -1330,6 +1373,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           if (event.type === 'message_delta' && event.usage && !accrued) {
             accrued = true
             reply = accrueCost(reply, event.usage, requestedAt)
+            // 第一次拿到实测：给这份请求里的文档定价（已有价格的不会再动）
+            reply = await calibrateDocuments(reply, prepared).catch(() => reply)
           }
           reportKeepAliveProgress(replyChars(reply))
           if (document.visibilityState === 'hidden') {

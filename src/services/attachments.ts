@@ -3,6 +3,8 @@ import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { uploadFile } from './api/client.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { calibrateImage } from './chat/fileTokens.js'
+import { useSettings } from './settings.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
 /** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
@@ -180,6 +182,19 @@ export const uploadAttachment = (
   const promise = enqueueUpload(apiKey, blob, name, isImage, controller.signal)
     .then((serverId) => {
       setTask(id, { status: 'done', serverId })
+      /**
+       * 图片的真价问一次服务端（count_tokens 对图片准到与计费一字不差）。
+       * 这里刻意不 await：用户选完图到真正发送通常还有几秒，够它跑完；
+       * 跑不完或失败就继续用占位值，绝不挡住发送。
+       */
+      if (isImage) {
+        void calibrateImage(
+          apiKey,
+          { id, serverId, name, size: blob.size, isImage, mimeType: blob.type },
+          serverId,
+          useSettings.getState().model
+        )
+      }
       return serverId
     })
     .catch((error: unknown) => {

@@ -160,6 +160,38 @@ export const deleteFile = async (apiKey: string, fileId: string): Promise<void> 
   })
 }
 
+/** 数一遍请求有多少输入 token 用的最小信封：与真实请求同形的 messages 即可 */
+type CountTokensRequest = {
+  model: string
+  messages: CreateMessageRequest['messages']
+}
+
+/**
+ * POST /anthropic/v1/messages/count_tokens —— 让服务端数一遍这份请求有多少输入 token。
+ *
+ * 实测（2026-11，本机真机抓头、同形 envelope）：
+ * - **图片准到和计费一字不差**：53 970 B 的 PNG → 226，真实请求的 usage 也是 226；
+ * - **文档只算壳子**：1 696 B 的 txt → 44，真发一次是 599（差 13.5 倍）；PDF 同理。
+ * 所以只有图片能用它定价；文档必须在真发一次之后反推（见 chat/fileTokens.ts）。
+ */
+export const countTokens = async (
+  apiKey: string,
+  body: CountTokensRequest,
+  signal?: AbortSignal
+): Promise<number> => {
+  const response = await request(`${ANTHROPIC_BASE_URL}/messages/count_tokens`, {
+    method: 'POST',
+    headers: {
+      ...anthropicHeaders(apiKey, true),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal,
+  })
+  const data = (await response.json()) as { input_tokens?: unknown }
+  return typeof data.input_tokens === 'number' ? data.input_tokens : 0
+}
+
 const hasFile = (body: CreateMessageRequest) =>
   body.messages.some(
     (message) =>
