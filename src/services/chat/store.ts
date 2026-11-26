@@ -13,6 +13,7 @@ import {
   getSessionModel,
   isContextOverflowError,
   needsCompaction,
+  requestKeyOf,
   withCompactionSummary,
   type CompactionProgress,
 } from './compaction.js'
@@ -1266,8 +1267,22 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const promptEstimate =
           estimateRequestTokens([...prepared.history, prepared.question]) +
           estimateTokens(system)
-        // 连同估算口径版本一起存：以后口径变了，这条估算就不能再当锚点基准
-        reply = { ...reply, latestReminder, promptEstimate, estimateVersion: ESTIMATE_VERSION }
+        // 连同估算口径版本与请求形状一起存：以后口径或形状变了，这条估算/实测就不能当锚点基准
+        const requestKey = requestKeyOf({
+          model,
+          thinking: initial.thinking ?? false,
+          search: initial.search ?? false,
+          hasFiles: [...prepared.history, prepared.question].some(
+            (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
+          ),
+        })
+        reply = {
+          ...reply,
+          latestReminder,
+          promptEstimate,
+          estimateVersion: ESTIMATE_VERSION,
+          requestKey,
+        }
         updateReply(sessionId, reply)
         persist(sessionId)
         const messages = toRequestMessages(

@@ -4,7 +4,7 @@ import { useSettings } from '../settings.js'
 import { getVisibleMessages } from './branches.js'
 import { supportsServerFeatures } from './capabilities.js'
 import { requestCost } from './cost.js'
-import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
+import { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION, safetyCheckField, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
 import {
   ESTIMATE_VERSION,
@@ -330,10 +330,46 @@ export const estimateRequestTokens = (messages: Message[], overhead = REQUEST_OV
 export type AnchorState = 'measured' | 'estimate' | 'dropped'
 
 /**
- * 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理；
- * estimate 那条回复的估算口径版本和现在不一样。
+ * 一次请求的"形状"。服务端回报的 usage 只对**那一次**的这个形状成立：
+ * 换模型、开关思考、开关联网、上下文里多了附件、提示词或估算口径改过，
+ * 实测值就不能再当这一轮的基准——量出来的根本不是同一个东西。
  */
-export type AnchorDropReason = 'compaction' | 'usage' | 'estimate'
+export type RequestShape = {
+  model: string
+  thinking: boolean
+  search: boolean
+  hasFiles: boolean
+}
+
+/** 形状的稳定短串，直接存进消息，不需要哈希 */
+export const requestKeyOf = (shape: RequestShape): string =>
+  `m:${shape.model}|t:${shape.thinking ? 1 : 0}|s:${shape.search ? 1 : 0}|f:${shape.hasFiles ? 1 : 0}` +
+  `|p:${SYSTEM_PROMPT_VERSION}|e:${ESTIMATE_VERSION}`
+
+/**
+ * 这个会话下一次请求的形状：模型跟会话走，两个开关跟当前设置，
+ * 附件看可见历史里有没有已经拿到 file_id 的（没有的不会进请求）。
+ */
+export const requestShapeOf = (session: Session): RequestShape => {
+  const settings = useSettings.getState()
+  return {
+    model: getSessionModel(session),
+    thinking: settings.thinking,
+    search: settings.search,
+    hasFiles: getVisibleMessages(session).some(
+      (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
+    ),
+  }
+}
+
+/** 会话当前请求形状的短串 */
+export const currentRequestKey = (session: Session): string => requestKeyOf(requestShapeOf(session))
+
+/**
+ * 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理；
+ * estimate 那条回复的估算口径版本和现在不一样；request 那次请求的形状和现在不一样。
+ */
+export type AnchorDropReason = 'compaction' | 'usage' | 'estimate' | 'request'
 
 export type ContextUsage = {
   /** 下一次请求预计占用的提示侧 token */
@@ -399,13 +435,17 @@ const measureContext = (
   let anchorEstimate: number | undefined
   /** 锚点那条回复写 promptEstimate 时的估算口径版本；缺省（老数据）为 0 */
   let anchorEstimateVersion = 0
+  /** 锚点那次请求的形状；缺省（旧版本写下的）为空串，永远对不上 */
+  let anchorRequestKey = ''
   let anchorCreatedAt = 0
+  const wantedKey = currentRequestKey(session)
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const message = visible[index]
     if (message?.role === 'assistant' && message.usage) {
       anchorUsage = getPromptTokens(message.usage)
       anchorEstimate = message.promptEstimate
       anchorEstimateVersion = message.estimateVersion ?? 0
+      anchorRequestKey = message.requestKey ?? ''
       anchorCreatedAt = message.createdAt
       break
     }
@@ -428,6 +468,12 @@ const measureContext = (
      * 老记录没有这个字段（视为 0），升级后会一次性退回收纯估算，下一次回复重新锚定。
      */
     dropReason = 'estimate'
+  } else if (anchorUsage !== undefined && anchorRequestKey !== wantedKey) {
+    /**
+     * 那次请求和下一次请求不是一回事（换模型、开关思考/联网、多了附件、提示词或口径改过），
+     * 实测值只对当时那个形状成立，拿来当基准就是在串数。
+     */
+    dropReason = 'request'
   }
   const anchorUsed = anchorUsage ?? null
   const anchorEstimateValue = anchorEstimate ?? null

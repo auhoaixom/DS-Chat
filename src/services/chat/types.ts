@@ -130,6 +130,12 @@ export type AssistantMessage = MessageBranch & {
    * 版本对不上，这个估算值就不能拿来当锚点的基准；缺省表示口径版本之前写下的。
    */
   estimateVersion?: number
+  /**
+   * 发出这次请求时的请求形状（模型 / 思考 / 联网 / 有无附件 / 提示词与口径版本），
+   * 见 compaction.ts 的 `requestKeyOf`。形状变了，这次回报的 usage 就不能当基准。
+   * 本机口径，不进导出包。
+   */
+  requestKey?: string
   error?: {
     /** upload：发送前补传附件失败，请求没有发出 */
     kind: ApiErrorKind | 'upload'

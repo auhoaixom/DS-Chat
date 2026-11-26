@@ -9,13 +9,14 @@ import {
   hasGain,
   isContextOverflowError,
   planCompaction,
+  requestKeyOf,
 } from '../src/services/chat/compaction.js'
 import { ApiError } from '../src/services/api/client.js'
 import { SAFETY_CHECK, SYSTEM_PROMPT, safetyCheckField } from '../src/services/chat/prompt.js'
 import { ESTIMATE_VERSION } from '../src/services/chat/tokens.js'
 import { useSettings } from '../src/services/settings.js'
 import type { Session } from '../src/services/chat/types.js'
-import { assistantMessage, at, compactionRecord, conversation, userMessage } from './helpers.js'
+import { assistantMessage, at, compactionRecord, conversation, imageFile, userMessage } from './helpers.js'
 
 const ids = (count: number) => Array.from({ length: count }, (_, index) => `m${index + 1}`)
 
@@ -192,12 +193,23 @@ test('被覆盖消息的 id 保持原顺序', () => {
 
 // ── getContextUsage：实测锚点与估算的口径 ──────────────────────
 
+/** 当前设置下的请求形状短串；与 store.ts 写入点同一套算法 */
+const keyOf = (hasFiles = false) =>
+  requestKeyOf({
+    model: useSettings.getState().model,
+    thinking: useSettings.getState().thinking,
+    search: useSettings.getState().search,
+    hasFiles,
+  })
+
 const answered = (text: string, createdAt: number, promptEstimate: number) => ({
   ...assistantMessage(text),
   createdAt,
   promptEstimate,
   // 和现在的写入点一致：当前口径写下的估算才允许当锚点基准
   estimateVersion: ESTIMATE_VERSION,
+  // 形状也要对得上，否则这条实测会被判成"换了模型/开关"
+  requestKey: keyOf(),
   usage: {
     input_tokens: 9_000,
     cache_creation_input_tokens: 0,
@@ -322,6 +334,29 @@ test('估算口径版本变了，旧锚点直接丢掉', () => {
   assert.equal(usage.anchorDropReason, 'estimate')
   // 退回收纯估算之后不会落在 64 这个"看起来很小的实测"上
   assert.ok(usage.used > 64, `纯估算应当是几百的量级，实际 ${usage.used}`)
+})
+
+test('换了模型或开关之后，不再拿旧实测当锚点', () => {
+  const messages = [userMessage('问'), answered('答', 100, 800)]
+  const original = useSettings.getState().thinking
+  try {
+    useSettings.setState({ thinking: !original })
+    const usage = getContextUsage(sessionOf(messages))
+    assert.ok(usage)
+    assert.equal(usage.measured, false)
+    assert.equal(usage.anchorDropReason, 'request')
+  } finally {
+    useSettings.setState({ thinking: original })
+  }
+})
+
+test('上下文里多了附件之后，旧实测也不再复用', () => {
+  // 这条回复是在"没有附件"的形状下发出去的
+  const answer = answered('答', 100, 800)
+  const withAttachment = { ...userMessage('问'), files: [{ ...imageFile(), serverId: 'file-1' }] }
+  const usage = getContextUsage(sessionOf([withAttachment, answer]))
+  assert.ok(usage)
+  assert.equal(usage.anchorDropReason, 'request')
 })
 
 test('没有口径版本的历史回复也不当锚点', () => {

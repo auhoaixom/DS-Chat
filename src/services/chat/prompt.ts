@@ -8,6 +8,14 @@ import { supportsServerFeatures } from './capabilities.js'
 /** 所有生成请求统一携带的助手身份说明 */
 export const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 
+/**
+ * 系统提示词的版本号。**改了 `SYSTEM_PROMPT` 就要 +1。**
+ * 每次请求的固定开销变了，服务端实测的提示侧 token 就和历史回复不是一回事了，
+ * 锚点（见 compaction.ts 的 requestKey）靠它判定要不要继续复用。
+ * 工具声明不单独计版本：它由模型能力与搜索开关决定，这两个已经在 requestKey 里了。
+ */
+export const SYSTEM_PROMPT_VERSION = 1
+
 /** 阅读链接始终开启，智能搜索开关控制是否另行声明搜索工具（含边想边搜）。 */
 export const serverTools = (model: string, search: boolean): CreateMessageRequest['tools'] => {
   if (!supportsServerFeatures(model)) {
