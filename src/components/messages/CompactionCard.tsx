@@ -42,6 +42,16 @@ export const CompactionCard = ({
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const run = useChatStore((state): CompactionRun | undefined => state.compacting[sessionId])
+  /**
+   * 必须和上面几个 hook 并排，**不能放到下面那两个提前返回之后**。
+   *
+   * 提前返回会让这个组件在不同状态下调用不同个数的 hook：压缩中返回 3 个、压缩完走到这里变 4 个、
+   * 撤销压缩后又回到 3 个。React 一发现个数变了就整棵子树抛错，于是压缩完成那一刻报
+   * 「Rendered more hooks than during the previous render」（#310）、撤销压缩那一刻报
+   * 「Rendered fewer hooks than expected」（#300），两次都掉进「界面出错了」的兜底页。
+   * 用户点「重试」能恢复，是因为重新挂载后 hook 个数从第一帧起就是一致的——数据其实早就写好了。
+   */
+  const pinned = useOriginalsPinned((state) => state.pinned)
 
   if (run) {
     return (
@@ -91,10 +101,16 @@ export const CompactionCard = ({
    * 用户滑过原文块之后不再退出吸顶——那样是布局开关，只能瞬间切换，看着像"啪"地消失。
    * 改成吸顶保持不变、把卡片整体推上去（`data-away`），视觉上是"收起来"。
    * 想收起原文得往回滑，这是定下的取舍，所以这里不给别的入口。
-   * 卡片摘要自己展开着时不吸顶：那段摘要可能很长，钉在顶上会吃掉半个屏幕。
+   *
+   * **摘要展开着也照样吸顶**。早先这里写的是 `originalsOpen && !open`，本意是怕长摘要钉在
+   * 顶上吃掉半个屏幕；但摘要区本来就限了 46vh 并在卡片里自己滚，那个担心并不成立，
+   * 而代价很实在：用户点箭头的那一刻卡片从 `sticky` 掉回正常流，直接飞回整条对话的最顶上
+   * （真机实测 top 从 60 变成 −22202），得往上滑很久才找得回来——点的是卡片上的按钮，
+   * 东西却跑掉了。所以吸顶只看原文开没开。
+   *
+   * `pinned` 这个 hook 不在这里调用——见文件顶部那一段说明。
    */
-  const pinned = useOriginalsPinned((state) => state.pinned)
-  const sticky = originalsOpen && !open
+  const sticky = originalsOpen
   return (
     <div
       className={clsx(styles.card, sticky && styles.sticky)}

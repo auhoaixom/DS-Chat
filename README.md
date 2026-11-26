@@ -10,7 +10,7 @@
 
 一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
 
-当前版本 `1.6.3`（`versionCode 103`）。MIT 许可，欢迎 issue 与 PR。
+当前版本 `1.6.4`（`versionCode 104`）。MIT 许可，欢迎 issue 与 PR。
 
 ## 这是什么
 
@@ -211,3 +211,4 @@ tools/icon/            字标抠图与各密度图标生成
 - [RELEASES.md](RELEASES.md)：版本台账，tag / `versionCode` / APK / 变更。
 - [tools/probe/README.md](tools/probe/README.md)：真机问题怎么用 CDP 探针复现。
 - [src/services/chat/history/README.md](src/services/chat/history/README.md)：导入导出格式与保留范围。
+

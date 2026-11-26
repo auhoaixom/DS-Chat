@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.6.4 | 2026-11-27 | 104 | 有 | fix: stop the compaction card from crashing the screen, and keep it pinned when the summary opens (v1.6.4) |
 | v1.6.3 | 2026-11-26 | 103 | 有 | fix: give every bubble its own React key, so scrolling back up stops duplicating questions (v1.6.3) |
 | v1.6.2 | 2026-11-26 | 102 | 有 | fix: put the compaction card away after a jump to the bottom, not only after a swipe (v1.6.2) |
 | v1.6.1 | 2026-11-26 | 101 | 有 | feat: bring a jump-to-bottom button, and render the compacted originals in batches you ask for (v1.6.1) |
