@@ -2,12 +2,18 @@ import { create } from 'zustand'
 import { useSettings } from '../../services/settings.js'
 import { closeMobileSider } from '../sider/mobileSiderState.js'
 
-/** 设置的五个分类，值同时是子页的身份 */
-export type SettingsSection = 'account' | 'data' | 'region' | 'personalization' | 'chat'
+/** 设置的六个分类，值同时是子页的身份 */
+export type SettingsSection =
+  | 'account'
+  | 'data'
+  | 'region'
+  | 'personalization'
+  | 'chat'
+  | 'about'
 
 /**
  * 分类在列表里的顺序。
- * 用户定的顺序：账户 → 数据 → 语言与地区 → 个性化 → 聊天。
+ * 用户定的顺序：账户 → 数据 → 语言与地区 → 个性化 → 聊天与后台 → 关于。
  */
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   'account',
@@ -15,6 +21,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   'region',
   'personalization',
   'chat',
+  'about',
 ]
 
 /**

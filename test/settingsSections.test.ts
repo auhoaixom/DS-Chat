@@ -7,10 +7,35 @@ import {
   ensureApiKey,
   openSection,
   openSettings,
+  SETTINGS_SECTIONS,
   settingsBackAction,
   useSettingsDialog,
 } from '../src/components/settings/settingsDialogState.js'
 import { setApiKey } from '../src/services/settings.js'
+
+/**
+ * 分类的顺序是用户定的，不是代码顺手排的。
+ * 顺序一变，他每天点的那几下滑动路径就全变了——这种改动必须有人签字，
+ * 所以用测试钉住，改的时候至少会看见这行断言。
+ */
+test('六个分类按用户定的顺序排', () => {
+  assert.deepEqual(SETTINGS_SECTIONS, [
+    'account',
+    'data',
+    'region',
+    'personalization',
+    'chat',
+    'about',
+  ])
+})
+
+test('关于也是子页：进去之后返回是退一格', () => {
+  openSettings()
+  openSection('about')
+  assert.equal(settingsBackAction(), 'section')
+  backToRoot()
+  assert.equal(settingsBackAction(), 'close')
+})
 
 /**
  * 设置的两层页面：返回键该退一格还是关窗，全看这个状态。

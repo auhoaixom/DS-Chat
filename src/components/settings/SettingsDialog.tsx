@@ -28,9 +28,11 @@ import {
 } from '../../services/settings.js'
 import { fetchBalance, formatBalance, type BalanceAvailability } from '../../services/balance.js'
 import { openSystemSettings } from '../../services/keepAlive.js'
+import { checkForUpdate, REPO_URL, RELEASES_URL } from '../../services/update.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
+import { LinkButton } from '../base/LinkButton.js'
 import { Modal, ModalCloseButton } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { Switch } from '../base/Switch.js'
@@ -64,6 +66,7 @@ const sectionTitles: Record<SettingsSection, TranslationKey> = {
   region: 'settingsSectionRegion',
   personalization: 'settingsSectionPersonalization',
   chat: 'settingsSectionChat',
+  about: 'settingsSectionAbout',
 }
 
 const SettingsContent = () => {
@@ -117,6 +120,8 @@ const SettingsContent = () => {
       .filter(Boolean)
       .join(' · '),
     chat: t(enterNewline ? 'settingsSummaryEnterNewline' : 'settingsSummaryEnterSend'),
+    // 关于这一行只写版本号：不联网之后，这里是用户唯一能看到"装的是哪一版"的地方
+    about: `v${__APP_VERSION__}`,
   }
 
   useEffect(() => {
@@ -263,11 +268,10 @@ const SettingsContent = () => {
                   <KeepAliveSetting />
                 </>
               ) : null}
+              {section === 'about' ? <AboutSection /> : null}
             </div>
           )}
         </div>
-        {/* 窗口最底下一行版本号：固定在那里，不跟内容滚 */}
-        <div className={styles.version}>{`DS Chat ${__APP_VERSION__}`}</div>
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
@@ -663,6 +667,115 @@ const EnterKeySetting = () => {
         />
       }
     />
+  )
+}
+
+/** 一次检查的界面状态；判断逻辑都在 services/update.ts，这里只管显示 */
+type UpdateState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'latest' }
+  | { kind: 'available'; version: string; downloadUrl: string | null }
+  | { kind: 'failed'; reason: 'network' | 'rate' | 'bad' }
+
+/** 三种失败各有各的说法：网络不通和"被限流"，给用户的下一步不是一回事 */
+const updateFailureKeys: Record<'network' | 'rate' | 'bad', TranslationKey> = {
+  network: 'settingsUpdateFailedNetwork',
+  rate: 'settingsUpdateFailedRate',
+  bad: 'settingsUpdateFailedBad',
+}
+
+/**
+ * 「关于」：检测更新 + 支持作者。
+ *
+ * 检查是手动的、一次性的——不自动查、不后台轮询、结果也不落盘，关掉设置就忘了。
+ * 查到有新版本只把链接交出去：App 不下载、不安装，也不要任何安装权限。
+ * 三个去处都是 `<a target="_blank">`，交给系统浏览器，跟应用里其它外链同一条路。
+ */
+const AboutSection = () => {
+  const t = useTranslate()
+  const [state, setState] = useState<UpdateState>({ kind: 'idle' })
+  const controllerRef = useRef<AbortController | null>(null)
+
+  // 离开这一页就掐掉在途请求：回来时不该有迟到的结果改写界面
+  useEffect(() => () => controllerRef.current?.abort(), [])
+
+  const check = async () => {
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    setState({ kind: 'checking' })
+    const outcome = await checkForUpdate(__APP_VERSION__, { signal: controller.signal })
+    if (controller.signal.aborted) {
+      return
+    }
+    setState(outcome.kind === 'failed' ? { kind: 'failed', reason: outcome.reason } : outcome)
+  }
+
+  const description =
+    state.kind === 'latest'
+      ? t('settingsUpdateLatest')
+      : state.kind === 'available'
+        ? t('settingsUpdateAvailable', { version: state.version })
+        : state.kind === 'failed'
+          ? t(updateFailureKeys[state.reason])
+          : undefined
+
+  return (
+    <>
+      <SettingCell
+        label={t('settingsCheckUpdate')}
+        description={description}
+        status={null}
+        className={styles.updateCell}
+        action={
+          <div className={styles.updateActions}>
+            {state.kind === 'available' ? (
+              // 发布页没挂 apk 时退回 Release 列表：绝不给一颗点了没反应的按钮
+              <LinkButton
+                href={state.downloadUrl ?? RELEASES_URL}
+                variant="primary"
+                size="m"
+                className={styles.cellButton}
+              >
+                {t(state.downloadUrl ? 'settingsUpdateGoUpdate' : 'settingsUpdateGoReleases')}
+              </LinkButton>
+            ) : (
+              <>
+                {state.kind === 'failed' ? (
+                  <LinkButton href={RELEASES_URL} size="m" className={styles.cellButton}>
+                    {t('settingsUpdateGoReleases')}
+                  </LinkButton>
+                ) : null}
+                <Button
+                  variant="outlined"
+                  size="m"
+                  className={styles.cellButton}
+                  disabled={state.kind === 'checking'}
+                  onClick={() => void check()}
+                >
+                  {t(
+                    state.kind === 'checking'
+                      ? 'settingsCheckUpdateChecking'
+                      : 'settingsCheckUpdateAction'
+                  )}
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      />
+      <SettingCell
+        label={t('settingsSupportAuthor')}
+        description={t('settingsSupportAuthorHint')}
+        status={null}
+        action={
+          <LinkButton href={REPO_URL} size="m" className={styles.cellButton}>
+            {t('settingsSupportAuthorAction')}
+          </LinkButton>
+        }
+      />
+    </>
   )
 }
 

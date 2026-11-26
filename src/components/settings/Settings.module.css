@@ -228,6 +228,30 @@
   flex-wrap: wrap;
 }
 
+/*
+ * 「关于」里的检测更新行。
+ * 文字可能很长（"检查失败，网络好像不通"），右边还可能并排两颗按钮，
+ * 手机上放不下一行就换行——宁可这一格变高，也不让按钮被压扁或文字被截断。
+ */
+.updateCell {
+  flex-wrap: wrap;
+}
+
+.updateCell .text {
+  flex: 1 0 auto;
+  padding-right: 8px;
+}
+
+/* 按钮区不参与收缩：两颗按钮要么并排，要么整块换到下一行 */
+.updateActions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
 .locationCell .text {
   flex: 1 0 auto;
   padding-right: 8px;
@@ -423,15 +447,20 @@
 
 @media not all and (min-width: 768px) {
   /*
-   * 手机上是一个固定高度的矮窗口：五个分类 + 底部一行版本号正好装下，
-   * 剩下的留白只当收尾。列表页与子页用同一个高度——子页内容超出时在
-   * 里面滚动，不去改窗口高度，免得进子页时顶边往上跳一下。
+   * 手机上是一个固定高度的矮窗口：六个分类正好装下，剩下的留白只当收尾。
+   * 列表页与子页用同一个高度——子页内容超出时在里面滚动，不去改窗口高度，
+   * 免得进子页时顶边往上跳一下。
+   *
+   * 540 是按六行算出来的：540 − 19 上 − 44 标题 − 7 间隙 − 22 下 = 448，
+   * 再减去内容区自己的 8 + 12 = 428，六行 × 68 = 408，余 20dp。
+   * 1.6.0 之前底部还有一行版本号（8 + 18），占掉 26dp，只够五行；
+   * 那一行已经并进「关于」，窗口因此只需要抬这么一点。
    */
   .dialog {
     align-self: flex-end;
     width: 100%;
     max-width: none;
-    height: min(calc(100% - 64px), 500px);
+    height: min(calc(100% - 64px), 540px);
     border-radius: 24px 24px 0 0;
   }
 
@@ -442,11 +471,6 @@
     padding-left: 0;
     /* 最后一项与底部版本号之间留一口气，免得贴着 */
     padding-bottom: 12px;
-  }
-
-  /* 版本号钉在窗口底部：内容滚动时不跟着走，也躲开手势条 */
-  .version {
-    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .text {

@@ -134,8 +134,25 @@ const fontScript = (scope) => `(() => {
   return JSON.stringify({ clusters: [...clusters.values()].sort((a, b) => b.count - a.count) })
 })()`
 
-const out = { target: page.url }
+/** 设置面板里所有滚动容器的溢出量：窗口高度是算出来的，一旦有内容超出就有人要滚。 */
+const overflowScript = (scope) => `(() => {
+  const panel = document.querySelector('${scope}')
+  if (!panel) return JSON.stringify({ error: '没有找到设置面板' })
+  const scrolling = []
+  for (const el of panel.querySelectorAll('*')) {
+    const style = getComputedStyle(el)
+    if (style.overflowY !== 'auto' && style.overflowY !== 'scroll') continue
+    if (el.clientHeight === 0) continue
+    scrolling.push({
+      hidden: el.scrollHeight - el.clientHeight,
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+    })
+  }
+  return JSON.stringify({ scrolling })
+})()`
 
+const out = { target: page.url }
 // 1. 当前屏幕（会话页或新对话页）
 const chat = JSON.parse(await evaluate(auditScript(null)))
 out.chat = chat
@@ -154,6 +171,7 @@ if (!chatOnly) {
     // 第一层：分类列表
     out.settings = JSON.parse(await evaluate(auditScript('[role="dialog"]')))
     out.settingsFonts = JSON.parse(await evaluate(fontScript('[role="dialog"]')))
+    out.settingsOverflow = JSON.parse(await evaluate(overflowScript('[role="dialog"]')))
     // 第二层：进一个子页再看一遍——具体设置项都在子页里，只查列表等于什么都没查
     // 分类行现在是「名称 + 状态摘要」两行，用 includes 匹配，别按整行文字全等
     const entered = await evaluate(`(() => {
@@ -168,6 +186,28 @@ if (!chatOnly) {
       await sleep(500)
       out.settingsPage = JSON.parse(await evaluate(auditScript('[role="dialog"]')))
       out.settingsPageFonts = JSON.parse(await evaluate(fontScript('[role="dialog"]')))
+      out.settingsPageOverflow = JSON.parse(await evaluate(overflowScript('[role="dialog"]')))
+      await evaluate(`(() => {
+        const back = document.querySelector('[aria-label="返回上一级"]')
+        if (back) back.click()
+      })()`)
+      await sleep(400)
+    }
+    // 「关于」是 1.6.0 新加的一页：一整行状态文字 + 可能并排的两颗按钮，
+    // 字号与换行都得单独看一遍，不能靠"跟个性化长得像"推断
+    const enteredAbout = await evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"]')
+      if (!dialog) return false
+      const row = [...dialog.querySelectorAll('button')].find((b) => b.textContent.includes('关于'))
+      if (!row) return false
+      row.click()
+      return true
+    })()`)
+    if (enteredAbout) {
+      await sleep(500)
+      out.settingsAbout = JSON.parse(await evaluate(auditScript('[role="dialog"]')))
+      out.settingsAboutFonts = JSON.parse(await evaluate(fontScript('[role="dialog"]')))
+      out.settingsAboutOverflow = JSON.parse(await evaluate(overflowScript('[role="dialog"]')))
       await evaluate(`(() => {
         const back = document.querySelector('[aria-label="返回上一级"]')
         if (back) back.click()
@@ -187,7 +227,19 @@ console.log(JSON.stringify(out, null, 2))
 const violations =
   out.chat.violations.length +
   (out.settings?.violations.length ?? 0) +
-  (out.settingsPage?.violations.length ?? 0)
+  (out.settingsPage?.violations.length ?? 0) +
+  (out.settingsAbout?.violations.length ?? 0)
+
+/** 滚出容器哪怕只有 1dp，也算这一屏装不下——窗口高度是算出来的，不该靠滚动补 */
+const overflowViolations = [
+  ['设置列表', out.settingsOverflow],
+  ['设置子页', out.settingsPageOverflow],
+  ['设置关于', out.settingsAboutOverflow],
+].flatMap(([label, report]) =>
+  (report?.scrolling ?? [])
+    .filter((item) => item.hidden > 1)
+    .map((item) => ({ label, ...item }))
+)
 const baseline = out.chat.bodyUserSelect !== 'none'
 console.log('')
 if (baseline) {
@@ -198,17 +250,20 @@ if (baseline) {
 }
 console.log(`可被长按选中的文字块：会话页 ${out.chat.violations.length} 组` +
   (out.settings ? `，设置列表 ${out.settings.violations.length} 组` : '') +
-  (out.settingsPage ? `，设置子页 ${out.settingsPage.violations.length} 组` : ''))
+  (out.settingsPage ? `，设置子页 ${out.settingsPage.violations.length} 组` : '') +
+  (out.settingsAbout ? `，关于页 ${out.settingsAbout.violations.length} 组` : ''))
 for (const group of [
   ...out.chat.violations,
   ...(out.settings?.violations ?? []),
   ...(out.settingsPage?.violations ?? []),
+  ...(out.settingsAbout?.violations ?? []),
 ]) {
   console.log(`  ${group.tag} ×${group.count}  ${group.samples.join(' / ')}`)
 }
 for (const [label, fonts] of [
   ['设置列表', out.settingsFonts],
   ['设置子页', out.settingsPageFonts],
+  ['关于页', out.settingsAboutFonts],
 ]) {
   if (!fonts?.clusters) {
     continue
@@ -218,8 +273,20 @@ for (const [label, fonts] of [
     console.log(`  ${cluster.fontSize} / ${cluster.fontWeight} / ${cluster.color}  ×${cluster.count}  ${cluster.samples.join(' / ')}`)
   }
 }
+console.log(
+  overflowViolations.length === 0
+    ? '设置面板溢出：无（每一页都装得下，不用滚）'
+    : `设置面板溢出：${overflowViolations.length} 处需要滚动 ❌`
+)
+for (const item of overflowViolations) {
+  console.log(`  ${item.label} 藏了 ${item.hidden}dp（可见 ${item.clientHeight}dp / 内容 ${item.scrollHeight}dp）`)
+}
 ws.close()
 if (strict && violations > 0) {
   console.log('判定：仍有可被长按选中的静态文字 ❌')
+  process.exit(1)
+}
+if (strict && overflowViolations.length > 0) {
+  console.log('判定：设置面板里有内容装不下 ❌')
   process.exit(1)
 }

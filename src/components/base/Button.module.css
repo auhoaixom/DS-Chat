@@ -15,6 +15,8 @@
   white-space: nowrap;
   user-select: none;
   outline: none;
+  /* 这套类同时给 LinkButton 的 <a> 用：按钮不该有下划线，链接也不该有 */
+  text-decoration: none;
   transition:
     background-color var(--ds-transition-duration) var(--ds-ease-in-out),
     opacity var(--ds-transition-duration) var(--ds-ease-in-out);
