@@ -10,7 +10,7 @@
 
 一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
 
-当前版本 `1.6.5`（`versionCode 105`）。MIT 许可，欢迎 issue 与 PR。
+当前版本 `1.6.6`（`versionCode 106`）。MIT 许可，欢迎 issue 与 PR。
 
 ## 这是什么
 

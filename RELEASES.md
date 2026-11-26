@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.6.6 | 2026-11-27 | 106 | 有 | fix: price attachments from the server, and only trust a measurement that still applies (v1.6.6) |
 | v1.6.5 | 2026-11-27 | 105 | 有 | feat: expand earlier messages on a tap instead of auto-loading on scroll (v1.6.5) |
 | v1.6.4 | 2026-11-27 | 104 | 有 | fix: stop the compaction card from crashing the screen, and keep it pinned when the summary opens (v1.6.4) |
 | v1.6.3 | 2026-11-26 | 103 | 有 | fix: give every bubble its own React key, so scrolling back up stops duplicating questions (v1.6.3) |
