@@ -8,6 +8,7 @@ import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { CompactionCard, CompactedOriginals } from './CompactionCard.js'
 import { OLDER_CHUNK, LOAD_OLDER_THRESHOLD, clampWindowStart, initialWindowStart } from './messageWindow.js'
+import { messageKey } from './messageKeys.js'
 import { distanceFromBottom, nextJumpVisible } from './bottomJump.js'
 import { useFarFromBottom, setFarFromBottom } from './bottomJumpState.js'
 import { ChatScrollContext } from './scrollContext.js'
@@ -467,7 +468,7 @@ export const MessageList = ({
               const index = start + offset
               return message.role === 'user' ? (
                 <UserMessage
-                  key={message.id}
+                  key={messageKey(message)}
                   sessionId={session.id}
                   message={message}
                   retryUploadId={uploadRetryId}
@@ -480,12 +481,11 @@ export const MessageList = ({
               ) : (
                 <AssistantMessage
                   /*
-                   * key 用父消息而不是回复自己的 id：同一轮的多个版本是兄弟，
-                   * 换版本时 React 才会复用同一个组件实例。按 id 作 key 的话每次切换
-                   * 都整棵卸载重挂，`content-visibility` 的实测高度跟着丢掉，
-                   * 滚动容器的高度会塌下去一截（切换版本后视口跳到对话最上方就是这个）。
+                   * key 的取法见 messageKeys.ts：提问和回答必须落到不同的 key 上，
+                   * 否则一轮问答的两条消息会互相冒领，往上翻补载时提问会重复一份。
+                   * 回答仍按父消息取，是为了换版本时复用同一个组件实例。
                    */
-                  key={message.parentId ?? message.id}
+                  key={messageKey(message)}
                   sessionId={session.id}
                   message={message}
                   isLast={index === lastIndex}

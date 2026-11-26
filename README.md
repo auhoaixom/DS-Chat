@@ -10,7 +10,7 @@
 
 一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
 
-当前版本 `1.6.2`（`versionCode 102`）。MIT 许可，欢迎 issue 与 PR。
+当前版本 `1.6.3`（`versionCode 103`）。MIT 许可，欢迎 issue 与 PR。
 
 ## 这是什么
 
@@ -192,7 +192,7 @@ tools/icon/            字标抠图与各密度图标生成
 
 ## 参与
 
-- 提 PR 之前先本地跑 `pnpm type`、`pnpm lint`、`pnpm test`（284 项）。
+- 提 PR 之前先本地跑 `pnpm type`、`pnpm lint`、`pnpm test`（292 项）。
 - 改界面前读一遍 [STANDARDS.md](STANDARDS.md)，它配了可机检的探针 `tools/probe/99k-ui-rules.mjs`。
 - 不要跑 `pnpm format`（会重写整仓）。
 - 缩进、引号、分号这些别顺手改：仓库里混着两三种风格，统一格式化属于单独一版的工作。
