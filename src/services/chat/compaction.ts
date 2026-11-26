@@ -349,13 +349,19 @@ export const requestKeyOf = (shape: RequestShape): string =>
 /**
  * 这个会话下一次请求的形状：模型跟会话走，两个开关跟当前设置，
  * 附件看可见历史里有没有已经拿到 file_id 的（没有的不会进请求）。
+ *
+ * `switches` 只给界面用：面板要跟着开关实时重算，不能等会话对象变化
+ * （`ContextMeter` 的 useMemo 依赖会话，开关改了会话没变，数字就会停在旧口径上）。
  */
-export const requestShapeOf = (session: Session): RequestShape => {
+export const requestShapeOf = (
+  session: Session,
+  switches?: { thinking: boolean; search: boolean }
+): RequestShape => {
   const settings = useSettings.getState()
   return {
     model: getSessionModel(session),
-    thinking: settings.thinking,
-    search: settings.search,
+    thinking: switches?.thinking ?? settings.thinking,
+    search: switches?.search ?? settings.search,
     hasFiles: getVisibleMessages(session).some(
       (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
     ),
@@ -363,7 +369,10 @@ export const requestShapeOf = (session: Session): RequestShape => {
 }
 
 /** 会话当前请求形状的短串 */
-export const currentRequestKey = (session: Session): string => requestKeyOf(requestShapeOf(session))
+export const currentRequestKey = (
+  session: Session,
+  switches?: { thinking: boolean; search: boolean }
+): string => requestKeyOf(requestShapeOf(session, switches))
 
 /**
  * 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理；
@@ -418,7 +427,8 @@ const plausibleAnchor = (usage: number): boolean => usage >= MIN_ANCHOR_TOKENS
 const measureContext = (
   session: Session,
   extra: Message[],
-  systemBase: string
+  systemBase: string,
+  switches?: { thinking: boolean; search: boolean }
 ): ContextUsage | null => {
   const visible = getVisibleMessages(session)
   if (visible.length === 0 && extra.length === 0) {
@@ -438,7 +448,7 @@ const measureContext = (
   /** 锚点那次请求的形状；缺省（旧版本写下的）为空串，永远对不上 */
   let anchorRequestKey = ''
   let anchorCreatedAt = 0
-  const wantedKey = currentRequestKey(session)
+  const wantedKey = currentRequestKey(session, switches)
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const message = visible[index]
     if (message?.role === 'assistant' && message.usage) {
@@ -523,8 +533,11 @@ const measureContext = (
 }
 
 /** 当前分支下一次请求的上下文占用；空会话返回 null */
-export const getContextUsage = (session: Session, systemBase = ''): ContextUsage | null =>
-  measureContext(session, [], systemBase)
+export const getContextUsage = (
+  session: Session,
+  systemBase = '',
+  switches?: { thinking: boolean; search: boolean }
+): ContextUsage | null => measureContext(session, [], systemBase, switches)
 
 /** 一场对话的累计缓存命中情况（只看带服务端用量的回答） */
 export type CacheStats = {

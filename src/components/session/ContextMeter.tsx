@@ -6,6 +6,7 @@ import { getCacheStats, getContextUsage } from '../../services/chat/compaction.j
 import { sessionCost } from '../../services/chat/cost.js'
 import { PRICING_UPDATED_AT, formatCost } from '../../services/chat/pricing.js'
 import { SYSTEM_PROMPT } from '../../services/chat/prompt.js'
+import { useSettings } from '../../services/settings.js'
 import { cancelCompaction, compactSession, undoCompaction, useChatStore } from '../../services/chat/store.js'
 import { formatTokensK } from '../../services/chat/tokens.js'
 import type { Session } from '../../services/chat/types.js'
@@ -25,7 +26,16 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 export const ContextMeter = ({ session }: { session: Session }) => {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
-  const usage = useMemo(() => getContextUsage(session, SYSTEM_PROMPT), [session])
+  /**
+   * 两个开关要单独订阅：锚点是否成立取决于"下一次请求的形状"，
+   * 形状变了而会话对象没变，只按 session 记忆的话数字会停在旧口径上（还写着「实测」）。
+   */
+  const thinking = useSettings((state) => state.thinking)
+  const search = useSettings((state) => state.search)
+  const usage = useMemo(
+    () => getContextUsage(session, SYSTEM_PROMPT, { thinking, search }),
+    [session, thinking, search]
+  )
   const cache = useMemo(() => getCacheStats(session), [session])
   // 只统计有成本记录的回复：导入的历史与旧版本留下的消息没有这个字段
   const cost = useMemo(() => sessionCost(session), [session])
