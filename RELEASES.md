@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.6.2 | 2026-11-26 | 102 | 有 | fix: put the compaction card away after a jump to the bottom, not only after a swipe (v1.6.2) |
 | v1.6.1 | 2026-11-26 | 101 | 有 | feat: bring a jump-to-bottom button, and render the compacted originals in batches you ask for (v1.6.1) |
 | v1.6.0 | 2026-11-26 | 100 | 有 | feat: add an about page that checks for updates, and make the sheet tall enough for six categories (v1.6.0) |
 | v1.5.0 | 2026-11-25 | 99 | 有 | feat: split the settings into five categories behind a list page, add two display switches, and keep diagnostics out of release (v1.5.0) |

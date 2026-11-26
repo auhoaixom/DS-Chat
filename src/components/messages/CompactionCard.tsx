@@ -191,10 +191,14 @@ export const CompactedOriginals = ({ messages }: { messages: Message[] }) => {
   /**
    * 告诉卡片「用户有没有滑过原文块」，决定它还要不要贴在屏幕顶上。
    *
-   * 判定用末尾那颗零高度的哨兵：它滚出滚动容器顶部，就说明原文已经被越过了。
-   * 交给 IntersectionObserver 而不是在滚动回调里量矩形——那会在滚动中触发强制布局，
-   * 而这里需要的只是"越过"那一下。拿不到滚动父级时保持原样（一直吸顶），
-   * 宁可维持旧行为，也不让卡片突然不吸顶。
+   * 判定用末尾那颗零高度的哨兵：它的底边落在滚动容器顶部之下，就说明原文块还没被越过。
+   *
+   * **不用 IntersectionObserver**：它只在「相交／不相交」翻转时回调。用户停在原文内部时
+   * 哨兵在视口下方（不相交），点「回到底部」一步跳到末尾后哨兵在视口上方（还是不相交），
+   * 状态没翻转就一次回调都不会来，卡片会一直吸着。手势滑动碰不到这个坑（哨兵会先经过视口，
+   * 翻转两次），但跳转是几帧内直接跨过——所以这里老老实实按滚动位置量，每帧最多量一次。
+   *
+   * `shown` 变化也要重量：点「继续展开」不产生滚动，但哨兵跟着原文块一起往下挪了。
    */
   useEffect(() => {
     const root = rootRef.current
@@ -203,24 +207,31 @@ export const CompactedOriginals = ({ messages }: { messages: Message[] }) => {
     if (!root || !sentinel || !scroller) {
       return
     }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[entries.length - 1]
-        if (!entry) {
-          return
-        }
-        const rootTop = entry.rootBounds?.top ?? 0
-        setOriginalsPinned(pinnedFromSentinel(entry.boundingClientRect.bottom, rootTop))
-      },
-      { root: scroller, threshold: 0 }
-    )
-    observer.observe(sentinel)
-    return () => {
-      observer.disconnect()
-      // 收起原文：下次再展开时从头来过，卡片照常吸顶
-      setOriginalsPinned(true)
+    const measure = () => {
+      const box = sentinel.getBoundingClientRect()
+      const view = scroller.getBoundingClientRect()
+      setOriginalsPinned(pinnedFromSentinel(box.bottom, view.top))
     }
-  }, [])
+    let frame = 0
+    const schedule = () => {
+      // 滚动里量矩形会强制布局；同一帧里的多个事件只该付一次这笔钱
+      if (frame === 0) {
+        frame = requestAnimationFrame(() => {
+          frame = 0
+          measure()
+        })
+      }
+    }
+    measure()
+    scroller.addEventListener('scroll', schedule, { passive: true })
+    return () => {
+      scroller.removeEventListener('scroll', schedule)
+      cancelAnimationFrame(frame)
+    }
+  }, [shown, messages.length])
+
+  // 收起原文（组件卸载）时把状态归位，下次展开从头来过
+  useEffect(() => () => setOriginalsPinned(true), [])
 
   return (
     <div ref={rootRef} className={styles.originals} aria-label={t('compactionOriginalsTitle')}>
