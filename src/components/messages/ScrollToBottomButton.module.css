@@ -1,0 +1,70 @@
+/*
+ * 「回到底部」：浮在输入框右上方的一颗圆按钮。
+ *
+ * 位置挂在输入框容器上（`bottom: 100%` = 输入框顶边往上），所以输入框长高、
+ * 键盘弹起、换成多行输入时它会跟着走，不用另算一份坐标。
+ *
+ * 尺寸分两层：**看得见的那圈是 36**，外面再留 4 圈透明，凑满 44 的命中区
+ * （STANDARDS.md 规矩 5 的下限）。直接做 36 的按钮，手指点不准；只做视觉缩小、
+ * 不动命中区，两边都不吃亏。
+ */
+.button {
+  position: absolute;
+  right: 4px;
+  bottom: 100%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  /* 贴着输入框，只留一道窄缝 */
+  margin: 0 0 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+
+  /* 图标按原稿 14 用，不放大：圆小了，箭头再大就顶满 */
+  & > svg {
+    position: relative;
+    width: 14px;
+    height: 14px;
+  }
+
+  &:focus-visible::before {
+    box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);
+  }
+
+  /* 收起：淡出并轻轻下沉，同时退出命中测试，免得看不见还能点到 */
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 160ms var(--ds-ease-in-out),
+    transform 160ms var(--ds-ease-in-out);
+}
+
+/* 看得见的那一圈：底色、边框、阴影都长在这里，按钮本身是透明的 */
+.button::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background-color: var(--dsw-alias-bg-layer-2);
+  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.16);
+}
+
+.button[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}

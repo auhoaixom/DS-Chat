@@ -8,6 +8,8 @@ import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { CompactionCard, CompactedOriginals } from './CompactionCard.js'
 import { OLDER_CHUNK, LOAD_OLDER_THRESHOLD, clampWindowStart, initialWindowStart } from './messageWindow.js'
+import { distanceFromBottom, nextJumpVisible } from './bottomJump.js'
+import { useFarFromBottom, setFarFromBottom } from './bottomJumpState.js'
 import { ChatScrollContext } from './scrollContext.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
@@ -30,6 +32,8 @@ import styles from './MessageList.module.css'
 
 /** 距底部小于该值时视为在底部，流式内容增长时跟随 */
 const STICKY_THRESHOLD = 40
+/** 「回到底部」那段滑动的时长：再长像卡住，再短看不出是往下走 */
+const JUMP_DURATION_MS = 280
 const EMPTY_VERSIONS: MessageVersions = { ids: [], index: -1 }
 
 export const MessageList = ({
@@ -106,6 +110,58 @@ export const MessageList = ({
     }
   }, [])
 
+  /** 正在跑的「回到底部」动画帧号，0 表示没在跑 */
+  const jumpFrameRef = useRef(0)
+
+  /**
+   * 用户主动按了「回到底部」。
+   *
+   * 和 `scrollToBottom` 不是一回事：那个会被「用户已经离开底部」挡掉，这个必须真的下去，
+   * 并按用户的意思重新打开贴底跟随。带一小段动画——瞬移会让人分不清是页面跳了还是
+   * 自己点错了。终点每帧重算：消息上有 `content-visibility`，滚进视口的那些会从估算高度
+   * 换成真实高度，总高度在这一路上一直在变，开头算一次的话最后会停在离底部差一截的地方。
+   */
+  const jumpToBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    cancelAnimationFrame(jumpFrameRef.current)
+    stickyRef.current = true
+    const apply = (top: number) => {
+      el.scrollTop = top
+      scrollTopRef.current = el.scrollTop
+    }
+    // 系统里关掉了动画就直接到底，不给这段过渡
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      apply(el.scrollHeight)
+      return
+    }
+    const start = el.scrollTop
+    const startedAt = performance.now()
+    const step = () => {
+      const target = el.scrollHeight - el.clientHeight
+      const progress = Math.min(1, (performance.now() - startedAt) / JUMP_DURATION_MS)
+      if (progress >= 1) {
+        apply(el.scrollHeight)
+        jumpFrameRef.current = 0
+        return
+      }
+      // ease-out：起步快、收尾稳，落到底部时不砸一下
+      apply(start + (target - start) * (1 - (1 - progress) ** 3))
+      jumpFrameRef.current = requestAnimationFrame(step)
+    }
+    jumpFrameRef.current = requestAnimationFrame(step)
+  }, [])
+
+  /** 用户自己动手就停下动画：手指按住屏幕时还在写 scrollTop，会跟他抢 */
+  const stopJump = useCallback(() => {
+    if (jumpFrameRef.current !== 0) {
+      cancelAnimationFrame(jumpFrameRef.current)
+      jumpFrameRef.current = 0
+    }
+  }, [])
+
   /**
    * 关掉贴底跟随，交给调用方在渲染后自己把元素位置补回来。
    *
@@ -116,7 +172,10 @@ export const MessageList = ({
   const holdAt = useCallback(() => {
     stickyRef.current = false
   }, [])
-  const scrollApi = useMemo(() => ({ scrollToBottom, holdAt }), [scrollToBottom, holdAt])
+  const scrollApi = useMemo(
+    () => ({ scrollToBottom, jumpToBottom, holdAt }),
+    [scrollToBottom, jumpToBottom, holdAt]
+  )
 
   /**
    * 往前补一批更早的消息。
@@ -243,6 +302,20 @@ export const MessageList = ({
   useEffect(closeSearchPanel, [session.id, lastMessageId])
 
   /**
+   * 换会话时先把按钮收起来。
+   *
+   * 不能挂在 `lastMessageId` 上——用户正往上翻旧消息时来了新的一条，那颗按钮不该跟着消失。
+   * 真正的显隐仍然由滚动位置决定，这里只是把上一个会话的结论清掉，等新会话滚到底部
+   * 时由 scroll 事件重新算。
+   */
+  useLayoutEffect(() => {
+    setFarFromBottom(false)
+  }, [session.id])
+
+  // 离开会话页（回到欢迎页或换页）时也把它清掉，别让别的界面继承这个状态
+  useEffect(() => () => setFarFromBottom(false), [])
+
+  /**
    * 压缩或撤销压缩会一次性在列表顶部插入/移除一大段内容。
    * 只按滚动条位置保持的话，视口会被"顶"走（撤销时直接甩回对话开头），
    * 所以按内容高度差把滚动位置补回来，让用户眼前的那一条消息留在原处。
@@ -356,10 +429,23 @@ export const MessageList = ({
       if (start > 0 && el.scrollHeight > el.clientHeight && el.scrollTop < LOAD_OLDER_THRESHOLD) {
         loadOlder()
       }
+      // 「回到底部」那颗按钮跟着走：这条判断必须在 scroll 里做，
+      // 别的地方拿不到"用户此刻看到的是哪一屏"
+      setFarFromBottom(
+        nextJumpVisible(useFarFromBottom.getState().far, distanceFromBottom(el))
+      )
     }
     el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [isMobile, scrollToBottom, start, loadOlder])
+    el.addEventListener('touchstart', stopJump, { passive: true })
+    el.addEventListener('wheel', stopJump, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      el.removeEventListener('touchstart', stopJump)
+      el.removeEventListener('wheel', stopJump)
+      cancelAnimationFrame(jumpFrameRef.current)
+      jumpFrameRef.current = 0
+    }
+  }, [isMobile, scrollToBottom, start, loadOlder, stopJump])
 
   const lastIndex = messages.length - 1
   const uploadRetryId = getUploadRetryId(messages, streaming)

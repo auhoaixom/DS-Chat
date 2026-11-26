@@ -3,6 +3,7 @@ import type { zh } from './zh.js'
 export const en = {
   welcomeMessageChat250808: 'How can I help you?',
   contentCaveat: 'AI-generated, for reference only',
+  scrollToBottom: 'Back to bottom',
   expandSiderbarButton: 'Open sidebar',
   collapseSiderbarButton: 'Close sidebar',
   newChat: 'New chat',
@@ -328,6 +329,7 @@ settingsSupportAuthorAction: 'Open GitHub',
   compactionModeManual: 'Manual',
   compactionUndo: 'Undo compaction',
   compactionShowOriginals: 'View originals',
+  compactionOriginalsMore: 'Show more ({count} left)',
   compactionHideOriginals: 'Hide originals',
   compactionOriginalsTitle:
     'These messages were compacted. Read-only: they are not part of the conversation anymore',

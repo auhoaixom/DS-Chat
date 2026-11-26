@@ -14,6 +14,26 @@
   margin-top: 0;
   background-color: var(--dsw-alias-bg-base);
   box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.45);
+  transition:
+    transform 180ms var(--ds-ease-in-out),
+    opacity 180ms var(--ds-ease-in-out);
+}
+
+/*
+ * 用户滑过原文块之后：卡片不切换吸顶（那个开关是布局属性，切换只能瞬间发生，
+ * 看着像"啪"地不见了），而是**整块推上去**。视觉上是"收起来"，滑回来是"放下来"。
+ * 留 `pointer-events: none`：看不见的时候不该还能点到。
+ */
+.sticky[data-away='true'] {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky {
+    transition: none;
+  }
 }
 
 .head {
@@ -185,8 +205,42 @@
 }
 
 /*
+ * 原文块末尾的「继续展开」：手动分段加载的唯一入口，点一次多 5 轮。
+ * 观感沿用卡片里那几个蓝色文字按钮（.action），但把触控高度撑到 44dp
+ * ——它比那几个更难被注意到，点歪一次就白等了。
+ */
+.originalsMore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-text);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/*
+ * 原文块末尾的哨兵：零高度，看不见也不占位，只用来判断「原文块被整块滑过去了」。
+ * 它滚出滚动容器顶部，卡片就取消吸顶（见 CompactionCard.tsx 里的 observer）。
+ */
+.originalsEnd {
+  height: 0;
+}
+
+/*
  * 原文列表这里**故意不加** `.originals > * { content-visibility: auto }`：
- * 挂载量已经被分段挂载压到一屏（20 条 + 每次补 5 条），再叠「滚到才排版」的话，
+ * 挂载量已经被分段挂载压到一屏（首批 5 轮 + 每次点 5 轮），再叠「滚到才排版」的话，
  * 每条长回答滚进视口时都要现排一次，实测 75–180ms 的卡顿正好落在滚动过程中间，手感反而更差。
  * 不加则是挂载时一次排完，滚动全程 16.8ms。
  */

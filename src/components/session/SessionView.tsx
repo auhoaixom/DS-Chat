@@ -6,6 +6,7 @@ import { useSettings } from '../../services/settings.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { useAttachPanelOpen } from '../chatInput/attachPanelState.js'
 import { MessageList } from '../messages/MessageList.js'
+import { ScrollToBottomButton } from '../messages/ScrollToBottomButton.js'
 import { ContextMeter } from './ContextMeter.js'
 import { MobileHeader } from './MobileHeader.js'
 import styles from './SessionView.module.css'
@@ -48,6 +49,8 @@ export const SessionView = ({
         streaming={streaming}
         footer={
           <div className={styles.inputContainer}>
+            {/* 浮在输入框右上方：由列表的滚动位置决定显隐，点一下滑回底部 */}
+            <ScrollToBottomButton />
             <ChatInput sessionId={session.id} />
             {attachPanelOpen ? null : (
               <div className={styles.caveat}>{t('contentCaveat')}</div>
