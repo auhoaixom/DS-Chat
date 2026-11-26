@@ -6,7 +6,13 @@ import { supportsServerFeatures } from './capabilities.js'
 import { requestCost } from './cost.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { getReplyText, toHistoryParams } from './reply.js'
-import { estimateMessageTokens, estimateTokens, getPromptTokens, getContextWindow } from './tokens.js'
+import {
+  ESTIMATE_VERSION,
+  estimateMessageTokens,
+  estimateTokens,
+  getPromptTokens,
+  getContextWindow,
+} from './tokens.js'
 import type {
   Compaction,
   FileAttachment,
@@ -323,8 +329,11 @@ export const estimateRequestTokens = (messages: Message[], overhead = REQUEST_OV
  */
 export type AnchorState = 'measured' | 'estimate' | 'dropped'
 
-/** 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理 */
-export type AnchorDropReason = 'compaction' | 'usage'
+/**
+ * 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理；
+ * estimate 那条回复的估算口径版本和现在不一样。
+ */
+export type AnchorDropReason = 'compaction' | 'usage' | 'estimate'
 
 export type ContextUsage = {
   /** 下一次请求预计占用的提示侧 token */
@@ -388,12 +397,15 @@ const measureContext = (
   const rawTotal = rawPrompt + rawSummary + rawMessages
   let anchorUsage: number | undefined
   let anchorEstimate: number | undefined
+  /** 锚点那条回复写 promptEstimate 时的估算口径版本；缺省（老数据）为 0 */
+  let anchorEstimateVersion = 0
   let anchorCreatedAt = 0
   for (let index = visible.length - 1; index >= 0; index -= 1) {
     const message = visible[index]
     if (message?.role === 'assistant' && message.usage) {
       anchorUsage = getPromptTokens(message.usage)
       anchorEstimate = message.promptEstimate
+      anchorEstimateVersion = message.estimateVersion ?? 0
       anchorCreatedAt = message.createdAt
       break
     }
@@ -409,6 +421,13 @@ const measureContext = (
     dropReason = 'compaction'
   } else if (anchorUsage !== undefined && !plausibleAnchor(anchorUsage)) {
     dropReason = 'usage'
+  } else if (anchorEstimate !== undefined && anchorEstimateVersion !== ESTIMATE_VERSION) {
+    /**
+     * 锚点里的 promptEstimate 是旧尺子量的。两把尺子相减得到的既不是对话变多变少，
+     * 也不是服务端口径差异，纯粹是口径漂移——这种锚点比没有更糟，直接当一个都没有。
+     * 老记录没有这个字段（视为 0），升级后会一次性退回收纯估算，下一次回复重新锚定。
+     */
+    dropReason = 'estimate'
   }
   const anchorUsed = anchorUsage ?? null
   const anchorEstimateValue = anchorEstimate ?? null
@@ -419,11 +438,14 @@ const measureContext = (
   let used = rawTotal
   if (anchorUsage !== undefined && anchorEstimate !== undefined) {
     /**
-     * 净增减只认正数：锚点之后的对话只会变长，估算变短只可能是估算口径改过
-     * （比如固定开销从 800 调到 56）或消息被删。这时宁可停在实测值上，
-     * 也不能让差值把总量拉成 0——那会让进度环凭空归零。
+     * 净增减带符号：对话变短（撤销压缩、删消息）也要立刻反映出来，不能卡在旧实测值上。
+     *
+     * 以前这里夹的是 `Math.max(0, rawTotal - anchorEstimate)`，理由是"估算口径改过之后
+     * 差值会变成大负数，把占用拉成 0"。那个理由现在由 `ESTIMATE_VERSION` 接管：
+     * 口径不同的锚点根本不会被选中，能走到这里的两个数一定是同一把尺子量的。
+     * 剩下的负数只可能来自内容真的变少了，那就该往下走。
      */
-    used = anchorUsage + Math.max(0, rawTotal - anchorEstimate)
+    used = Math.max(0, anchorUsage + (rawTotal - anchorEstimate))
   }
   const measured = anchorUsage !== undefined && anchorEstimate !== undefined
   const anchor: AnchorState = measured ? 'measured' : dropReason === null ? 'estimate' : 'dropped'

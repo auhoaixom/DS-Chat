@@ -21,7 +21,7 @@ import { accrueCost } from './cost.js'
 import * as db from './db.js'
 import { SYSTEM_PROMPT, safetyCheckField, serverTools } from './prompt.js'
 import { supportsServerFeatures } from './capabilities.js'
-import { estimateTokens } from './tokens.js'
+import { ESTIMATE_VERSION, estimateTokens } from './tokens.js'
 import {
   clearAllDrafts,
   clearDraft,
@@ -1266,7 +1266,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         const promptEstimate =
           estimateRequestTokens([...prepared.history, prepared.question]) +
           estimateTokens(system)
-        reply = { ...reply, latestReminder, promptEstimate }
+        // 连同估算口径版本一起存：以后口径变了，这条估算就不能再当锚点基准
+        reply = { ...reply, latestReminder, promptEstimate, estimateVersion: ESTIMATE_VERSION }
         updateReply(sessionId, reply)
         persist(sessionId)
         const messages = toRequestMessages(

@@ -16,6 +16,21 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-v4.1-pro': 1_048_576,
 }
 
+/**
+ * 估算口径的版本号。
+ *
+ * 消息里存的 `promptEstimate` 是「当时那把尺子」量出来的，锚点再用它去算表面净增减。
+ * 尺子一改，历史记录里的数就和现在不是一个单位了，差出来的不是对话变多变少，而是口径漂移
+ * ——所以锚点必须连它一起认，版本对不上就当一个都没有，退回收纯估算。
+ *
+ * 什么时候 +1（改任何一项都要）：
+ * - `estimateTokens` 的 0.75 / 0.32 两个系数
+ * - `IMAGE_TOKENS` / `DOCUMENT_TOKENS` / `READ_LINK_TOKENS` 占位值
+ * - `compaction.ts` 的 `REQUEST_OVERHEAD`
+ * - 附件真值（fileTokens）改变了某类附件的取值方式
+ */
+export const ESTIMATE_VERSION = 2
+
 /** 图片经 Files API 展开成视觉 token；按偏大估，宁可提前压缩 */
 const IMAGE_TOKENS = 1_500
 /** 文档按解析后的文本量差异很大，取一个保守的均价 */

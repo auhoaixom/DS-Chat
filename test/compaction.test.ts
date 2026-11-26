@@ -12,6 +12,7 @@ import {
 } from '../src/services/chat/compaction.js'
 import { ApiError } from '../src/services/api/client.js'
 import { SAFETY_CHECK, SYSTEM_PROMPT, safetyCheckField } from '../src/services/chat/prompt.js'
+import { ESTIMATE_VERSION } from '../src/services/chat/tokens.js'
 import { useSettings } from '../src/services/settings.js'
 import type { Session } from '../src/services/chat/types.js'
 import { assistantMessage, at, compactionRecord, conversation, userMessage } from './helpers.js'
@@ -195,6 +196,8 @@ const answered = (text: string, createdAt: number, promptEstimate: number) => ({
   ...assistantMessage(text),
   createdAt,
   promptEstimate,
+  // 和现在的写入点一致：当前口径写下的估算才允许当锚点基准
+  estimateVersion: ESTIMATE_VERSION,
   usage: {
     input_tokens: 9_000,
     cache_creation_input_tokens: 0,
@@ -286,10 +289,25 @@ test('短请求的估算与实测同一个量级，固定开销不再虚高一�
   assert.ok(estimated >= 64 && estimated < 120, `估算 ${estimated} 应与实测 64 同量级`)
 })
 
-test('估算口径改小后，旧锚点也不会把占用拉成 0', () => {
-  // 这条回答的 promptEstimate 是旧口径（800 开销）存下的 828，比现在的估算大得多
+test('内容真的变少时占用跟着往下走，不再卡在旧实测值上', () => {
+  // 锚点的 promptEstimate（2000）是按"还带着那段长提问"量的
+  const answer = answered('答', 100, 2_000)
+  const long = getContextUsage(sessionOf([userMessage(`问：${'甲'.repeat(2_000)}`), answer]))
+  const short = getContextUsage(sessionOf([userMessage('问'), answer]))
+  assert.ok(long && short)
+  assert.equal(short.anchor, 'measured')
+  // 旧口径夹 Math.max(0, …)：两个数会一模一样，撤销压缩后数字不回升
+  assert.ok(
+    short.used < long.used,
+    `变短之后应当下降：${short.used} < ${long.used}`
+  )
+})
+
+test('估算口径版本变了，旧锚点直接丢掉', () => {
+  // 这条回复的 promptEstimate 是旧尺子量的（v0.9.6 的 800 开销），和现在的估算不是一个单位
   const stale = {
     ...answered('答：2', 100, 828),
+    estimateVersion: ESTIMATE_VERSION - 1,
     usage: {
       input_tokens: 64,
       cache_creation_input_tokens: 0,
@@ -299,11 +317,22 @@ test('估算口径改小后，旧锚点也不会把占用拉成 0', () => {
   }
   const usage = getContextUsage(sessionOf([userMessage('82374919*61525321'), stale]), SYSTEM_PROMPT)
   assert.ok(usage)
-  assert.equal(usage.measured, true)
-  // 净增减为负时停在实测值上，不夹成 0、也不冒出负增长
-  assert.equal(usage.used, 64)
-  // 系统提示词按比例摊分后是十来个 token，不会再被摊成 1
-  assert.ok(usage.systemTokens > 1, `系统提示词摊成了 ${usage.systemTokens}`)
+  assert.equal(usage.measured, false)
+  assert.equal(usage.anchor, 'dropped')
+  assert.equal(usage.anchorDropReason, 'estimate')
+  // 退回收纯估算之后不会落在 64 这个"看起来很小的实测"上
+  assert.ok(usage.used > 64, `纯估算应当是几百的量级，实际 ${usage.used}`)
+})
+
+test('没有口径版本的历史回复也不当锚点', () => {
+  const legacy = { ...answered('答：2', 100, 828) } as Record<string, unknown>
+  delete legacy.estimateVersion
+  const usage = getContextUsage(
+    sessionOf([userMessage('82374919*61525321'), legacy as never]),
+    SYSTEM_PROMPT
+  )
+  assert.ok(usage)
+  assert.equal(usage.anchorDropReason, 'estimate')
 })
 
 test('压缩之后不再沿用更早的锚点，否则巨大负增量会把占用夹成 0', () => {

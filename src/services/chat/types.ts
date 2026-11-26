@@ -125,6 +125,11 @@ export type AssistantMessage = MessageBranch & {
   costs?: RequestCost[]
   /** 发出这次请求时的提示侧估算（token），用于按"表面净增减"推算当前上下文占用 */
   promptEstimate?: number
+  /**
+   * 写 `promptEstimate` 时用的估算口径版本（见 tokens.ts 的 `ESTIMATE_VERSION`）。
+   * 版本对不上，这个估算值就不能拿来当锚点的基准；缺省表示口径版本之前写下的。
+   */
+  estimateVersion?: number
   error?: {
     /** upload：发送前补传附件失败，请求没有发出 */
     kind: ApiErrorKind | 'upload'
