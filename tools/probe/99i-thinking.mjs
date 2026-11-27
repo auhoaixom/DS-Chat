@@ -110,7 +110,12 @@ const inject = `(() => {
 await send('Page.enable')
 await send('Emulation.clearDeviceMetricsOverride')
 await send('Page.addScriptToEvaluateOnNewDocument', { source: inject })
-await evaluate(`(() => { localStorage.setItem('chat-demo:api-key', 'probe-key'); return 'key' })()`)
+// 只在**完全没有** key 时补一个占位值，绝不覆盖已有值：应用会把明文当 key 用并加密写回，
+// 覆盖等于把用户填好的 key 冲成假的（2026-11-28 踩过，压缩一路 401 却报「稍后再试」）。
+await evaluate(`(() => {
+  if (localStorage.getItem('chat-demo:api-key') === null) localStorage.setItem('chat-demo:api-key', 'probe-key')
+  return 'key'
+})()`)
 // 种一条够长的会话：页面得真的能滚，"思考时页面不动"这条断言才有意义
 await evaluate(`(async () => {
   const now = Date.now()

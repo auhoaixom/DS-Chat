@@ -34,7 +34,8 @@ test('整条对话的 key 互不重复，挂末尾一段时也是', () => {
   assert.equal(session.messages.length, 22)
   const all = messageKeys(session.messages)
   assert.equal(new Set(all).size, all.length)
-  // 首屏挂末尾 20 条、补载后挂全部 22 条，两种都要唯一 —— 重复时 React 会复制已显示过的提问
+  // 首屏挂末尾 10 轮（这里只有 11 轮，所以是后 10 轮、第 3 条起）、补载后挂全部 22 条，
+  // 两种都要唯一 —— 重复时 React 会复制已显示过的提问
   for (const shown of [session.messages.slice(2), session.messages]) {
     assert.equal(new Set(messageKeys(shown)).size, shown.length)
   }

@@ -7,6 +7,7 @@ import { useFilePreview } from '../components/files/filePreviewState.js'
 import { closeSearchPanel, useSearchPanel } from '../components/search/searchPanelState.js'
 import { backToRoot, closeSettings, settingsBackAction, useSettingsDialog } from '../components/settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeRightSider, useRightSider } from '../components/turns/rightSiderState.js'
 import { newChat, useChatStore } from '../services/chat/store.js'
 
 /**
@@ -54,6 +55,10 @@ export const bindBackButton = () => {
     }
     if (useMobileSider.getState().open) {
       closeMobileSider()
+      return
+    }
+    if (useRightSider.getState().open) {
+      closeRightSider()
       return
     }
     if (useChatStore.getState().activeId !== null) {

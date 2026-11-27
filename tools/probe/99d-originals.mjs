@@ -55,7 +55,12 @@ const reuse = process.argv.includes('--reuse')
 // 1. 造一条「压缩过 + 还有很多可见消息」的会话；顺手塞一个假 API Key，
 //    否则没有 key 时应用会在 reload 后自动弹设置浮层，挡住会话列表
 if (!reuse) {
-await evaluate(`(() => { localStorage.setItem('chat-demo:api-key', 'probe-key'); return 'key' })()`)
+// 只在**完全没有** key 时补一个占位值，绝不覆盖已有值：应用会把明文当 key 用并加密写回，
+// 覆盖等于把用户填好的 key 冲成假的（2026-11-28 踩过，压缩一路 401 却报「稍后再试」）。
+await evaluate(`(() => {
+  if (localStorage.getItem('chat-demo:api-key') === null) localStorage.setItem('chat-demo:api-key', 'probe-key')
+  return 'key'
+})()`)
 await evaluate(`(async () => {
   const now = Date.now()
   const messages = []

@@ -12,12 +12,13 @@ import type { Compaction, Message } from '../../services/chat/types.js'
 import { IconChevronDownOutline14, IconCompressOutline14 } from '../base/icons.js'
 import { Markdown } from '../markdown/Markdown.js'
 import { nextOriginalsEnd, ORIGINALS_ROUNDS, pinnedFromSentinel } from './originalsWindow.js'
+import { countTurns } from './messageWindow.js'
 import { setOriginalsPinned, useOriginalsPinned } from './originalsPinnedState.js'
 import { findScrollParent } from './scrollParent.js'
 import styles from './CompactionCard.module.css'
 
 /**
- * 原文列表首屏挂多少条，由 `nextOriginalsEnd` 按轮算（一批 5 轮），
+ * 原文列表首屏挂多少条，由 `nextOriginalsEnd` 按轮算（一批 5 轮，轮 = 用户消息），
  * 之后每点一次「继续展开」再多 5 轮。见 originalsWindow.ts。
  */
 
@@ -202,7 +203,8 @@ export const CompactedOriginals = ({ messages }: { messages: Message[] }) => {
    */
   const [shown, setShown] = useState(() => nextOriginalsEnd(messages, 0, ORIGINALS_ROUNDS))
   const taken = Math.min(shown, messages.length)
-  const remaining = messages.length - taken
+  /** 还剩几轮；轮 = 用户发过几条消息（与消息列表同一口径），不是剩下的条数 */
+  const remaining = countTurns(messages, taken, messages.length)
 
   /**
    * 告诉卡片「用户有没有滑过原文块」，决定它还要不要贴在屏幕顶上。

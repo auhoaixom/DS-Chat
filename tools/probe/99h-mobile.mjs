@@ -80,7 +80,12 @@ const clickByText = (label) =>
 
 // 1. 桌面尺寸下把会话打开。数据自己种（和 99d 用同一份），脚本之间不互相依赖；
 //    顺手塞一个假 API Key，否则没 key 时应用会自动弹设置浮层挡住会话列表
-await evaluate(`(() => { localStorage.setItem('chat-demo:api-key', 'probe-key'); return 'key' })()`)
+// 只在**完全没有** key 时补一个占位值，绝不覆盖已有值：应用会把明文当 key 用并加密写回，
+// 覆盖等于把用户填好的 key 冲成假的（2026-11-28 踩过，压缩一路 401 却报「稍后再试」）。
+await evaluate(`(() => {
+  if (localStorage.getItem('chat-demo:api-key') === null) localStorage.setItem('chat-demo:api-key', 'probe-key')
+  return 'key'
+})()`)
 await evaluate(`(async () => {
   const now = Date.now()
   const messages = []
@@ -156,8 +161,9 @@ await sleep(1200)
 const scrollable = await evaluate(`!!${SCROLLER}`)
 if (!scrollable) throw new Error('切换后没找到滚动层')
 
-// 3. 回到最上面，记下展开前的位置。
-//    滚到顶部会触发往前补载（loadOlder），补载必须把视口钉住 —— 立刻量与 800ms 后量应当一致
+// 3. 回到最上面，记下位置。
+//    注意：滚到顶部**不再**触发往前补载（v1.6.5 起补载只由蓝字按钮触发），
+//    所以这里量的是"停在顶部不飘"——立刻量与 800ms 后量应当一致
 await evaluate(`(() => { ${SCROLLER}.scrollTop = 0; return 'top' })()`)
 const topImmediate = JSON.parse(await evaluate(STATE)).top
 await sleep(800)

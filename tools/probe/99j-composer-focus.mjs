@@ -75,7 +75,11 @@ await send('Emulation.clearDeviceMetricsOverride')
 await send('Page.reload')
 await sleep(2800)
 await evaluate(`(async () => {
-  localStorage.setItem('chat-demo:api-key', 'probe-key')
+  // 只在**完全没有** key 时补一个占位值，绝不覆盖已有值：应用会把明文当 key 用并加密写回，
+  // 覆盖等于把用户填好的 key 冲成假的（2026-11-28 踩过，压缩一路 401 却报「稍后再试」）。
+  if (localStorage.getItem('chat-demo:api-key') === null) {
+    localStorage.setItem('chat-demo:api-key', 'probe-key')
+  }
   // 1.4.0 起：库里只要有会话、又没写过加密标记，启动会弹一个不可跳过的引导框挡住一切点击。
   // 这个脚本自己不种会话，但临时配置目录是几个探针共用的，别的脚本种下的数据还在。
   await new Promise((resolve) => {

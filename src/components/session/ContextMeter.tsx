@@ -12,6 +12,7 @@ import type { Session } from '../../services/chat/types.js'
 import { useAnchoredPosition, useDismiss } from '../base/anchored.js'
 import { Button } from '../base/Button.js'
 import { showToast } from '../base/toastState.js'
+import { openSettings } from '../settings/settingsDialogState.js'
 import styles from './ContextMeter.module.css'
 
 /** 圆环几何：半径 7.5、线宽 2.2，viewBox 18×18 */
@@ -66,6 +67,9 @@ export const ContextMeter = ({ session }: { session: Session }) => {
       showToast({ key: 'compactionBusy' })
     } else if (result === 'no-gain') {
       showToast({ key: 'compactionNoGain' })
+    } else if (result === 'auth') {
+      // 跟聊天那条路用同一句话，并且带一颗「去设置」——这条用户自己能修
+      showToast({ key: 'replyInvalidApiKey' }, { key: 'changeApiKey', onClick: () => openSettings('account') })
     } else if (result === 'empty') {
       showToast({ key: 'compactionNoNeed' })
     } else {

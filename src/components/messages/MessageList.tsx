@@ -9,13 +9,16 @@ import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { CompactionCard, CompactedOriginals } from './CompactionCard.js'
 import {
-  OLDER_CHUNK,
   LOAD_OLDER_THRESHOLD,
   clampWindowStart,
-  expandOlderStart,
+  compactedAtTop,
   initialWindowStart,
+  olderTurnCounts,
 } from './messageWindow.js'
 import { messageKey } from './messageKeys.js'
+import { closeRightSider } from '../turns/rightSiderState.js'
+import { activeTurnOf, turnRows } from '../turns/turnRows.js'
+import { clearTurnNav, publishTurnNav, setActiveTurn } from '../turns/turnNavState.js'
 import { distanceFromBottom, nextJumpVisible } from './bottomJump.js'
 import { useFarFromBottom, setFarFromBottom } from './bottomJumpState.js'
 import { ChatScrollContext } from './scrollContext.js'
@@ -59,6 +62,11 @@ export const MessageList = ({
   const stickyRef = useRef(true)
   const scrollTopRef = useRef(0)
   const restoreScrollRef = useRef<{ messageId: string; top: number } | null>(null)
+  /**
+   * 挂着的每一轮的提问节点（`[data-turn-id]`），按 DOM 顺序。
+   * 挂载段变了才重新收集一次；滚动时只读它们的 rect，不查 DOM。
+   */
+  const turnElsRef = useRef<HTMLElement[]>([])
   /** 上一次渲染时的滚动位置与内容高度，用于抵消顶部插入/移除造成的位移 */
   const cutMetricsRef = useRef<{
     sessionId: string
@@ -80,20 +88,21 @@ export const MessageList = ({
   /**
    * 只挂末尾一段消息；往上滚到顶再往前补。
    *
+   * 计量单位是**轮**（用户发过几条消息就是几轮，回答不算），不是消息条数：
+   * 所以起点一律落在提问上，最后一轮只问了还没答也不会少挂。
+   *
    * 记的是「从第几条开始」，不是「挂多少条」：来新消息（流式回复）时窗口不能跟着往前滑，
    * 否则正在往上翻旧消息的人会被顶一下。切会话时按当前条数重新算，而且是在渲染期间算的，
    * 不让下一段对话先按上一个会话的窗口挂一次。
    */
   const [windowState, setWindowState] = useState(() => ({
     sessionId: session.id,
-    start: initialWindowStart(messages.length),
+    start: initialWindowStart(messages),
   }))
-  // 起点收进合法范围；上界为什么是「留够一屏」而不是「最后一条」，见 messageWindow.ts
+  // 起点收进合法范围；上界为什么是「留够十轮」而不是「最后一条」，见 messageWindow.ts
   const start = clampWindowStart(
-    windowState.sessionId === session.id
-      ? windowState.start
-      : initialWindowStart(messages.length),
-    messages.length,
+    windowState.sessionId === session.id ? windowState.start : initialWindowStart(messages),
+    messages,
   )
   const shown = start > 0 ? messages.slice(start) : messages
   /** 上一次点「展开更早」时记下的锚点元素与它当时的视口位置 */
@@ -184,6 +193,91 @@ export const MessageList = ({
   }, [])
 
   /**
+   * 右侧目录点了一行：收起抽屉，把那一轮的提问滚到视口顶部。
+   *
+   * 不做平滑动画——用户要的是"立刻看到那一条"。
+   *
+   * 落点要**逐帧收口，而且要收够久**：屏幕外的消息挂着 `content-visibility: auto`
+   * 与 `contain-intrinsic-size: auto 200px`，滚过去之后被渲染/被回收的那几屏高度会在
+   * 随后的帧里继续变。只补一次、或者刚对齐就收手，都会在几百毫秒后被悄悄推开
+   * （实测：点第 3 轮，先精确落在第 3 轮，之后整段高度缩了一屏，落点滑到第 5 轮头上）。
+   *
+   * 所以这里连补最多 40 帧，且要求连续 6 帧误差都小于 1px 才停——"稳定"比"对齐"更难等到。
+   * 误差驱动，不会越补越偏；用户一碰屏幕就由 `stopJump` 取消。
+   */
+  const jumpToTurn = useCallback((turnId: string) => {
+    closeRightSider()
+    const el = scrollRef.current
+    const content = contentRef.current
+    if (!el || !content) {
+      return
+    }
+    const target = content.querySelector<HTMLElement>(`[data-turn-id="${CSS.escape(turnId)}"]`)
+    if (!target) {
+      return
+    }
+    cancelAnimationFrame(jumpFrameRef.current)
+    jumpFrameRef.current = 0
+    // 定位之后就没有"跟着底部"的意思了；真贴底的话下面的 scroll 回调会把它打开
+    stickyRef.current = false
+    let frames = 0
+    let calm = 0
+    const step = () => {
+      jumpFrameRef.current = 0
+      const box = el.getBoundingClientRect()
+      // 压缩卡片吸顶时会盖住顶部几十像素，落点得让开它
+      const first = content.firstElementChild
+      const card =
+        first instanceof HTMLElement &&
+        getComputedStyle(first).position === 'sticky' &&
+        Math.abs(first.getBoundingClientRect().top - box.top) < 2
+          ? first.offsetHeight
+          : 0
+      const delta = target.getBoundingClientRect().top - box.top - 8 - card
+      if (Math.abs(delta) > 1) {
+        el.scrollTop += delta
+        scrollTopRef.current = el.scrollTop
+        calm = 0
+      } else {
+        calm += 1
+      }
+      frames += 1
+      if (frames < 40 && calm < 6) {
+        jumpFrameRef.current = requestAnimationFrame(step)
+      }
+    }
+    step()
+  }, [])
+
+  /**
+   * 把"现在读到哪一轮"报给右侧目录。
+   *
+   * 判据只有一条：视口顶部往下那条阅读线（96px 或视口高的 20%，取小的那个）之上
+   * 最后一轮。贴底时直接算最后一轮——用户看到的就是最新的，不必再量。
+   */
+  const reportActiveTurn = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    const els = turnElsRef.current
+    if (els.length === 0) {
+      setActiveTurn(null)
+      return
+    }
+    const box = el.getBoundingClientRect()
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < STICKY_THRESHOLD
+    const rects = els.map((node) => ({
+      id: node.dataset.turnId ?? '',
+      top: node.getBoundingClientRect().top,
+    }))
+    const line = box.top + Math.min(96, box.height * 0.2)
+    setActiveTurn(
+      nearBottom ? (rects.at(-1)?.id ?? null) : (activeTurnOf(rects, line) ?? rects[0]?.id ?? null)
+    )
+  }, [])
+
+  /**
    * 关掉贴底跟随，交给调用方在渲染后自己把元素位置补回来。
    *
    * 本来想在这里连补偿一起做，但**列表不会因为子树的状态变化而重渲染**
@@ -207,7 +301,7 @@ export const MessageList = ({
    * 渲染后把它挪回原处——估值怎么变都不影响这条。
    */
   /**
-   * 用户点了「展开更早的 N 条」：往前补一批。
+   * 用户点了「展开更早的 N 轮」：往前补一批。
    *
    * 以前是滑到离顶就自动补，那条路在长消息下会把用户从顶上推下去——补上来的内容全在他
    * 上方，而"把锚点挪回原处"等于把他从顶上撵走，一次补批等于五屏，猛滑一次追不回来，
@@ -244,11 +338,10 @@ export const MessageList = ({
     setOlderHidden(true)
     setWindowState((state) => ({
       sessionId: session.id,
-      start: expandOlderStart(
+      start: olderTurnCounts(
         messages,
-        state.sessionId === session.id ? state.start : initialWindowStart(messages.length),
-        OLDER_CHUNK,
-      ),
+        state.sessionId === session.id ? state.start : initialWindowStart(messages),
+      ).next,
     }))
   }, [session.id, messages, start])
 
@@ -486,6 +579,8 @@ export const MessageList = ({
       setFarFromBottom(
         nextJumpVisible(useFarFromBottom.getState().far, distanceFromBottom(el))
       )
+      // 右侧目录的高亮同理：只有这里知道视口此刻停在哪儿
+      reportActiveTurn()
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('touchstart', stopJump, { passive: true })
@@ -497,37 +592,97 @@ export const MessageList = ({
       cancelAnimationFrame(jumpFrameRef.current)
       jumpFrameRef.current = 0
     }
-  }, [isMobile, scrollToBottom, start, olderHidden, stopJump])
+  }, [isMobile, scrollToBottom, start, olderHidden, stopJump, reportActiveTurn])
 
   const lastIndex = messages.length - 1
   const uploadRetryId = getUploadRetryId(messages, streaming)
+  /** 那颗「展开更早」按钮要说的三个数：新起点、这次展开几轮、总共还压着几轮 */
+  const olderTurns = olderTurnCounts(messages, start)
+
+  /**
+   * 把右侧目录要的东西一次性交给它：行数据、两个数字、两个动作。
+   *
+   * 行取自 `shown`（已挂载的那一段），所以目录永远和消息界面同一批内容；
+   * 它自己不记窗口，也就不可能和这里算出两个不同的"还剩几轮"。
+   */
+  const rows = turnRows(shown)
+  useEffect(() => {
+    publishTurnNav({
+      sessionId: session.id,
+      rows,
+      older: olderTurns,
+      expandable: start > 0,
+      // 展开到头、上面确实压着摘要，才说"压缩过的对话不支持定位"
+      compactedAbove: compactedAtTop(start, covered),
+      expandOlder,
+      jumpToTurn,
+    })
+  }, [
+    session.id,
+    rows,
+    olderTurns,
+    start,
+    covered,
+    expandOlder,
+    jumpToTurn,
+  ])
+
+  // 回到欢迎页（组件卸载）时清空，别让抽屉里留着上一段对话的目录
+  useEffect(() => clearTurnNav, [])
+
+  /**
+   * 挂载段变了才重新收集一轮提问节点，并立刻重报一次当前轮：
+   * 展开更早、切会话、压缩之后节点集合都会变，等用户滚动才更新会有一瞬间对不上。
+   */
+  useLayoutEffect(() => {
+    const content = contentRef.current
+    if (!content) {
+      turnElsRef.current = []
+      reportActiveTurn()
+      return
+    }
+    turnElsRef.current = [...content.querySelectorAll<HTMLElement>('[data-turn-id]')]
+    reportActiveTurn()
+  }, [session.id, start, messages.length, reportActiveTurn])
   return (
     <ChatScrollContext.Provider value={scrollApi}>
       <div ref={isMobile ? undefined : scrollRef} className={styles.container}>
         <div ref={isMobile ? scrollRef : undefined} className={styles.scroll}>
           <div ref={contentRef} className={styles.column}>
-            <CompactionCard
-              sessionId={session.id}
-              compaction={session.compaction}
-              coveredCount={covered}
-              originalsOpen={originalsOpen}
-              onToggleOriginals={() => setOriginalsOpen((value) => !value)}
-            />
-            {originalsOpen ? <CompactedOriginals messages={coveredMessages} /> : null}
             {/*
-              更早的消息按次展开：一次 20 条。
+              压缩卡片只在该出现的时候出现：**窗口已经展到头**（start === 0）。
+
+              以前它无条件渲染，于是长会话上出现过自相矛盾的一屏——卡片写着"上面都压缩了"，
+              紧下面那颗按钮却写着"还有 88 轮没展开"。没展到头就等于压缩不存在，
+              跟右侧目录顶上那句灰字用的是同一条规则（`compactedAtTop`）。
+              「撤销压缩」另有一个入口在顶栏的用量面板里，所以这里收起不丢功能。
+            */}
+            {compactedAtTop(start, covered) ? (
+              <CompactionCard
+                sessionId={session.id}
+                compaction={session.compaction}
+                coveredCount={covered}
+                originalsOpen={originalsOpen}
+                onToggleOriginals={() => setOriginalsOpen((value) => !value)}
+              />
+            ) : null}
+            {compactedAtTop(start, covered) && originalsOpen ? (
+              <CompactedOriginals messages={coveredMessages} />
+            ) : null}
+            {/*
+              更早的消息按次展开：一次 10 轮（用户发过几条消息就是几轮，回答不算）。
               以前是滑到顶自动补，那套在长回复下会把人从顶上撵走（见 expandOlder 的注释）。
               `start` 归零表示已经展开到头，按钮自然消失。
             */}
             {start > 0 && !olderHidden ? (
               <button type="button" className={styles.olderMore} onClick={expandOlder}>
-                {t('loadOlderMore', { count: Math.min(OLDER_CHUNK, start) })}
+                {t('loadOlderMore', { count: olderTurns.revealed })}
                 {/*
                   括号里是**总数**（这次要展开的也算在内），不是"展开后还剩多少"。
-                  最后一批（不足 20 条）也照样带上括号，不再换一套只有前半句的文案——
+                  最后一批（不足 10 轮）也照样带上括号，不再换一套只有前半句的文案——
                   同一个按钮只有一种说法，省得人以为换了东西。
                 */}
-                {t('loadOlderRemaining', { remaining: start })}
+                {t('loadOlderRemaining', { remaining: olderTurns.remaining })}
               </button>
             ) : null}
             {shown.map((message, offset) => {

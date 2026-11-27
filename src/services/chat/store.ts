@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
-import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
+import { classifyApiError, extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
 import { acquireKeepAlive, releaseKeepAlive, reportKeepAliveProgress } from '../keepAlive.js'
@@ -718,8 +718,11 @@ const runCompaction = async (
   }
 }
 
-/** empty：消息太少；no-gain：压完省不下上下文，已作废 */
-export type CompactionResult = 'done' | 'empty' | 'no-gain' | 'busy' | 'failed'
+/**
+ * empty：消息太少；no-gain：压完省不下上下文，已作废；
+ * auth：API Key 无效——这条用户自己能修（去设置里换一把），重试永远没用。
+ */
+export type CompactionResult = 'done' | 'empty' | 'no-gain' | 'busy' | 'failed' | 'auth'
 
 /** 手动压缩当前分支：消息太少、正在生成或已在压缩时不做 */
 export const compactSession = async (sessionId: string): Promise<CompactionResult> => {
@@ -740,8 +743,16 @@ export const compactSession = async (sessionId: string): Promise<CompactionResul
   try {
     const result = await runCompaction(sessionId, 'manual', controller.signal, { force: true })
     return result === 'skipped' ? 'empty' : result
-  } catch {
-    return controller.signal.aborted ? 'empty' : 'failed'
+  } catch (error) {
+    if (controller.signal.aborted) {
+      return 'empty'
+    }
+    /**
+     * 401 不能糊成「压缩失败，请稍后再试」：key 无效时重试一万次还是 401，
+     * 而这是用户自己就能修的一件事（设置里换一把 key）。聊天那条路早就分开说了
+     * （`describe.ts` 的 unauthorized 分支），压缩这边一直漏着。
+     */
+    return classifyApiError(error) === 'unauthorized' ? 'auth' : 'failed'
   } finally {
     compactionControllers.delete(sessionId)
   }

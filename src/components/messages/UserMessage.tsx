@@ -60,7 +60,8 @@ export const UserMessage = memo(function UserMessage({
   }
 
   return (
-    <div className={clsx(styles.container, isFirst && styles.isFirst)}>
+    // data-turn-id：右侧目录按它找「这一轮在哪儿」并滚动定位（一轮 = 一条提问）
+    <div className={clsx(styles.container, isFirst && styles.isFirst)} data-turn-id={message.id}>
       {message.files.length > 0 ? (
         <div
           className={clsx(

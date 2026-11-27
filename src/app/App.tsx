@@ -33,6 +33,7 @@ import { Button } from '../components/base/Button.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
 import { closeMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
+import { RightSider } from '../components/turns/RightSider.js'
 import styles from './App.module.css'
 
 export const App = () => {
@@ -80,8 +81,9 @@ export const App = () => {
   }
 
   usePreventPageScroll(isMobile)
-  // 移动端除了顶栏按钮，也能在左侧右滑拉出侧边栏（展开时在抽屉上左滑推回）
-  useSiderSwipe(isMobile)
+  // 移动端除了顶栏按钮，也能在左侧右滑拉出侧边栏（展开时在抽屉上左滑推回）。
+  // 右侧目录是它的镜像：左滑拉出、右滑推回。没有打开的对话时不给唤出。
+  useSiderSwipe(isMobile, isMobile && activeId !== null)
 
   useEffect(() => {
     document.documentElement.lang = locale
@@ -135,7 +137,15 @@ export const App = () => {
   return (
     <>
       <div ref={frameRef} className={styles.frame}>
-        {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
+        {isMobile ? (
+          <>
+            <MobileSider />
+            {/* 右侧目录与左抽屉互斥：开一个会先把另一个收掉 */}
+            <RightSider />
+          </>
+        ) : siderCollapsed ? null : (
+          <Sider />
+        )}
         <main className={styles.main}>
           {saveError ? (
             <div className={styles.saveError} role="alert">

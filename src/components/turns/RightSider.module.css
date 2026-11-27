@@ -1,0 +1,156 @@
+/*
+ * 右侧目录抽屉。位置由 JS 每帧写 transform（拖动与收敛同一套），
+ * 这里不能留 transition：CSS 过渡会让 Chrome 在动画开始时预栅格化整层，实测 250ms 尖峰。
+ */
+.drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 800;
+  transform: translate3d(100%, 0, 0);
+  will-change: transform;
+  contain: layout paint;
+}
+
+.mask {
+  position: absolute;
+  inset: 0;
+  z-index: 799;
+  opacity: 0;
+  background-color: rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  will-change: opacity;
+}
+
+/* 宽高与配色照抄左抽屉的 .sider：两边滑出来要是同一件家具 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - 48px);
+  height: 100%;
+  padding: 6px 12px 0;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  background-color: var(--dsw-specific-sidebar-fill);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 48px;
+  margin-bottom: 16px;
+  padding: 15px 4px 10px 0;
+  flex-shrink: 0;
+}
+
+.heading {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+/* 收起按钮用的还是面板图标，镜像一下表示「往右收」 */
+.flip {
+  display: inline-flex;
+  transform: scaleX(-1);
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 16px;
+}
+
+/*
+ * 压缩段说明：这里不可点，只是一句话。
+ * 展开到头、上面又确实压着摘要时才出现（覆盖段被判无效时不显示）。
+ */
+.hint {
+  padding: 10px 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/*
+ * 「展开更早的 N 轮（总共还有 M 轮）」：外形照抄消息界面那颗蓝字按钮。
+ * 放在列表最上面——它是时间上最早的一端，与主页面那颗位置呼应。
+ */
+.older {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 2px 0 6px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-text);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+/*
+ * 一行 = 一轮。数值与左侧栏的 SessionItem 相同（44px / 圆角 16 / 16px 单行省略），
+ * 只保留 hover 与当前态；没有长按、没有右键、没有菜单——这个抽屉只负责定位。
+ */
+.row {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 16px;
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+
+  /* 当前读到的那一轮：与左抽屉高亮当前会话同一套取值 */
+  &.active {
+    background-color: var(--dsw-specific-sidebar-nav-item-active-accent);
+    color: var(--dsw-alias-brand-primary);
+  }
+
+  @media (hover: hover) {
+    &:not(.active):hover {
+      background-color: var(--dsw-specific-sidebar-nav-item-hover);
+    }
+  }
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 22px;
+}

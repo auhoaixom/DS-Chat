@@ -11,6 +11,13 @@ import {
   settleSider,
   useMobileSider,
 } from '../components/sider/mobileSiderState.js'
+import {
+  dragRightSider,
+  getRightSiderWidth,
+  settleRightSider,
+  useRightSider,
+} from '../components/turns/rightSiderState.js'
+import { swipeIntent } from '../components/turns/turnRows.js'
 
 /**
  * 松手判定：从起手那一侧移动抽屉宽度的 0.15 就算数（300dp 抽屉约 45dp ≈ 0.71cm），
@@ -36,7 +43,7 @@ const overlayOpen = () =>
   document.querySelector('[role="menu"]') !== null ||
   document.querySelector('[role="dialog"]') !== null
 
-/** 起手点落在可横向滚动的内容里（代码块、宽表格）时，右滑留给它自己滚 */
+/** 起手点落在可横向滚动的内容里（代码块、宽表格）时，横滑留给它自己滚 */
 const scrollsHorizontally = (target: Element) => {
   for (let element: Element | null = target; element && element !== document.body; ) {
     const style = getComputedStyle(element)
@@ -48,18 +55,28 @@ const scrollsHorizontally = (target: Element) => {
   return false
 }
 
+type Side = 'left' | 'right'
+
 /**
- * 移动端侧边栏的拖动：收起时在左侧右滑拉出，展开时在屏幕**任意位置**左滑推回，
+ * 两个侧栏共用的横滑手势：**一个 hook、一套监听**。
+ *
+ * 左抽屉：收起时右滑拉出，展开时任意位置左滑推回。
+ * 右目录：镜像——收起时左滑拉出，展开时右滑推回。
+ *
+ * 谁该动由 `swipeIntent` 判定（纯函数，有单测）：左开只认向左，右开只认向右，
+ * 都关时右滑开左、左滑开右；右抽屉不可用时（没有打开的对话）左滑不接手。
  * 全程跟随手指，松手按「位移过半或甩得够快」决定停在开还是关。
  * 纵向滚动、斜着划、长按选字、输入框、可横向滚动的内容、其它浮层都不接管。
  */
-export const useSiderSwipe = (enabled: boolean) => {
+export const useSiderSwipe = (leftEnabled: boolean, rightEnabled: boolean) => {
   useEffect(() => {
-    if (!enabled) {
+    if (!leftEnabled && !rightEnabled) {
       return
     }
     let tracking = false
     let horizontal = false
+    /** 本次手势操作的是哪一侧；起手时已开着的那侧已知，都关时等方向定下来才知道 */
+    let side: Side | null = null
     let closing = false
     let startProgress = 0
     let startX = 0
@@ -74,9 +91,22 @@ export const useSiderSwipe = (enabled: boolean) => {
     const stop = () => {
       tracking = false
       horizontal = false
+      side = null
     }
 
-    const progressAt = (x: number) => startProgress + (x - startX) / Math.max(1, getSiderWidth())
+    const widthOf = (target: Side) => (target === 'left' ? getSiderWidth() : getRightSiderWidth())
+
+    /** 位移换算成进度：左抽屉向右为正，右抽屉向左为正 */
+    const progressAt = (target: Side, x: number) => {
+      const travel = target === 'right' ? startX - x : x - startX
+      return startProgress + travel / Math.max(1, widthOf(target))
+    }
+
+    const dragOf = (target: Side, value: number) =>
+      target === 'left' ? dragSider(value) : dragRightSider(value)
+
+    const settleOf = (target: Side, open: boolean) =>
+      target === 'left' ? settleSider(open) : settleRightSider(open)
 
     const onTouchStart = (event: TouchEvent) => {
       stop()
@@ -87,10 +117,16 @@ export const useSiderSwipe = (enabled: boolean) => {
       if (!target) {
         return
       }
-      const open = useMobileSider.getState().open
-      closing = open
-      if (open) {
-        // 收起：屏幕任意位置起手都行，和展开对称（抽屉里、遮罩上都算）
+      const leftOpen = useMobileSider.getState().open
+      const rightOpen = useRightSider.getState().open
+      if (leftOpen) {
+        // 收起：屏幕任意位置起手都行
+        side = 'left'
+        closing = true
+        startProgress = 1
+      } else if (rightOpen) {
+        side = 'right'
+        closing = true
         startProgress = 1
       } else {
         // 展开：也从屏幕任意位置起手，只要避开输入框和可横向滚动的内容
@@ -100,6 +136,8 @@ export const useSiderSwipe = (enabled: boolean) => {
         if (scrollsHorizontally(target)) {
           return
         }
+        side = null
+        closing = false
         startProgress = 0
       }
       const touch = event.touches[0]
@@ -128,13 +166,22 @@ export const useSiderSwipe = (enabled: boolean) => {
           stop()
           return
         }
-        // 收起状态下向左划是别的手势；展开时向左划正是要的关闭
-        if (!closing && dx < -SLOP) {
+        if (!(Math.abs(dx) > SLOP && Math.abs(dx) * HORIZONTAL_RATIO >= Math.abs(dy))) {
+          return
+        }
+        // 方向 + 当前开合状态交给纯函数判定：交给谁、还是干脆不接手
+        const intent = swipeIntent({
+          leftOpen: closing && side === 'left',
+          rightOpen: closing && side === 'right',
+          dx,
+          rightEnabled,
+        })
+        if (intent === null) {
           stop()
           return
         }
-        if (!(Math.abs(dx) > SLOP && Math.abs(dx) * HORIZONTAL_RATIO >= Math.abs(dy))) {
-          return
+        if (!closing) {
+          side = intent === 'open-left' ? 'left' : 'right'
         }
         // 半天才动起来的多半是长按选字后拖手柄，不抢
         if (event.timeStamp - startTime > 400) {
@@ -142,6 +189,10 @@ export const useSiderSwipe = (enabled: boolean) => {
           return
         }
         horizontal = true
+      }
+      if (side === null) {
+        stop()
+        return
       }
       // 认下这条手势后要压住页面滚动，否则抽屉还没跟手、界面先跟着晃
       if (event.cancelable) {
@@ -154,31 +205,32 @@ export const useSiderSwipe = (enabled: boolean) => {
       lastX = touch.clientX
       lastTime = event.timeStamp
       moved = true
-      dragSider(progressAt(touch.clientX))
+      dragOf(side, progressAt(side, touch.clientX))
     }
 
     const onTouchEnd = () => {
-      const wasTracking = tracking && horizontal
+      const wasTracking = tracking && horizontal && side !== null
+      const activeSide = side
       stop()
-      if (!wasTracking) {
+      if (!wasTracking || activeSide === null) {
         return
       }
-      // 松手后紧跟着的那次点击不能算数，否则滑过会话行会顺手切走会话
+      // 松手后紧跟着的那次点击不能算数，否则滑过一行会顺手点进去
       if (moved) {
         suppressUntil = performance.now() + 400
       }
       const dx = lastX - startX
-      // 向右拖指向「展开」，向左拖指向「收起」；朝着当前状态的方向拖，保持不动
-      const target = dx > 0
-      const distanceOk = Math.abs(dx) >= getSiderWidth() * COMMIT_TRAVEL
-      const flingOk = Math.abs(velocity) >= FLING_VELOCITY && velocity > 0 === dx > 0
+      // 朝「展开」方向拖才算展开：左抽屉向右、右抽屉向左
+      const wantsOpen = activeSide === 'right' ? dx < 0 : dx > 0
+      const distanceOk = Math.abs(dx) >= widthOf(activeSide) * COMMIT_TRAVEL
+      const flingOk = Math.abs(velocity) >= FLING_VELOCITY && velocity > 0 === wantsOpen
       const open =
-        Math.abs(dx) < MIN_TRAVEL || target === closing
+        Math.abs(dx) < MIN_TRAVEL || wantsOpen === closing
           ? closing
           : distanceOk || flingOk
-            ? target
+            ? wantsOpen
             : closing
-      settleSider(open)
+      settleOf(activeSide, open)
     }
 
     const onClickCapture = (event: MouseEvent) => {
@@ -202,5 +254,5 @@ export const useSiderSwipe = (enabled: boolean) => {
       window.removeEventListener('touchcancel', onTouchEnd)
       document.removeEventListener('click', onClickCapture, true)
     }
-  }, [enabled])
+  }, [leftEnabled, rightEnabled])
 }
