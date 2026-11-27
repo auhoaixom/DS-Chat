@@ -49,7 +49,10 @@ export type SealedSession = SealedSummary & {
 type SealedMeta = { title: string }
 
 /** body 载荷解密后的内容；undefined 的字段不写进 JSON，读回来自然还是 undefined */
-type SealedBody = Pick<Session, 'messages' | 'rootMessageId' | 'compaction' | 'schema'>
+type SealedBody = Pick<
+  Session,
+  'messages' | 'rootMessageId' | 'compaction' | 'schema' | 'anchorId' | 'extraCosts'
+>
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -71,6 +74,10 @@ const pickBody = (session: Session): SealedBody => ({
   rootMessageId: session.rootMessageId,
   compaction: session.compaction,
   schema: session.schema,
+  // 撤销压缩后挂上的锚点必须落盘，否则杀掉 App 重开就退回那个偏低的数
+  anchorId: session.anchorId,
+  // 压缩摘要那几笔请求的钱只存在会话上，丢了会话合计就少一截
+  extraCosts: session.extraCosts,
 })
 
 const sealMeta = (id: string, title: string): Promise<ArrayBuffer> =>
@@ -107,6 +114,8 @@ export const openSession = async (sealed: SealedSession): Promise<Session> => {
     ...(body.compaction === undefined ? {} : { compaction: body.compaction }),
     ...(sealed.pinned === undefined ? {} : { pinned: sealed.pinned }),
     ...(body.schema === undefined ? {} : { schema: body.schema }),
+    ...(body.anchorId === undefined ? {} : { anchorId: body.anchorId }),
+    ...(body.extraCosts === undefined ? {} : { extraCosts: body.extraCosts }),
   }
 }
 

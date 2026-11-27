@@ -12,6 +12,7 @@
 
 | 版本 | 日期 | versionCode | APK | 变更 |
 |---|---|---|---|---|
+| v1.6.8 | 2026-11-27 | 108 | 有 | fix: keep the context anchor alive after a compaction, and save it with the session (v1.6.8) |
 | v1.6.7 | 2026-11-27 | 107 | 有 | fix: point the context baseline back at the pre-compaction reply, and stop the switches from moving the number (v1.6.7) |
 | v1.6.6 | 2026-11-27 | 106 | 有 | fix: price attachments from the server, and only trust a measurement that still applies (v1.6.6) |
 | v1.6.5 | 2026-11-27 | 105 | 有 | feat: expand earlier messages on a tap instead of auto-loading on scroll (v1.6.5) |

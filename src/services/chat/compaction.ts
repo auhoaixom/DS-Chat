@@ -354,7 +354,13 @@ export const requestKeyOf = (shape: RequestShape): string =>
  */
 export const requestShapeOf = (session: Session): RequestShape => ({
   model: getSessionModel(session),
-  hasFiles: getVisibleMessages(session).some(
+  /**
+   * 只看**真正会进请求**的消息：被压缩覆盖掉的那些不进请求，
+   * 挂在上面的附件也就不会产生 hasFiles。用全部可见消息算的话，
+   * 压缩一次之后这里永远是 true，而发送时算出来是 false，
+   * 指纹永远对不上 → 锚点被永久丢弃 → 面板一直卡在「估算」。
+   */
+  hasFiles: applyCompaction(getVisibleMessages(session), session.compaction).history.some(
     (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
   ),
 })

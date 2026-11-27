@@ -121,8 +121,26 @@ test('往返之后：逐条用量、系统信息快照、模型名都回来', ()
   }
 })
 
-test('置顶是本地偏好，往返不还原', () => {
-  assert.equal(roundTrip(sample()).pinned, undefined)
+test('置顶是本地偏好，往返不还原', () => {  assert.equal(roundTrip(sample()).pinned, undefined)
+})
+
+test('锚点是本机口径：导出包里没有它，导入后为空', () => {
+  const original: Session = {
+    ...sample(),
+    // 撤销压缩后会话上会挂着一个指回旧回复的锚点
+    anchorId: 'm3',
+    compaction: {
+      ...(sample().compaction as NonNullable<Session['compaction']>),
+      anchorId: 'm2',
+    },
+  }
+  // 连归档 JSON 一起查：不是在导入端丢掉，而是压根没写进去
+  const archive = JSON.stringify(toSessionFile(original, () => null))
+  assert.ok(!archive.includes('anchor_id'), '归档里不该出现 anchor_id')
+  assert.ok(!archive.includes('anchorId'), '归档里不该出现 anchorId')
+  const restored = roundTrip(original)
+  assert.equal(restored.anchorId, undefined)
+  assert.equal(restored.compaction?.anchorId, undefined)
 })
 
 test('官方包（没有扩展字段）照样能导入，只是少压缩与用量', () => {
