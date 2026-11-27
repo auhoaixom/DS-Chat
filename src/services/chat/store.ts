@@ -13,6 +13,8 @@ import {
   estimateRequestTokens,
   getSessionModel,
   isContextOverflowError,
+  isCoveredBranchPoint,
+  isCoveredMessage,
   needsCompaction,
   requestKeyOf,
   withCompactionSummary,
@@ -622,6 +624,26 @@ export const stopReply = (sessionId: string) => getStreamController(sessionId)?.
 /** 手动压缩的取消句柄；自动压缩复用本轮回复的 controller，停止生成即停止压缩 */
 const compactionControllers = new Map<string, AbortController>()
 
+/**
+ * 压缩请求正在路上。
+ *
+ * 这一段里**边界还没定**：摘要已经按"现在的路径"取好了原文，记录要等请求回来才写。
+ * 此刻若改动路径，写出来的覆盖段就会和摘要对不上。所以正在压缩时也要冻结，
+ * 不只是压缩完之后。`compactionControllers` 在 `compactSession` 一进门就同步登记，
+ * 比 React 那边的按钮变灰更早、更可靠；自动压缩/超限抢救都发生在发送流程内部，
+ * 那时本来就有流在跑，入口早就被 `getStreamController` 挡住了。
+ */
+const compactionInFlight = (sessionId: string): boolean =>
+  compactionControllers.has(sessionId) || Object.hasOwn(get().compacting, sessionId)
+
+/** 硬性规定：正在被压缩、或已经被压缩盖掉的那条，不许改（见 isCoveredMessage） */
+const frozenByCompaction = (sessionId: string, session: Session, messageId: string): boolean =>
+  compactionInFlight(sessionId) || isCoveredMessage(session, messageId)
+
+/** 同上，切版本专用（判据是岔口，见 isCoveredBranchPoint） */
+const branchFrozenByCompaction = (sessionId: string, session: Session, messageId: string): boolean =>
+  compactionInFlight(sessionId) || isCoveredBranchPoint(session, messageId)
+
 const setCompactionRun = (sessionId: string, run: CompactionRun | null) => {
   set((state) => {
     const rest = Object.entries(state.compacting).filter(([id]) => id !== sessionId)
@@ -840,6 +862,14 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
   const path = getVisibleMessages(session)
   const index =
     messageId === undefined ? path.length - 1 : path.findIndex((m) => m.id === messageId)
+  /*
+   * 硬性规定：被压缩盖掉的那段不许重新生成（见 isCoveredMessage）。
+   * 不传 messageId 时默认重答最后一条，同样要过这一关——全覆盖的会话里最后一条也在覆盖段内。
+   */
+  const target = path[index]
+  if (!target || frozenByCompaction(sessionId, session, target.id)) {
+    return
+  }
   const question = path[index - 1]
   if (question?.role !== 'user' || path[index]?.role !== 'assistant') {
     return
@@ -861,6 +891,14 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
   }
   const session = getSession(sessionId)
   if (!session || getStreamController(sessionId)) {
+    return false
+  }
+  /*
+   * 硬性规定：被压缩盖掉的那段不许编辑。
+   * 编辑会在这条提问旁边岔出新分支——覆盖段的后半截就此离开当前路径，
+   * 而摘要仍然描述着那段已经离开的对话（面板不会显示任何异常）。
+   */
+  if (frozenByCompaction(sessionId, session, messageId)) {
     return false
   }
   const path = getVisibleMessages(session)
@@ -894,6 +932,11 @@ export const selectMessageVersion = (sessionId: string, messageId: string) => {
   if (getStreamController(sessionId)) {
     return
   }
+  const session = getSession(sessionId)
+  // 硬性规定：不许在覆盖段内部岔出分支（理由见 isCoveredBranchPoint）
+  if (session && branchFrozenByCompaction(sessionId, session, messageId)) {
+    return
+  }
   updateSession(sessionId, (session) => selectVersion(session, messageId))
   persist(sessionId)
 }
@@ -905,6 +948,14 @@ export const continueReply = (sessionId: string, messageId: string) => {
   }
   const session = getSession(sessionId)
   if (!session || getStreamController(sessionId)) {
+    return
+  }
+  /*
+   * 硬性规定：被压缩盖掉的那段不许继续生成。
+   * 覆盖段里的消息**不进请求**（由摘要代表），往它后面追加内容只会让摘要
+   * 继续描述一段已经不存在的对话，而面板上一点异常都看不出来。
+   */
+  if (frozenByCompaction(sessionId, session, messageId)) {
     return
   }
   const path = getVisibleMessages(session)
@@ -943,6 +994,10 @@ export const retryUpload = (sessionId: string, messageId: string) => {
   }
   const session = getSession(sessionId)
   if (!session || getStreamController(sessionId)) {
+    return
+  }
+  // 硬性规定：被压缩盖掉的那段不许重传附件（理由见 isCoveredMessage）
+  if (frozenByCompaction(sessionId, session, messageId)) {
     return
   }
   const path = getVisibleMessages(session)

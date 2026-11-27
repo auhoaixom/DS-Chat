@@ -693,6 +693,54 @@ export const getCoveredCount = (messages: Message[], compaction?: Compaction): n
   return messages.slice(cut).some((message) => covered.has(message.id)) ? 0 : cut
 }
 
+/**
+ * 这条消息是不是**已经被压缩盖掉**的那一段。
+ *
+ * 硬性规定：被压缩过的对话不许编辑、不许切版本、不许重新生成、不许继续——
+ * 理由不是"数据会坏"，而是**摘要讲的是那一刻那段原文**：
+ * 改动覆盖段里的任何一条，都会让摘要描述一段已经不存在的对话。
+ * 更糟的是这种错没有任何可见症状：面板照样显示"已压缩"，请求里却带着用户
+ * 以为自己已经改掉/删掉的内容，模型据此继续推理。
+ *
+ * 判据必须和界面用同一个数（`getCoveredCount`）：界面藏掉几条，就是几条不可操作。
+ * 覆盖段因不连续被整体忽略时这里返回 false —— 那时原文照常进请求，
+ * 冻住它们只会让人莫名其妙。
+ */
+export const isCoveredMessage = (session: Session, messageId: string): boolean => {
+  const visible = getVisibleMessages(session)
+  const cut = getCoveredCount(visible, session.compaction)
+  if (cut === 0) {
+    return false
+  }
+  const index = visible.findIndex((message) => message.id === messageId)
+  return index >= 0 && index < cut
+}
+
+/**
+ * 切到这条版本，会不会把覆盖段**从中间**岔开。
+ *
+ * 和 `isCoveredMessage` 不是一回事：切换目标本身必然不在当前路径上（它是兄弟版本），
+ * 所以要看的不是它，而是"岔口在哪"。岔口在覆盖段内部（父消息是覆盖段里的、
+ * 且不是最后一条覆盖消息）时，覆盖段后半截会离开当前路径，摘要就讲着一段
+ * 已经不在的对话；岔口落在末尾或保留段里则完全无害（覆盖段原样不动）。
+ * 所以判据是 `父消息下标 < cut - 1`，边界那一条（保留段第一条换版本）照常允许。
+ */
+export const isCoveredBranchPoint = (session: Session, messageId: string): boolean => {
+  const visible = getVisibleMessages(session)
+  const cut = getCoveredCount(visible, session.compaction)
+  if (cut === 0) {
+    return false
+  }
+  const target = session.messages.find((message) => message.id === messageId)
+  const parentId = target ? (target.parentId ?? null) : null
+  // 换根等于换掉第一条：它一定在覆盖段里
+  if (parentId === null) {
+    return true
+  }
+  const parentIndex = visible.findIndex((message) => message.id === parentId)
+  return parentIndex >= 0 && parentIndex < cut - 1
+}
+
 /** 服务端判定超出上下文长度时返回 true，用于压缩后重试一次 */
 /**
  * 服务端判定超出上下文长度时返回 true，用于压缩后重试。

@@ -1,6 +1,6 @@
 {
   "name": "ds-chat",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "description": "DS Chat：基于 DeepSeek API 的静态聊天应用的本地安卓改造版。",
   "license": "MIT",
   "private": true,

@@ -3,7 +3,7 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import { buildMessageVersions, getVisibleMessages, type MessageVersions } from '../../services/chat/branches.js'
 import { getCoveredCount } from '../../services/chat/compaction.js'
-import { selectMessageVersion } from '../../services/chat/store.js'
+import { selectMessageVersion, useChatStore } from '../../services/chat/store.js'
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
@@ -69,6 +69,12 @@ export const MessageList = ({
   const visible = getVisibleMessages(session)
   // 已经压进摘要的早期消息不再渲染，顶部改用一张压缩卡片表示
   const covered = getCoveredCount(visible, session.compaction)
+  /**
+   * 压缩进行中同样算"忙"：那十几秒里覆盖段的边界还在变，
+   * 这时候改一条消息（编辑、切版本、重答）会让写出来的摘要描述一条已经变了的路径。
+   * 按钮跟着变灰，用户至少知道"现在动不了"，而不是点了没反应。
+   */
+  const compacting = useChatStore((state) => Boolean(state.compacting[session.id]))
   const messages = covered > 0 ? visible.slice(covered) : visible
   const coveredMessages = covered > 0 ? visible.slice(0, covered) : []
   /**
@@ -535,7 +541,7 @@ export const MessageList = ({
                   retryUploadId={uploadRetryId}
                   isFirst={index === 0}
                   isLast={index === lastIndex || index === lastIndex - 1}
-                  busy={streaming}
+                  busy={streaming || compacting}
                   versions={versions.get(message.id) ?? EMPTY_VERSIONS}
                   onSelectVersion={selectVersion}
                 />
@@ -551,7 +557,7 @@ export const MessageList = ({
                   message={message}
                   isLast={index === lastIndex}
                   streaming={streaming && index === lastIndex}
-                  busy={streaming}
+                  busy={streaming || compacting}
                   versions={versions.get(message.id) ?? EMPTY_VERSIONS}
                   onSelectVersion={selectVersion}
                 />
