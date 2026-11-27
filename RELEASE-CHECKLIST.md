@@ -430,7 +430,7 @@ adb shell dumpsys package com.dschat.app | Select-String 'versionName|versionCod
 
 发版时在 `apk-archive/vX.Y.Z-evidence/` 放：
 
-- 二十一项手工回归的截图
+- 二十三项手工回归的截图
 - `pnpm test` 的完整输出
 - APK 的 sha256 与设备上的 versionName
 

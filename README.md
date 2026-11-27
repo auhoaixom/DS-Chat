@@ -10,7 +10,7 @@
 
 一个自带 API Key 的安卓聊天客户端：React 前端直接连 DeepSeek API，没有自己的服务端，数据只在本机。
 
-当前版本 `1.6.8`（`versionCode 108`）。MIT 许可，欢迎 issue 与 PR。
+当前版本 `1.6.9`（`versionCode 109`）。MIT 许可，欢迎 issue 与 PR。
 
 ## 这是什么
 
@@ -39,7 +39,7 @@ adb install -r app\build\outputs\apk\release\app-release.apk
 
 **版本号要改三处**：`package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 和 `versionCode`。漏改一个不会报错，只会打出一个装不上的包；现在 `pnpm test` 会拦住这种情况（要求 `versionCode` 不小于历史上任何一版，准备发新版时还必须严格大于上一版）。
 
-完整的发版流程（十二项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本见 [RELEASES.md](RELEASES.md)。改界面前先看 [STANDARDS.md](STANDARDS.md)（界面规矩与坑台账，配 `tools/probe/99k-ui-rules.mjs` 可机检）。
+完整的发版流程（二十三项手工回归、产物核对、证据归档）见 [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)。已发布的版本见 [RELEASES.md](RELEASES.md)。改界面前先看 [STANDARDS.md](STANDARDS.md)（界面规矩与坑台账，配 `tools/probe/99k-ui-rules.mjs` 可机检）。
 
 ## 开发
 
@@ -189,10 +189,11 @@ tools/icon/            字标抠图与各密度图标生成
 - 版本号三处必须同时改，见上文"出包"。
 - 压缩原文的分批展开是手动的：收起再展开回到首批 5 轮，不记住上次展开到哪；这是有意的（挂载量由用户决定）。
 - 展开原文时顶部那张压缩卡片会吸顶；但滑过原文块、进入下面的正常对话之后它会收起，这时想收起原文得往回滑。
+- 被压缩进去的那段对话**不能编辑、不能切版本、不能重答、不能继续生成**——摘要是旧对话的一整块文字快照，改动其中一条它就会去描述一段已经不存在的对话，而且没有任何报错。压缩进行中那十几秒同样不能动。想改就先「撤销压缩」，原文回到可操作状态。
 
 ## 参与
 
-- 提 PR 之前先本地跑 `pnpm type`、`pnpm lint`、`pnpm test`（292 项）。
+- 提 PR 之前先本地跑 `pnpm type`、`pnpm lint`、`pnpm test`（366 项）。
 - 改界面前读一遍 [STANDARDS.md](STANDARDS.md)，它配了可机检的探针 `tools/probe/99k-ui-rules.mjs`。
 - 不要跑 `pnpm format`（会重写整仓）。
 - 缩进、引号、分号这些别顺手改：仓库里混着两三种风格，统一格式化属于单独一版的工作。
