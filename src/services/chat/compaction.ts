@@ -331,48 +331,36 @@ export type AnchorState = 'measured' | 'estimate' | 'dropped'
 
 /**
  * 一次请求的"形状"。服务端回报的 usage 只对**那一次**的这个形状成立：
- * 换模型、开关思考、开关联网、上下文里多了附件、提示词或估算口径改过，
- * 实测值就不能再当这一轮的基准——量出来的根本不是同一个东西。
+ * 换模型、上下文里多了附件、提示词或估算口径改过，实测值就不能再当这一轮的基准。
+ *
+ * 两个开关**故意不在里面**：
+ * - 深度思考只改变输出行为，同一段对话送进去的东西是一样的；
+ * - 智能搜索多一组工具声明，差异几十到几百 token，下一次实测就会纠正。
+ * 把它们放进来只会让用户点一下开关、面板上的数就跳一下——那是 bug 的样子。
  */
 export type RequestShape = {
   model: string
-  thinking: boolean
-  search: boolean
   hasFiles: boolean
 }
 
 /** 形状的稳定短串，直接存进消息，不需要哈希 */
 export const requestKeyOf = (shape: RequestShape): string =>
-  `m:${shape.model}|t:${shape.thinking ? 1 : 0}|s:${shape.search ? 1 : 0}|f:${shape.hasFiles ? 1 : 0}` +
+  `m:${shape.model}|f:${shape.hasFiles ? 1 : 0}` +
   `|p:${SYSTEM_PROMPT_VERSION}|e:${ESTIMATE_VERSION}`
 
 /**
- * 这个会话下一次请求的形状：模型跟会话走，两个开关跟当前设置，
+ * 这个会话下一次请求的形状：模型跟会话走，
  * 附件看可见历史里有没有已经拿到 file_id 的（没有的不会进请求）。
- *
- * `switches` 只给界面用：面板要跟着开关实时重算，不能等会话对象变化
- * （`ContextMeter` 的 useMemo 依赖会话，开关改了会话没变，数字就会停在旧口径上）。
  */
-export const requestShapeOf = (
-  session: Session,
-  switches?: { thinking: boolean; search: boolean }
-): RequestShape => {
-  const settings = useSettings.getState()
-  return {
-    model: getSessionModel(session),
-    thinking: switches?.thinking ?? settings.thinking,
-    search: switches?.search ?? settings.search,
-    hasFiles: getVisibleMessages(session).some(
-      (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
-    ),
-  }
-}
+export const requestShapeOf = (session: Session): RequestShape => ({
+  model: getSessionModel(session),
+  hasFiles: getVisibleMessages(session).some(
+    (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
+  ),
+})
 
 /** 会话当前请求形状的短串 */
-export const currentRequestKey = (
-  session: Session,
-  switches?: { thinking: boolean; search: boolean }
-): string => requestKeyOf(requestShapeOf(session, switches))
+export const currentRequestKey = (session: Session): string => requestKeyOf(requestShapeOf(session))
 
 /**
  * 丢弃锚点的原因：compaction 压缩后旧锚点失效；usage 服务端用量不合常理；
@@ -405,6 +393,76 @@ export type ContextUsage = {
   /** 诊断用：被判定的锚点实测值与当时的估算值，没有锚点时为 null */
   anchorUsed: number | null
   anchorEstimate: number | null
+  /** 当前生效的锚点是哪条回复（压缩记录要用它记下"压缩前是谁"）；没有锚点时为 null */
+  anchorId: string | null
+}
+
+type AnchorCandidate = {
+  id: string
+  usage: number
+  estimate: number | undefined
+  estimateVersion: number
+  requestKey: string
+  createdAt: number
+}
+
+/**
+ * 拿谁的实测当基准。
+ *
+ * 默认是"最近一条带 usage 的回复"，但撤销压缩之后这个默认是错的：最近一条往往是
+ * 压缩后那次小请求，用它会算出"小实测 + 按字数估回来的原文"这种拼接口径（26%）。
+ * 所以撤销时 `session.anchorId` 会指向压缩前那条，这里优先用它；
+ * 它被删掉或不在当前分支上时，静默退回常规查找。
+ */
+const findAnchor = (session: Session, visible: Message[]): AnchorCandidate | null => {
+  const pick = (message: Message): AnchorCandidate | null =>
+    message.role === 'assistant' && message.usage
+      ? {
+          id: message.id,
+          usage: getPromptTokens(message.usage),
+          estimate: message.promptEstimate,
+          estimateVersion: message.estimateVersion ?? 0,
+          requestKey: message.requestKey ?? '',
+          createdAt: message.createdAt,
+        }
+      : null
+  const forcedId = session.anchorId
+  if (forcedId) {
+    const forced = visible.find((message) => message.id === forcedId)
+    const candidate = forced ? pick(forced) : null
+    if (candidate) {
+      return candidate
+    }
+  }
+  for (let index = visible.length - 1; index >= 0; index -= 1) {
+    const message = visible[index]
+    if (message) {
+      const candidate = pick(message)
+      if (candidate) {
+        return candidate
+      }
+    }
+  }
+  return null
+}
+
+/** 压缩记录里要记的"压缩前生效的锚点" */
+export const anchorIdOf = (session: Session): string | undefined =>
+  findAnchor(session, getVisibleMessages(session))?.id
+
+/**
+ * 早于某个时刻的最后一条带实测的回复。
+ * 老记录没有 `Compaction.anchorId`（这个字段是后加的），撤销时只能按时间找回来。
+ */
+export const anchorIdBefore = (session: Session, createdAt: number): string | undefined => {
+  const visible = getVisibleMessages(session)
+  for (let index = visible.length - 1; index >= 0; index -= 1) {
+    const message = visible[index]
+    if (message?.role === 'assistant' && message.usage && message.createdAt < createdAt) {
+      return message.id
+    }
+  }
+  return undefined
 }
 
 /**
@@ -427,8 +485,7 @@ const plausibleAnchor = (usage: number): boolean => usage >= MIN_ANCHOR_TOKENS
 const measureContext = (
   session: Session,
   extra: Message[],
-  systemBase: string,
-  switches?: { thinking: boolean; search: boolean }
+  systemBase: string
 ): ContextUsage | null => {
   const visible = getVisibleMessages(session)
   if (visible.length === 0 && extra.length === 0) {
@@ -448,17 +505,14 @@ const measureContext = (
   /** 锚点那次请求的形状；缺省（旧版本写下的）为空串，永远对不上 */
   let anchorRequestKey = ''
   let anchorCreatedAt = 0
-  const wantedKey = currentRequestKey(session, switches)
-  for (let index = visible.length - 1; index >= 0; index -= 1) {
-    const message = visible[index]
-    if (message?.role === 'assistant' && message.usage) {
-      anchorUsage = getPromptTokens(message.usage)
-      anchorEstimate = message.promptEstimate
-      anchorEstimateVersion = message.estimateVersion ?? 0
-      anchorRequestKey = message.requestKey ?? ''
-      anchorCreatedAt = message.createdAt
-      break
-    }
+  const wantedKey = currentRequestKey(session)
+  const candidate = findAnchor(session, visible)
+  if (candidate) {
+    anchorUsage = candidate.usage
+    anchorEstimate = candidate.estimate
+    anchorEstimateVersion = candidate.estimateVersion
+    anchorRequestKey = candidate.requestKey
+    anchorCreatedAt = candidate.createdAt
   }
   /**
    * 压缩之后的锚点不再可信：实测值和服务端口径、估算值和我们自己的字数口径，
@@ -480,13 +534,14 @@ const measureContext = (
     dropReason = 'estimate'
   } else if (anchorUsage !== undefined && anchorRequestKey !== wantedKey) {
     /**
-     * 那次请求和下一次请求不是一回事（换模型、开关思考/联网、多了附件、提示词或口径改过），
+     * 那次请求和下一次请求不是一回事（换模型、多了附件、提示词或口径改过），
      * 实测值只对当时那个形状成立，拿来当基准就是在串数。
      */
     dropReason = 'request'
   }
   const anchorUsed = anchorUsage ?? null
   const anchorEstimateValue = anchorEstimate ?? null
+  const anchorId = dropReason === null && candidate ? candidate.id : null
   if (dropReason !== null) {
     anchorUsage = undefined
     anchorEstimate = undefined
@@ -529,15 +584,13 @@ const measureContext = (
     anchorDropReason: dropReason,
     anchorUsed,
     anchorEstimate: anchorEstimateValue,
+    anchorId,
   }
 }
 
 /** 当前分支下一次请求的上下文占用；空会话返回 null */
-export const getContextUsage = (
-  session: Session,
-  systemBase = '',
-  switches?: { thinking: boolean; search: boolean }
-): ContextUsage | null => measureContext(session, [], systemBase, switches)
+export const getContextUsage = (session: Session, systemBase = ''): ContextUsage | null =>
+  measureContext(session, [], systemBase)
 
 /** 一场对话的累计缓存命中情况（只看带服务端用量的回答） */
 export type CacheStats = {
@@ -849,6 +902,8 @@ export const buildCompaction = async ({
       afterTokens,
       model,
       viaReplay: replayable,
+      // 记下压缩前生效的锚点：撤销时把它交给会话，面板才不会拿压缩后的小实测当基准
+      anchorId: anchorIdOf(session),
       summaryUsage: result.usage
         ? {
             input: result.usage.input_tokens,

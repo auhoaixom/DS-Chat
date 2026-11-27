@@ -197,8 +197,6 @@ test('被覆盖消息的 id 保持原顺序', () => {
 const keyOf = (hasFiles = false) =>
   requestKeyOf({
     model: useSettings.getState().model,
-    thinking: useSettings.getState().thinking,
-    search: useSettings.getState().search,
     hasFiles,
   })
 
@@ -336,17 +334,33 @@ test('估算口径版本变了，旧锚点直接丢掉', () => {
   assert.ok(usage.used > 64, `纯估算应当是几百的量级，实际 ${usage.used}`)
 })
 
-test('换了模型或开关之后，不再拿旧实测当锚点', () => {
+test('换了模型之后，不再拿旧实测当锚点', () => {
   const messages = [userMessage('问'), answered('答', 100, 800)]
-  const original = useSettings.getState().thinking
+  const original = useSettings.getState().model
   try {
-    useSettings.setState({ thinking: !original })
+    useSettings.setState({ model: 'deepseek-v4-pro' })
     const usage = getContextUsage(sessionOf(messages))
     assert.ok(usage)
     assert.equal(usage.measured, false)
     assert.equal(usage.anchorDropReason, 'request')
   } finally {
-    useSettings.setState({ thinking: original })
+    useSettings.setState({ model: original })
+  }
+})
+
+test('点开关不动数字：思考/搜索开关不影响占用', () => {
+  const messages = [userMessage('问'), answered('答', 100, 800)]
+  const before = getContextUsage(sessionOf(messages))
+  const original = useSettings.getState()
+  try {
+    useSettings.setState({ thinking: !original.thinking, search: !original.search })
+    const after = getContextUsage(sessionOf(messages))
+    assert.ok(before && after)
+    // 开关只改变输出行为（搜索多一组工具声明，几十 token），不该让整个数换算法
+    assert.equal(after.anchor, 'measured')
+    assert.equal(after.used, before.used)
+  } finally {
+    useSettings.setState({ thinking: original.thinking, search: original.search })
   }
 })
 
@@ -404,6 +418,75 @@ test('压缩记录比锚点更早时，锚点照常有效', () => {  const first
   assert.ok(usage)
   assert.equal(usage.measured, true)
 })
+
+// ── 撤销压缩：基准要指回压缩前那条 ────────────────────────────
+
+/** 压缩前那条大实测，和压缩后那几条小实测；撤销后 session.anchorId 指回前者 */
+const undone = () => {
+  const first = userMessage(`问：${'甲'.repeat(2_000)}`)
+  const big = answered(`答：${'乙'.repeat(2_000)}`, 100, 1_200)
+  const second = userMessage(`再问：${'丙'.repeat(500)}`)
+  const small = answered(`再答：${'丁'.repeat(500)}`, 200, 2_000)
+  return { first, big, second, small, messages: [first, big, second, small] }
+}
+
+test('撤销压缩后按压缩前那条算，而不是压缩后的小实测', () => {
+  const { big, messages } = undone()
+  const plain = getContextUsage(sessionOf(messages))
+  const withAnchor = getContextUsage({ ...sessionOf(messages), anchorId: big.id })
+  assert.ok(plain && withAnchor)
+  assert.equal(plain.anchor, 'measured')
+  assert.equal(withAnchor.anchor, 'measured')
+  // 常规查找会落到最后那条小实测上；指回压缩前那条，数必须大得多
+  assert.equal(withAnchor.anchorId, big.id)
+  assert.equal(withAnchor.anchorUsed, 10_000)
+  assert.ok(
+    withAnchor.used > plain.used,
+    `指回压缩前应当更大：${withAnchor.used} vs ${plain.used}`
+  )
+  // 增量是同一套算法：压缩前实测 + （现在的估算 − 那时的估算）
+  const raw = estimateRequestTokens(messages)
+  assert.equal(withAnchor.used, 10_000 + (raw - 1_200))
+})
+
+test('压缩后又聊了几轮再撤销，那几轮的量要算进去', () => {
+  const { big, second, small } = undone()
+  const extra = userMessage(`又聊：${'戊'.repeat(1_000)}`)
+  const messages = [
+    userMessage(`问：${'甲'.repeat(2_000)}`),
+    big,
+    second,
+    small,
+    extra,
+    answered('答三', 400, 3_000),
+  ]
+  const usage = getContextUsage({ ...sessionOf(messages), anchorId: big.id })
+  assert.ok(usage)
+  assert.equal(usage.anchorUsed, 10_000)
+  assert.equal(usage.anchorId, big.id)
+  // 压缩前实测 + 之后新增（那几轮的字数），必须大于压缩前那个数
+  assert.ok(usage.used > 10_000, `应当把后聊的算进去，实际 ${usage.used}`)
+})
+
+test('锚点指向的消息被删了，就退回常规查找', () => {
+  const { second, small } = undone()
+  const messages = [userMessage('问'), second, small]
+  const usage = getContextUsage({ ...sessionOf(messages), anchorId: 'm-已经不存在' })
+  assert.ok(usage)
+  assert.equal(usage.anchor, 'measured')
+  assert.equal(usage.anchorId, small.id, '退回最近一条带实测的回复')
+})
+
+test('锚点指向的消息口径版本不对时，照常丢弃', () => {
+  const { big } = undone()
+  const stale = { ...big, estimateVersion: ESTIMATE_VERSION - 1 }
+  const usage = getContextUsage({ ...sessionOf([userMessage('问'), stale]), anchorId: big.id })
+  assert.ok(usage)
+  assert.equal(usage.anchor, 'dropped')
+  assert.equal(usage.anchorDropReason, 'estimate')
+  assert.equal(usage.anchorId, null)
+})
+
 
 // ── getSessionModel：模型名不再写死 ────────────────────────────
 

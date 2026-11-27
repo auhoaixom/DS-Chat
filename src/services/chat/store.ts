@@ -7,6 +7,7 @@ import { useSettings } from '../settings.js'
 import { acquireKeepAlive, releaseKeepAlive, reportKeepAliveProgress } from '../keepAlive.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
 import {
+  anchorIdBefore,
   applyCompaction,
   buildCompaction,
   estimateRequestTokens,
@@ -735,7 +736,19 @@ export const undoCompaction = (sessionId: string) => {
   }
   updateSession(sessionId, (session) => {
     const next = { ...session }
+    /**
+     * 删记录之前先把"压缩前用的锚点"接过来。不接的话，撤销之后最近一条带实测的回复
+     * 是压缩后那次小请求，面板会算出"小实测 + 按字数估回来的原文"（就是那个 26%）。
+     */
+    const anchorId =
+      session.compaction?.anchorId ??
+      (session.compaction ? anchorIdBefore(session, session.compaction.createdAt) : undefined)
     delete next.compaction
+    if (anchorId) {
+      next.anchorId = anchorId
+    } else {
+      delete next.anchorId
+    }
     return next
   })
   persist(sessionId)
@@ -1313,8 +1326,6 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
         // 连同估算口径版本与请求形状一起存：以后口径或形状变了，这条估算/实测就不能当锚点基准
         const requestKey = requestKeyOf({
           model,
-          thinking: initial.thinking ?? false,
-          search: initial.search ?? false,
           hasFiles: [...prepared.history, prepared.question].some(
             (message) => message.role === 'user' && message.files.some((file) => file.serverId !== null)
           ),
@@ -1375,6 +1386,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             reply = accrueCost(reply, event.usage, requestedAt)
             // 第一次拿到实测：给这份请求里的文档定价（已有价格的不会再动）
             reply = await calibrateDocuments(reply, prepared).catch(() => reply)
+            // 新的实测到了：撤销时挂上的"指回压缩前"的锚点已经完成使命，交还给"最近一条"
+            if (getSession(sessionId)?.anchorId !== undefined) {
+              updateSession(sessionId, (session) => {
+                const next = { ...session }
+                delete next.anchorId
+                return next
+              })
+            }
           }
           reportKeepAliveProgress(replyChars(reply))
           if (document.visibilityState === 'hidden') {
